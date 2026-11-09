@@ -1,4 +1,4 @@
-const API_BASE = '/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 export async function fetchObstacles(filters = {}) {
   const query = new URLSearchParams();
@@ -24,8 +24,11 @@ export async function createObstacle(obstacleData) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(obstacleData)
   });
-  if (!res.ok) throw new Error('Failed to create obstacle report');
-  return res.json();
+  const result = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(result?.message || result?.error || 'Laporan gagal disimpan ke server.');
+  }
+  return result;
 }
 
 export async function upvoteObstacle(id) {

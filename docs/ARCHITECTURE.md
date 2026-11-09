@@ -29,7 +29,7 @@ flowchart TD
         MOD_ROUT["Routing Module (Kaka)<br/>(GIS Graph & Spatial Cost Engine)"]
         INT_AI["AI Service HTTP Client<br/>(aiService.client.js)"]
         INT_WTH["Weather Service Client<br/>(Open-Meteo Integration)"]
-        DB_REPO["Database Repository Layer<br/>(In-Memory / MongoDB / Prisma)"]
+        DB_REPO["Database Repository Layer<br/>(Supabase PostgreSQL + PostGIS + Storage)"]
 
         API_GW --> MOD_OBS
         API_GW --> MOD_REP
@@ -71,6 +71,13 @@ flowchart TD
     MOD_ROUT <==>|Footway Features| OSM
     INT_WTH <==>|Live Precipitation & Humidity| OPEN_METEO
 ```
+
+### Persistensi dan keamanan data
+
+- Data rintangan, validasi komunitas, histori laporan instansi, dan cache cuaca disimpan di Supabase PostgreSQL. Koordinat menggunakan `geography(Point, 4326)` beserta indeks GiST untuk pencarian spasial.
+- Foto disimpan di bucket Supabase Storage privat `obstacle-photos`; tabel hanya menyimpan path objek. Kredensial `service_role` hanya boleh digunakan oleh server, tidak oleh aplikasi browser.
+- Row Level Security membatasi laporan privat ke pemiliknya, mencegah pengguna memvalidasi laporan sendiri, dan membatasi akses histori laporan instansi. Status laporan diperbarui dari validasi komunitas.
+- Skema awal tersedia di `supabase/migrations/20261109121000_obstacle_reporting.sql`.
 
 ---
 
@@ -134,4 +141,3 @@ Berbeda dengan navigasi pejalan kaki umum, mesin evaluasi Leluasa mengacu pada *
    - $> 8\%$: Berbahaya dan diberi penalti elevasi tinggi.
 3. **Kondisi Permukaan Jalan (*Surface Friction Index*)**:
    - Permukaan keramik dekoratif saat hujan diidentifikasi memiliki risiko slip tinggi ($\text{COF} < 0.35$), sehingga dialihkan ke koridor berkanopi atau cor semen bertekstur.
-

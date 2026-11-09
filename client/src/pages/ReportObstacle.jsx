@@ -1,20 +1,80 @@
 import React, { useState, useRef } from 'react';
 import { createObstacle } from '../services/api.js';
 
+const MAX_SOURCE_SIZE = 8 * 1024 * 1024;
+const MAX_COMPRESSED_SIZE = 1.5 * 1024 * 1024;
+
+async function compressImage(file) {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('Pilih file gambar yang valid.');
+  }
+  if (file.size > MAX_SOURCE_SIZE) {
+    throw new Error('Ukuran foto maksimal 8 MB.');
+  }
+
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  } catch {
+    throw new Error('Foto tidak dapat dibuka. Coba gunakan file gambar lain.');
+  }
+
+  try {
+    let scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+    let quality = 0.82;
+    let blob;
+
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Browser tidak dapat memproses foto.');
+
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      blob = await new Promise((resolve, reject) => {
+        canvas.toBlob(
+          result => result ? resolve(result) : reject(new Error('Kompresi foto gagal.')),
+          'image/jpeg',
+          quality,
+        );
+      });
+
+      if (blob.size <= MAX_COMPRESSED_SIZE) return blob;
+      if (quality > 0.5) quality -= 0.1;
+      else scale *= 0.8;
+    }
+
+    throw new Error('Foto masih terlalu besar setelah dikompresi. Pilih foto lain.');
+  } finally {
+    bitmap.close();
+  }
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Foto tidak dapat disiapkan untuk diunggah.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
 export default function ReportObstacle({ setActiveTab }) {
-  const [currentStep, setCurrentStep] = useState(2);
+  const [currentStep, setCurrentStep] = useState(1);
   const [category, setCategory] = useState('Bollard / Pembatas');
   const [clearanceOption, setClearanceOption] = useState('less_80');
   const [severity, setSeverity] = useState('impassable');
-  const [notes, setNotes] = useState('Dua bollard beton dipasang terlalu rapat dekat tiang rambu. Kursi roda listrik tidak bisa lewat tanpa menggores roda.');
+  const [notes, setNotes] = useState('');
   const [forwardDpupr, setForwardDpupr] = useState(true);
   const [shareCommunity, setShareCommunity] = useState(true);
-  const [tensorsVisible, setTensorsVisible] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [uploadedImage, setUploadedImage] = useState(null);
-  const [locationText, setLocationText] = useState('Jl. Tunjungan No. 88, Kelurahan Genteng, Kec. Genteng, Kota Surabaya');
-  const [isEditingLocation, setIsEditingLocation] = useState(false);
+  const [location, setLocation] = useState(null);
+  const [isLocating, setIsLocating] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [reportId, setReportId] = useState('');
 
   const fileInputRef = useRef(null);
 
@@ -27,47 +87,100 @@ export default function ReportObstacle({ setActiveTab }) {
     { id: 'PKL / Parkir Liar', icon: 'local_parking' }
   ];
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setUploadedImage(event.target.result);
-        setCurrentStep(2);
-      };
-      reader.readAsDataURL(file);
+    e.target.value = '';
+    if (!file) return;
+
+    setFormError('');
+    setUploadedImage(null);
+    setSubmitSuccess(false);
+    setReportId('');
+    try {
+      const compressed = await compressImage(file);
+      const dataUrl = await blobToDataUrl(compressed);
+      setUploadedImage(dataUrl);
+      setCurrentStep(2);
+      setSubmitSuccess(false);
+    } catch (error) {
+      setFormError(error.message || 'Foto gagal diproses.');
+    }
+  };
+
+  const handleGetLocation = () => {
+    if (!navigator.geolocation) {
+      setFormError('Browser ini tidak mendukung pengambilan lokasi GPS.');
+      return;
+    }
+
+    setFormError('');
+    setLocation(null);
+    setIsLocating(true);
+    try {
+      navigator.geolocation.getCurrentPosition(
+        position => {
+          setLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+          });
+          setIsLocating(false);
+        },
+        error => {
+          const messages = {
+            1: 'Izin lokasi ditolak. Aktifkan izin lokasi browser untuk melanjutkan.',
+            2: 'Lokasi tidak tersedia. Coba lagi di area dengan sinyal GPS yang lebih baik.',
+            3: 'Pengambilan lokasi terlalu lama. Silakan coba lagi.',
+          };
+          setFormError(messages[error.code] || 'Lokasi GPS gagal diambil.');
+          setIsLocating(false);
+        },
+        { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 },
+      );
+    } catch {
+      setFormError('Browser tidak dapat mengakses GPS. Pastikan aplikasi dibuka melalui HTTPS.');
+      setIsLocating(false);
     }
   };
 
   const handleSubmit = async () => {
+    if (!uploadedImage) {
+      setFormError('Ambil atau pilih foto rintangan terlebih dahulu.');
+      return;
+    }
+    if (!location) {
+      setFormError('Ambil lokasi GPS sebelum mengirim laporan.');
+      return;
+    }
+
+    setFormError('');
     setIsSubmitting(true);
     try {
       const clearanceVal = clearanceOption === 'less_80' ? 65 : clearanceOption === '80_120' ? 95 : 130;
-      await createObstacle({
-        title: `${category} dilaporkan di ${locationText.split(',')[0]}`,
-        location: locationText,
-        coordinates: { lat: -7.26042, lng: 112.73831 },
+      const response = await createObstacle({
+        title: `${category} dilaporkan di ${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`,
+        locationText: `GPS ${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`,
+        coordinates: { lat: location.lat, lng: location.lng },
+        locationAccuracyM: location.accuracy,
         category,
         clearance: clearanceVal,
+        clearanceOption,
         severity,
         notes,
-        dpuprForward: forwardDpupr,
-        shareCommunity: shareCommunity,
-        photoUrl: uploadedImage || undefined
+        forwardDpupr,
+        shareCommunity,
+        uploadedImage,
       });
 
       setSubmitSuccess(true);
       setCurrentStep(3);
-      setTimeout(() => {
-        setIsSubmitting(false);
-      }, 1500);
-    } catch (err) {
-      console.error(err);
+      setReportId(response?.data?.id || response?.id || '');
+    } catch (error) {
+      setFormError(error.message || 'Laporan gagal dikirim. Silakan coba lagi.');
+    } finally {
       setIsSubmitting(false);
     }
   };
-
-  const defaultPhoto = "https://lh3.googleusercontent.com/aida-public/AB6AXuAWEa0Wus1u-hnXUBxKj2npTbprzDFLI7iZUFGMJxzWhScO4C84Fj083fnMd1HtiEYXpT5zqCNnstzhr0N2eDwK2XbcaQfHI-qo8MKOOIrvnaQaXPH9wOmFIXq9j1S6VK6oJ69ZMk-ymbXYwx393_UJjz2d6mrJ-vu7jq_XVm1tbtl0yQ5ARppRDZdkVz4RKU6qddw5SFKYPOukeeYzA53xPRB7TO-Gg3_jEwK3Z3HZ";
 
   return (
     <div className="w-full max-w-7xl mx-auto px-3 sm:px-margin md:px-gutter-desktop py-space-md sm:py-space-lg flex flex-col gap-space-md sm:gap-space-lg lg:gap-space-xl animate-fadeIn pb-8 lg:pb-0">
@@ -108,8 +221,8 @@ export default function ReportObstacle({ setActiveTab }) {
               <span className="font-label-md text-xs sm:text-sm font-bold">2</span>
             </div>
             <div className="flex flex-col">
-              <span className="font-label-sm text-[10px] sm:text-xs text-secondary font-bold uppercase tracking-wider">Langkah 2 · Ditinjau</span>
-              <span className="font-headline-sm text-xs sm:text-sm text-primary font-bold">Analisis Rintangan AI</span>
+              <span className="font-label-sm text-[10px] sm:text-xs text-secondary font-bold uppercase tracking-wider">Langkah 2 · Detail</span>
+              <span className="font-headline-sm text-xs sm:text-sm text-primary font-bold">Lokasi & Keterangan</span>
             </div>
           </div>
 
@@ -128,7 +241,7 @@ export default function ReportObstacle({ setActiveTab }) {
             </div>
             <div className="flex flex-col">
               <span className="font-label-sm text-[10px] sm:text-xs uppercase tracking-wider text-on-surface-variant">
-                {currentStep === 3 ? 'Langkah 3 · Terverifikasi' : 'Langkah 3 · Menunggu'}
+                {currentStep === 3 ? 'Langkah 3 · Terkirim' : 'Langkah 3 · Menunggu'}
               </span>
               <span className="font-label-lg text-xs sm:text-sm text-on-surface font-semibold">Kirim ke Komunitas</span>
             </div>
@@ -142,8 +255,11 @@ export default function ReportObstacle({ setActiveTab }) {
           <div className="flex items-center gap-2.5">
             <span className="material-symbols-outlined text-2xl sm:text-3xl">verified</span>
             <div className="flex flex-col">
-              <span className="font-headline-sm text-xs sm:text-sm font-bold">Laporan Rintangan Telah Disiarkan!</span>
-              <span className="text-[11px] opacity-90">Telemetri rute langsung diperbarui untuk 1.240 pengguna Surabaya. Tiket perbaikan DPUPR telah dibuat.</span>
+              <span className="font-headline-sm text-xs sm:text-sm font-bold">Laporan berhasil dikirim</span>
+              <span className="text-[11px] opacity-90">
+                {reportId ? `ID laporan: ${reportId}. ` : ''}
+                Laporan menunggu pemrosesan dan verifikasi komunitas.
+              </span>
             </div>
           </div>
           <button
@@ -159,97 +275,41 @@ export default function ReportObstacle({ setActiveTab }) {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-md sm:gap-space-lg lg:gap-space-xl items-start">
         {/* Kolom Kiri: Kanvas Deteksi Computer Vision & Telemetri Lokasi */}
         <section className="lg:col-span-6 flex flex-col gap-space-md sm:gap-space-lg">
-          {/* Kanvas Foto dengan HUD AI */}
+          {/* Pratinjau foto yang sudah dikompresi di perangkat */}
           <div className="relative w-full rounded-xl overflow-hidden bg-primary shadow-md">
-            <div className="relative w-full aspect-[4/3] bg-surface-dim">
-              <img
-                alt="Foto rintangan trotoar terdeteksi"
-                className="w-full h-full object-cover"
-                src={uploadedImage || defaultPhoto}
-              />
-
-              <div className="absolute inset-0 bg-gradient-to-t from-primary/80 via-transparent to-primary/30 pointer-events-none"></div>
-
-              {/* Kotak Deteksi AI Bounding Box */}
-              {tensorsVisible && (
-                <>
-                  <div
-                    className="absolute top-[28%] left-[22%] w-[38%] h-[54%] rounded-lg pointer-events-none"
-                    style={{
-                      border: '2px dashed #83f6e7',
-                      boxShadow: '0 0 0 1px rgba(0,21,42,0.4), inset 0 0 16px rgba(131,246,231,0.25)'
-                    }}
-                  >
-                    <div className="absolute -top-6 sm:-top-7 left-0 flex items-center gap-1 px-2 py-0.5 sm:py-1 rounded bg-primary text-secondary-container shadow-md">
-                      <span className="material-symbols-outlined text-xs sm:text-sm">smart_toy</span>
-                      <span className="font-label-sm text-[9px] sm:text-[11px] font-bold">[AI: Bollard Beton]</span>
-                      <span className="bg-secondary text-on-secondary px-1 rounded text-[9px] font-bold">91%</span>
-                    </div>
-                  </div>
-
-                  {/* Penggaris Dimensi Lebar */}
-                  <div className="absolute top-[52%] left-[34%] w-[30%] flex flex-col items-center pointer-events-none">
-                    <div className="w-full flex items-center justify-between">
-                      <span className="w-2 h-2 rounded-full bg-error shadow-[0_0_6px_#ba1a1a]"></span>
-                      <div className="flex-1 h-0.5 bg-error mx-1 relative">
-                        <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-error text-on-error font-label-sm text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded font-bold shadow-md whitespace-nowrap">
-                          65 cm
-                        </span>
-                      </div>
-                      <span className="w-2 h-2 rounded-full bg-error shadow-[0_0_6px_#ba1a1a]"></span>
-                    </div>
-                    <div className="mt-3 px-1.5 py-0.5 rounded bg-error-container text-on-error-container font-label-sm text-[9px] sm:text-[10px] font-semibold flex items-center gap-1 shadow-xs">
-                      <span className="material-symbols-outlined text-xs">warning</span>
-                      <span>Di bawah batas legal 90 cm</span>
-                    </div>
-                  </div>
-                </>
+            <div className="relative w-full aspect-[4/3] bg-surface-dim flex items-center justify-center">
+              {uploadedImage ? (
+                <img
+                  alt="Pratinjau foto rintangan"
+                  className="w-full h-full object-contain"
+                  src={uploadedImage}
+                />
+              ) : (
+                <div className="flex flex-col items-center gap-3 px-6 text-center text-on-surface-variant">
+                  <span className="material-symbols-outlined text-5xl text-secondary">add_a_photo</span>
+                  <span className="font-label-md text-sm">Pilih foto rintangan untuk melihat pratinjau</span>
+                </div>
               )}
 
-              {/* HUD Header Atas */}
               <div className="absolute top-2.5 sm:top-4 left-2.5 sm:left-4 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container-lowest/90 backdrop-blur-md shadow-xs">
-                <span className="w-2 h-2 rounded-full bg-secondary animate-ping"></span>
-                <span className="font-label-sm text-[10px] sm:text-xs text-primary font-bold">Mesin Analisis CV v4.2</span>
+                <span className={`w-2 h-2 rounded-full ${uploadedImage ? 'bg-secondary' : 'bg-outline'}`}></span>
+                <span className="font-label-sm text-[10px] sm:text-xs text-primary font-bold">
+                  {uploadedImage ? 'Foto siap dikirim' : 'Belum ada foto'}
+                </span>
               </div>
 
-              <div className="absolute top-2.5 sm:top-4 right-2.5 sm:right-4 flex items-center gap-1">
-                <button
-                  aria-label="Alihkan tampilan AI"
-                  onClick={() => setTensorsVisible(!tensorsVisible)}
-                  className="h-8 sm:h-9 px-2 sm:px-3 rounded-lg bg-surface-container-lowest/90 backdrop-blur-md text-on-surface hover:bg-surface-container font-label-sm text-[10px] sm:text-xs flex items-center gap-1 transition-colors shadow-xs"
-                  type="button"
-                >
-                  <span className="material-symbols-outlined text-sm sm:text-base text-secondary">
-                    {tensorsVisible ? 'visibility' : 'visibility_off'}
-                  </span>
-                  <span>{tensorsVisible ? 'Tensors Aktif' : 'Tensors Nonaktif'}</span>
-                </button>
-              </div>
-
-              {/* Pita Informasi Privasi Bawah */}
-              <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-surface-container-lowest/95 backdrop-blur-xs text-primary shadow-xs">
-                <div className="flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-secondary text-sm sm:text-base">sensor_occupied</span>
-                  <span className="font-label-sm text-[10px] sm:text-xs font-semibold">2 Wajah Disamarkan</span>
+              {uploadedImage && (
+                <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-container-lowest/95 text-primary shadow-xs">
+                  <span className="material-symbols-outlined text-secondary text-sm">privacy_tip</span>
+                  <span className="font-label-sm text-[10px] sm:text-xs font-semibold">Foto dikompresi dan metadata EXIF dihapus di perangkat</span>
                 </div>
-                <span className="font-label-sm text-[10px] sm:text-xs text-secondary font-bold">Sesuai UU PDP</span>
-              </div>
+              )}
             </div>
 
-            {/* Metrik Ringkas AI */}
-            <div className="grid grid-cols-3 divide-x divide-outline-variant/20 bg-surface-container-low p-2 sm:p-space-sm text-center">
-              <div className="flex flex-col py-0.5">
-                <span className="font-label-sm text-[10px] text-on-surface-variant">Lebar Terdeteksi</span>
-                <span className="font-headline-sm text-sm sm:text-base text-error font-bold">65 cm</span>
-              </div>
-              <div className="flex flex-col py-0.5">
-                <span className="font-label-sm text-[10px] text-on-surface-variant">Batas Legal Min</span>
-                <span className="font-headline-sm text-sm sm:text-base text-primary font-bold">90 cm</span>
-              </div>
-              <div className="flex flex-col py-0.5">
-                <span className="font-label-sm text-[10px] text-on-surface-variant">Dampak</span>
-                <span className="font-headline-sm text-sm sm:text-base text-error font-bold">Terblokir</span>
-              </div>
+            <div className="bg-surface-container-low p-3 text-center">
+              <span className="font-body-sm text-xs text-on-surface-variant">
+                Kategori dan tingkat keparahan dapat Anda tinjau sebelum laporan dikirim.
+              </span>
             </div>
           </div>
 
@@ -257,9 +317,9 @@ export default function ReportObstacle({ setActiveTab }) {
           <div className="flex items-start gap-2.5 p-3 sm:p-space-md rounded-xl bg-surface-container-low text-on-surface shadow-xs">
             <span className="material-symbols-outlined text-secondary text-xl shrink-0 mt-0.5">verified_user</span>
             <div className="flex flex-col">
-              <span className="font-label-md text-xs font-bold text-primary">Perlindungan Privasi Aktif</span>
+              <span className="font-label-md text-xs font-bold text-primary">Privasi Foto</span>
               <p className="font-body-sm text-[11px] text-on-surface-variant mt-0.5">
-                Wajah pejalan kaki dan nomor plat kendaraan bermotor diburamkan langsung di perangkat pengguna sebelum disimpan ke basis data publik.
+                Foto diubah menjadi JPEG di perangkat dan metadata EXIF dihapus sebelum diunggah. Wajah dan pelat nomor tidak otomatis diburamkan.
               </p>
             </div>
           </div>
@@ -268,52 +328,54 @@ export default function ReportObstacle({ setActiveTab }) {
           <div className="flex flex-col gap-2 p-3 sm:p-space-md rounded-xl bg-surface-container-lowest shadow-xs">
             <div className="flex items-center justify-between">
               <span className="font-label-sm text-[11px] uppercase tracking-wider text-on-surface-variant font-bold">Telemetri Lokasi</span>
-              <span className="inline-flex items-center gap-1 font-label-sm text-[11px] text-secondary font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-secondary"></span>
-                GPS Akurat ±2m
+              <span className={`inline-flex items-center gap-1 font-label-sm text-[11px] font-semibold ${location ? (location.accuracy > 50 ? 'text-amber-700' : 'text-secondary') : 'text-on-surface-variant'}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${location ? (location.accuracy > 50 ? 'bg-amber-600' : 'bg-secondary') : 'bg-outline'}`}></span>
+                {location ? `Akurasi ±${Math.round(location.accuracy)}m` : 'Lokasi belum diambil'}
               </span>
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="w-16 sm:w-20 h-16 sm:h-20 rounded-lg bg-surface-container shrink-0 flex items-center justify-center relative overflow-hidden bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&w=200&q=80')" }}>
+              <div className="w-16 sm:w-20 h-16 sm:h-20 rounded-lg bg-surface-container shrink-0 flex items-center justify-center relative overflow-hidden">
                 <span className="material-symbols-outlined text-error text-2xl z-10 drop-shadow-md">fmd_bad</span>
               </div>
 
               <div className="flex flex-col flex-1 min-w-0">
-                {isEditingLocation ? (
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="text"
-                      value={locationText}
-                      onChange={(e) => setLocationText(e.target.value)}
-                      className="w-full text-xs p-1.5 rounded-lg border border-secondary focus:outline-none"
-                    />
-                    <button
-                      onClick={() => setIsEditingLocation(false)}
-                      className="px-2 py-1 bg-secondary text-on-secondary rounded text-xs font-bold"
-                    >
-                      Selesai
-                    </button>
-                  </div>
+                {location ? (
+                  <>
+                    <div className="flex items-center gap-1 text-primary">
+                      <span className="material-symbols-outlined text-secondary text-base">near_me</span>
+                      <span className="font-headline-sm text-xs sm:text-sm font-bold">Lokasi GPS berhasil diambil</span>
+                    </div>
+                    <span className="font-body-sm text-[11px] text-on-surface-variant">
+                      {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
+                    </span>
+                    {location.accuracy > 50 && (
+                      <span className="font-body-sm text-[10px] text-amber-700 mt-0.5">
+                        Akurasi GPS rendah. Coba ambil ulang di area terbuka.
+                      </span>
+                    )}
+                  </>
                 ) : (
                   <>
                     <div className="flex items-center gap-1 text-primary">
                       <span className="material-symbols-outlined text-secondary text-base">near_me</span>
-                      <span className="font-headline-sm text-xs sm:text-sm font-bold truncate">{locationText.split(',')[0]}</span>
+                      <span className="font-headline-sm text-xs sm:text-sm font-bold">Lokasi diperlukan</span>
                     </div>
-                    <span className="font-body-sm text-[11px] text-on-surface-variant truncate">{locationText}</span>
+                    <span className="font-body-sm text-[11px] text-on-surface-variant">
+                      Izinkan akses lokasi untuk menandai rintangan.
+                    </span>
                   </>
                 )}
-                <span className="font-label-sm text-[10px] text-on-surface-variant/80 mt-0.5">Koordinat: -7.26042, 112.73831 · Jawa Timur</span>
 
                 <div className="mt-1 flex items-center gap-2">
                   <button
-                    onClick={() => setIsEditingLocation(!isEditingLocation)}
+                    onClick={handleGetLocation}
+                    disabled={isLocating}
                     className="min-h-[32px] px-2.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary font-label-sm text-[11px] flex items-center gap-1 transition-colors"
                     type="button"
                   >
-                    <span className="material-symbols-outlined text-xs text-secondary">edit_location</span>
-                    <span>{isEditingLocation ? 'Simpan' : 'Ubah Lokasi'}</span>
+                    <span className="material-symbols-outlined text-xs text-secondary">{isLocating ? 'progress_activity' : 'my_location'}</span>
+                    <span>{isLocating ? 'Mengambil GPS...' : location ? 'Ambil Ulang GPS' : 'Ambil Lokasi GPS'}</span>
                   </button>
                 </div>
               </div>
@@ -326,14 +388,14 @@ export default function ReportObstacle({ setActiveTab }) {
           <div className="w-full bg-surface-container-lowest rounded-xl p-4 sm:p-space-lg lg:p-space-xl shadow-sm flex flex-col gap-space-md sm:gap-space-lg">
             <div className="flex flex-col gap-1 pb-2 border-b border-outline-variant/30">
               <div className="flex items-center justify-between">
-                <h2 className="font-headline-md text-base sm:text-xl font-bold text-primary">Peninjauan Deteksi AI</h2>
+                <h2 className="font-headline-md text-base sm:text-xl font-bold text-primary">Detail Rintangan</h2>
                 <span className="px-2.5 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-[10px] sm:text-xs font-bold flex items-center gap-1">
-                  <span className="material-symbols-outlined text-xs">auto_awesome</span>
-                  Terisi Otomatis
+                  <span className="material-symbols-outlined text-xs">edit_note</span>
+                  Tinjau Manual
                 </span>
               </div>
               <p className="font-body-md text-xs text-on-surface-variant">
-                Periksa dan koreksi saran AI sebelum mengirim laporan. Anda memiliki kendali manual penuh terhadap laporan ini.
+                Pilih kategori dan kondisi yang paling sesuai. Analisis AI belum dijalankan pada formulir ini.
               </p>
             </div>
 
@@ -341,7 +403,7 @@ export default function ReportObstacle({ setActiveTab }) {
             <div className="flex flex-col gap-1">
               <label className="font-label-lg text-xs font-bold text-primary flex items-center justify-between">
                 <span>Kategori Rintangan</span>
-                <span className="font-label-sm text-[11px] text-secondary font-semibold">Tingkat Kecocokan 91%</span>
+                <span className="font-label-sm text-[11px] text-on-surface-variant font-semibold">Pilih satu kategori</span>
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 pt-1">
                 {categories.map((c) => {
@@ -545,7 +607,7 @@ export default function ReportObstacle({ setActiveTab }) {
                 />
                 <div className="flex flex-col">
                   <span className="font-label-md text-xs text-primary font-bold">Bagikan ke Peta Live Leluasa</span>
-                  <span className="font-body-sm text-[10px] text-on-surface-variant">Memberi peringatan rute instan kepada 1.240 pengguna sekitar.</span>
+                  <span className="font-body-sm text-[10px] text-on-surface-variant">Laporan dapat dilihat komunitas untuk membantu verifikasi dan perencanaan rute.</span>
                 </div>
               </label>
             </div>
@@ -566,22 +628,28 @@ export default function ReportObstacle({ setActiveTab }) {
           </button>
         </div>
 
+        {formError && (
+          <div className="w-full rounded-xl border border-error/30 bg-error/10 px-4 py-3 text-sm text-error" role="alert">
+            {formError}
+          </div>
+        )}
+
         <button
           id="submit-report-btn"
           onClick={handleSubmit}
-          disabled={isSubmitting}
-          className="w-full sm:w-auto min-h-[48px] sm:min-h-[52px] px-6 sm:px-8 rounded-xl bg-secondary text-on-secondary hover:bg-on-secondary-container font-label-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98]"
+          disabled={isSubmitting || submitSuccess}
+          className="w-full sm:w-auto min-h-[48px] sm:min-h-[52px] px-6 sm:px-8 rounded-xl bg-secondary text-on-secondary hover:bg-on-secondary-container disabled:opacity-60 font-label-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98]"
           type="button"
         >
           {isSubmitting ? (
             <>
               <span className="material-symbols-outlined text-xl animate-spin">progress_activity</span>
-              <span>Memverifikasi Telemetri...</span>
+              <span>Mengirim laporan...</span>
             </>
           ) : submitSuccess ? (
             <>
               <span className="material-symbols-outlined text-xl">check</span>
-              <span>Laporan Berhasil Disiarkan!</span>
+              <span>Laporan Terkirim</span>
             </>
           ) : (
             <>

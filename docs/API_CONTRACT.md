@@ -305,14 +305,18 @@ Digunakan untuk mencatat laporan rintangan trotoar dari warga, verifikasi komuni
   "notes": "Bollard beton rapat menutup trotoar depan halte.",
   "locationText": "Jl. Tunjungan No. 88, Genteng, Surabaya",
   "coordinates": { "lat": -7.26042, "lng": 112.73831 },
+  "locationAccuracyM": 12,
   "category": "Bollard / Pembatas",
   "severity": "impassable",
   "clearanceOption": "less_80",
   "clearance": 65,
   "forwardDpupr": true,
+  "shareCommunity": true,
   "uploadedImage": "data:image/jpeg;base64,..."
 }
 ```
+
+The client resizes and re-encodes the selected image as JPEG before sending it, which removes embedded EXIF metadata. The API must validate the image and coordinates, upload the image to the private `obstacle-photos` bucket, and persist the resulting object path as `photo_path`; never store the data URL in the report row. Configure the API request-body limit to allow the compressed image (maximum 1.5 MiB) plus JSON overhead. Keep the Supabase service-role key server-side only.
 
 #### Response JSON (201 Created)
 ```json
@@ -353,4 +357,3 @@ Digunakan untuk mencatat laporan rintangan trotoar dari warga, verifikasi komuni
   }
 }
 ```
-
