@@ -17,8 +17,11 @@
     /* Linting */
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+
+    /* React & JS Support */
+    "jsx": "react-jsx",
+    "allowJs": true
   },
   "include": ["src"]
 }
