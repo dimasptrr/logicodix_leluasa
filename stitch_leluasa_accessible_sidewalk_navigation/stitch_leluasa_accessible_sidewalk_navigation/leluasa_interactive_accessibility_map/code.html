@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700&amp;family=Inter:wght@400;600&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{colors:{"surface":"#f7f9ff","on-surface":"#001d32","on-primary-fixed":"#011d35","tertiary-container":"#1c2b2a","surface-container":"#e3efff","error":"#ba1a1a","error-container":"#ffdad6","surface-dim":"#c1ddfb","on-secondary-container":"#007168","inverse-surface":"#16334a","secondary-container":"#83f6e7","on-surface-variant":"#43474d","on-tertiary-container":"#839390","inverse-primary":"#b0c9e8","outline-variant":"#c3c6ce","on-secondary":"#ffffff","background":"#f7f9ff","surface-container-low":"#edf4ff","on-secondary-fixed":"#00201d","secondary-fixed-dim":"#65d9cb","tertiary-fixed":"#d5e6e3","on-primary":"#ffffff","surface-container-lowest":"#ffffff","secondary":"#006a62","primary-fixed-dim":"#b0c9e8","primary-container":"#102a43","secondary-fixed":"#83f6e7","surface-container-highest":"#cee5ff","tertiary":"#081715","on-primary-container":"#7a92b0","surface-variant":"#cee5ff","on-error-container":"#93000a","primary":"#00152a","primary-fixed":"#d1e4ff","on-primary-fixed-variant":"#314863","tertiary-fixed-dim":"#b9cac7","surface-tint":"#49607c","on-error":"#ffffff","on-secondary-fixed-variant":"#005049","outline":"#74777e","inverse-on-surface":"#e8f2ff","surface-bright":"#f7f9ff","on-tertiary-fixed":"#0f1e1d","on-background":"#001d32","on-tertiary-fixed-variant":"#3a4a48","on-tertiary":"#ffffff","surface-container-high":"#d8eaff"},borderRadius:{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},spacing:{"space-2xl":"3rem","gutter-desktop":"1.5rem","space-xl":"2rem","margin-tablet":"1.5rem","margin":"1rem","space-lg":"1.5rem","gutter":"1rem","space-xs":"0.25rem","space-md":"1rem","margin-desktop":"2.5rem","space-sm":"0.5rem"},fontFamily:{"headline-lg":["Plus Jakarta Sans"],"headline-lg-mobile":["Plus Jakarta Sans"],"body-sm":["Inter"],"headline-md":["Plus Jakarta Sans"],"headline-sm":["Plus Jakarta Sans"],"label-sm":["Inter"],"label-lg":["Inter"],"body-lg":["Inter"],"label-md":["Inter"],"body-md":["Inter"],"display-lg":["Plus Jakarta Sans"]},fontSize:{"headline-lg":["2rem",{lineHeight:"2.5rem",fontWeight:"700"}],"headline-lg-mobile":["1.625rem",{lineHeight:"2.125rem",fontWeight:"700"}],"body-sm":["0.875rem",{lineHeight:"1.375rem",fontWeight:"400"}],"headline-md":["1.5rem",{lineHeight:"2rem",fontWeight:"600"}],"headline-sm":["1.25rem",{lineHeight:"1.75rem",fontWeight:"600"}],"label-sm":["0.75rem",{lineHeight:"1rem",fontWeight:"600"}],"label-lg":["1rem",{lineHeight:"1.25rem",fontWeight:"600"}],"body-lg":["1.125rem",{lineHeight:"1.75rem",fontWeight:"400"}],"label-md":["0.875rem",{lineHeight:"1.125rem",fontWeight:"600"}],"body-md":["1rem",{lineHeight:"1.5rem",fontWeight:"400"}],"display-lg":["3rem",{lineHeight:"3.5rem",fontWeight:"700"}]}}}}</script></head><body class="bg-surface font-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-full w-80 bg-surface-container-lowest shadow-[0_1px_8px_rgba(16,42,67,0.06)] z-50 flex flex-col justify-between overflow-y-auto"><div class="p-space-lg flex flex-col gap-space-md"><div class="flex items-start gap-space-sm"><img alt="Leluasa Brand Mark" class="h-8 w-auto object-contain mt-0.5" src="https://lh3.googleusercontent.com/aida/AEtjO1WOuTHrqz2-A0HGmGQmLWaMHDxLqbBHnkqWhwBOWfND6xTMkDPNys_zVRFBTS3hn8ZK9vi_oP3dVJVDAQhN17IO9Rs4u7YGjrHCausq8huEJSc1qwcFU6nJacHsKgsbes69ULJyHiDA6SWOR05yEu2Baa2KonHnRU4rNgIQSBQdwpxXNetPlbeqAVEwtRghomAE80hHFy09TryxPtB-oY5__rYGXTZs9fQsqBLngcA7WQ"/><div class="flex flex-col"><div class="flex items-center gap-space-xs"><span class="font-headline-sm text-headline-sm text-primary tracking-tight">Leluasa</span></div><span class="font-label-sm text-label-sm text-on-surface-variant">Move Freely. Navigate Inclusively.</span></div></div><div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-container w-fit"><span class="material-symbols-outlined text-[14px]">verified</span><span class="font-label-sm text-label-sm uppercase tracking-wider font-bold">LOGICODIX 2026 · Inclusive Health</span></div><nav class="flex flex-col gap-1 mt-space-sm" data-active-classes="bg-primary-container text-on-primary font-label-md rounded-xl shadow-[0_2px_8px_-2px_rgba(16,42,67,0.1)]"><a class="flex items-center gap-space-sm min-h-[48px] px-3.5 py-2.5 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all" data-path="home" href="#"><span class="material-symbols-outlined text-xl">space_dashboard</span><span>Home (Dashboard)</span></a><a aria-current="page" class="flex items-center gap-space-sm min-h-[48px] px-3.5 py-2.5 transition-all bg-primary-container text-on-primary font-label-md rounded-xl shadow-[0_2px_8px_-2px_rgba(16,42,67,0.1)]" data-path="explore-map" href="#"><span class="material-symbols-outlined text-xl">map</span><span>Explore Map</span></a><a class="flex items-center gap-space-sm min-h-[48px] px-3.5 py-2.5 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all" data-path="plan-route" href="#"><span class="material-symbols-outlined text-xl">alt_route</span><span>Plan Route</span></a><a class="flex items-center gap-space-sm min-h-[48px] px-3.5 py-2.5 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all" data-path="ai-route-intelligence" href="#"><span class="material-symbols-outlined text-xl">psychology</span><span>AI Route Intelligence</span></a><a class="flex items-center justify-between min-h-[48px] px-3.5 py-2.5 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all" data-path="report-obstacle" href="#"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-xl text-secondary">fmd_bad</span><span>Report Obstacle</span></div><span class="flex items-center justify-center w-6 h-6 rounded-full bg-secondary text-on-secondary font-label-sm text-label-sm shadow-[0_2px_6px_rgba(0,106,98,0.35)]">+</span></a><a class="flex items-center gap-space-sm min-h-[48px] px-3.5 py-2.5 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all" data-path="reports-impact" href="#"><span class="material-symbols-outlined text-xl">assessment</span><span>Reports &amp; Impact</span></a><a class="flex items-center gap-space-sm min-h-[48px] px-3.5 py-2.5 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all" data-path="weather-intelligence" href="#"><span class="material-symbols-outlined text-xl">routine</span><span>Weather Intelligence</span></a><a class="flex items-center gap-space-sm min-h-[48px] px-3.5 py-2.5 rounded-xl font-label-md text-label-md text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all" data-path="voice-assistant" href="#"><span class="material-symbols-outlined text-xl">graphic_eq</span><span>Voice Assistant</span></a></nav></div><div class="p-space-md m-space-md bg-surface-container-low rounded-xl flex flex-col gap-space-md"><div class="flex items-center justify-between"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-secondary text-lg">tune</span><span class="font-label-sm text-label-sm text-on-surface font-semibold">Quick Accessibility</span></div><button class="min-h-[32px] px-2.5 rounded-lg bg-surface-container-lowest text-secondary font-label-sm text-label-sm hover:bg-surface-container hover:text-on-surface transition-colors flex items-center gap-1 shadow-[0_1px_3px_rgba(16,42,67,0.04)]" type="button"><span class="material-symbols-outlined text-xs">contrast</span><span>Toggle</span></button></div><div class="flex items-center gap-space-sm pt-space-xs border-t border-outline-variant/30"><img alt="Profile" class="w-8 h-8 rounded-full object-cover shrink-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAeux4mFWcG1-ZRGqAVcaULKOBBXIlC0Tqhnz5ewIT2HuGngvhcu65Dz1HdN5aXr3a2_8piuKojYiOjwhIHrJyzPxN989xaRpETrCNtB5GrXpMp7ThIPo3i7K4Uh4mlzPvku_Tn-UgJW-qgyy94KcdjFBuEyrxTzbtj31rbx9E9arkeweKkyg62UBC1dePdNpyNSuBtTfoOukbPZgBs5xvO5cdDi-L3YZRaJ_o9vOCg"/><div class="flex flex-col min-w-0"><span class="font-label-md text-label-md text-primary font-semibold truncate">Dian Kartika</span><span class="font-label-sm text-label-sm text-on-surface-variant truncate">Wheelchair Commuter · Lvl 3</span></div></div></div></aside><div class="pl-80"><header class="fixed top-0 left-80 right-0 h-20 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(16,42,67,0.04)] z-40 px-space-xl flex items-center justify-between gap-space-lg"><div class="flex-1 max-w-xl"><div class="relative flex items-center w-full"><span class="material-symbols-outlined absolute left-4 text-on-surface-variant pointer-events-none text-xl">search</span><input class="w-full h-12 pl-12 pr-12 rounded-xl bg-surface-container-lowest text-on-surface placeholder:text-outline font-body-sm text-body-sm shadow-[0_2px_8px_-2px_rgba(16,42,67,0.06)] focus:outline-none focus:ring-2 focus:ring-secondary transition-all" placeholder="Search destination, clinic, accessible sidewalk in Surabaya..." type="text"/><button aria-label="Search voice input" class="absolute right-2 w-8 h-8 flex items-center justify-center rounded-lg text-on-surface-variant hover:text-secondary hover:bg-surface-container transition-colors" type="button"><span class="material-symbols-outlined text-lg">mic</span></button></div></div><div class="flex items-center gap-space-md shrink-0"><div class="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary-container/60 text-secondary"><span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span><span class="font-label-sm text-label-sm font-semibold">Surabaya Sidewalk AI Network · 94% Live</span></div><button aria-label="Voice Command" class="min-h-[48px] min-w-[48px] flex items-center justify-center rounded-xl bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shadow-[0_2px_8px_-2px_rgba(16,42,67,0.04)]" type="button"><span class="material-symbols-outlined text-xl">keyboard_voice</span></button><button aria-label="Notifications" class="relative min-h-[48px] min-w-[48px] flex items-center justify-center rounded-xl bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shadow-[0_2px_8px_-2px_rgba(16,42,67,0.04)]" type="button"><span class="material-symbols-outlined text-xl">notifications</span><span class="absolute top-2.5 right-2.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-error text-on-error font-label-sm text-[10px] font-bold">2</span></button><button aria-label="Accessibility Preferences" class="min-h-[48px] min-w-[48px] flex items-center justify-center rounded-xl bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shadow-[0_2px_8px_-2px_rgba(16,42,67,0.04)]" type="button"><span class="material-symbols-outlined text-xl">accessibility_new</span></button></div></header><main class="relative pt-20 min-h-screen bg-surface w-full"><div class="flex flex-col w-full relative">
+<!-- Map Canvas & Workspace Wrapper (height calculated to span full available viewport minus app header) -->
+<div class="relative w-full h-[calc(100vh-5rem)] overflow-hidden bg-surface-container select-none">
+<!-- BASE SIMULATED HIGH-FIDELITY STREET & SIDEWALK VECTOR MAP -->
+<div class="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing overflow-hidden" id="interactive-map-viewport">
+<!-- Ambient Background Graphic Layer (Surabaya Urban Grid) -->
+<svg class="w-full h-full object-cover" fill="none" preserveaspectratio="xMidYMid slice" viewbox="0 0 1600 1000" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<pattern height="80" id="city-block-pattern" patternunits="userSpaceOnUse" width="80">
+<rect fill="#eaf2fd" height="80" width="80"></rect>
+<path d="M 80 0 L 0 0 0 80" fill="none" stroke="#dbe7f7" stroke-width="1.5"></path>
+</pattern>
+<pattern height="16" id="diagonal-hazard-stripes" patterntransform="rotate(45)" patternunits="userSpaceOnUse" width="16">
+<line stroke="#ba1a1a" stroke-width="6" x1="0" x2="0" y1="0" y2="16"></line>
+<line stroke="#ffdad6" stroke-width="6" x1="8" x2="8" y1="0" y2="16"></line>
+</pattern>
+<filter height="140%" id="soft-glow" width="140%" x="-20%" y="-20%">
+<fedropshadow dx="0" dy="4" flood-color="#00152a" flood-opacity="0.18" stddeviation="6"></fedropshadow>
+</filter>
+</defs>
+<!-- Urban Land Parcels -->
+<rect fill="url(#city-block-pattern)" height="1000" width="1600"></rect>
+<!-- Green Parks / Civic plazas -->
+<!-- Taman Apsari / Gedung Grahadi Area -->
+<path d="M 280,240 L 460,240 L 460,420 L 280,420 Z" fill="#d2ede6" rx="16"></path>
+<text fill="#006a62" font-family="Plus Jakarta Sans" font-size="13" font-weight="700" letter-spacing="1" text-anchor="middle" x="370" y="335">TAMAN APSARI</text>
+<!-- Balai Kota Surabaya Park Area -->
+<path d="M 840,110 L 1050,110 L 1050,320 L 840,320 Z" fill="#d2ede6" rx="16"></path>
+<text fill="#006a62" font-family="Plus Jakarta Sans" font-size="13" font-weight="700" letter-spacing="1" text-anchor="middle" x="945" y="220">BALAI KOTA CIVIC HUB</text>
+<!-- Surabaya River (Kalimas Waterfront) -->
+<path d="M -50,680 C 350,650 620,780 920,700 C 1220,620 1440,710 1650,680" fill="none" stroke="#c1ddfb" stroke-linecap="round" stroke-width="62"></path>
+<path d="M -50,680 C 350,650 620,780 920,700 C 1220,620 1440,710 1650,680" fill="none" stroke="#cee5ff" stroke-linecap="round" stroke-width="48"></path>
+<text fill="#49607c" font-family="Plus Jakarta Sans" font-size="11" font-weight="600" letter-spacing="3" x="580" y="735">KALI MAS WATERFRONT</text>
+<!-- City Arterial Car Roadbeds (Subtle gray-white) -->
+<!-- Jl. Gubernur Suryo -->
+<path d="M 120,380 L 780,380 L 1180,380" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round" stroke-width="42"></path>
+<path d="M 120,380 L 780,380 L 1180,380" opacity="0.6" stroke="#d8eaff" stroke-linecap="round" stroke-linejoin="round" stroke-width="42"></path>
+<!-- Jl. Tunjungan -->
+<path d="M 330,80 L 330,760" stroke="#ffffff" stroke-linecap="round" stroke-width="36"></path>
+<path d="M 330,80 L 330,760" opacity="0.6" stroke="#d8eaff" stroke-linecap="round" stroke-width="36"></path>
+<!-- Jl. Pemuda (Key corridor) -->
+<path d="M 780,380 L 1480,380" stroke="#ffffff" stroke-linecap="round" stroke-width="48"></path>
+<path d="M 780,380 L 1480,380" opacity="0.6" stroke="#d8eaff" stroke-linecap="round" stroke-width="48"></path>
+<!-- Jl. Embong Malang -->
+<path d="M 330,520 L 780,720" stroke="#ffffff" stroke-linecap="round" stroke-width="32"></path>
+<!-- Jl. Genteng Kali -->
+<path d="M 330,220 L 780,220" stroke="#ffffff" stroke-linecap="round" stroke-width="30"></path>
+<!-- Road Centering Guidelines and Names -->
+<text fill="#74777e" font-family="Inter" font-size="11" font-weight="600" letter-spacing="1" x="210" y="385">JL. GUBERNUR SURYO</text>
+<text fill="#314863" font-family="Inter" font-size="12" font-weight="700" letter-spacing="1" x="960" y="386">JL. PEMUDA (DELTA PLAZA CORRIDOR)</text>
+<text fill="#74777e" font-family="Inter" font-size="11" font-weight="600" letter-spacing="1" transform="rotate(-90 345,600)" x="345" y="600">JL. TUNJUNGAN HERITAGE</text>
+<!-- ACCESSIBILITY SIDEWALK LAYER 1: Deep Teal Safe Corridor -->
+<!-- Sidewalk Path 1: From Tunjungan south, into Gubernur Suryo, up towards Balai Kota -->
+<path d="M 356,720 L 356,406 L 766,406 L 766,240 L 980,240" fill="none" opacity="0.9" stroke="#006a62" stroke-linecap="round" stroke-linejoin="round" stroke-width="10"></path>
+<path d="M 356,720 L 356,406 L 766,406 L 766,240 L 980,240" fill="none" stroke="#83f6e7" stroke-dasharray="8 6" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"></path>
+<!-- ACCESSIBILITY SIDEWALK LAYER 2: Caution Yellow Corridor (Jl. Genteng Kali & Tunjungan North) -->
+<path d="M 356,240 L 356,120" fill="none" stroke="#d99a19" stroke-linecap="round" stroke-width="10"></path>
+<path d="M 356,240 L 740,240" fill="none" stroke="#d99a19" stroke-dasharray="6 4" stroke-linecap="round" stroke-width="8"></path>
+<!-- ACCESSIBILITY SIDEWALK LAYER 3: Impassable Blocked Red Corridor (Jl. Pemuda 34 front) -->
+<!-- Normal accessible lead-in -->
+<path d="M 766,406 L 1020,406" fill="none" stroke="#006a62" stroke-linecap="round" stroke-width="10"></path>
+<!-- Completely blocked segment with hatch pattern -->
+<path d="M 1020,406 L 1190,406" fill="none" stroke="url(#diagonal-hazard-stripes)" stroke-linecap="square" stroke-width="16"></path>
+<!-- Detour line suggested around obstacle into southern alleyway -->
+<path d="M 1000,406 Q 1020,470 1100,470 Q 1190,470 1205,406 L 1380,406" fill="none" opacity="0.75" stroke="#006a62" stroke-dasharray="6 6" stroke-width="6"></path>
+</svg>
+</div>
+<!-- LIVE USER GPS RADAR BLIP (Location: Jl. Gubernur Suryo 12) -->
+<div class="absolute left-[390px] top-[390px] -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none flex items-center justify-center">
+<div class="w-16 h-16 rounded-full bg-secondary/20 animate-ping absolute"></div>
+<div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center shadow-lg">
+<div class="w-5 h-5 rounded-full bg-secondary flex items-center justify-center text-on-secondary">
+<span class="material-symbols-outlined text-[12px] font-bold">navigation</span>
+</div>
+</div>
+<div class="absolute -bottom-7 bg-primary text-on-primary text-[10px] font-label-sm font-bold px-2 py-0.5 rounded-full shadow-md whitespace-nowrap">
+        You are here · Dian K.
+      </div>
+</div>
+<!-- INTERACTIVE MAP PINS -->
+<!-- PIN 1: SELECTED RED PIN (Jl. Pemuda 34) -->
+<div class="absolute left-[830px] top-[370px] -translate-x-1/2 -translate-y-full z-30 cursor-pointer group" id="pin-pemuda">
+<div class="flex flex-col items-center">
+<!-- Floating Alert Flag / Callout Badge -->
+<div class="bg-error text-on-error font-label-sm text-label-sm font-bold px-3 py-1.5 rounded-xl shadow-xl flex items-center gap-1.5 mb-1 ring-4 ring-error/20 animate-bounce">
+<span class="material-symbols-outlined text-[16px]">dangerous</span>
+<span>Impassable Block (Jl. Pemuda 34)</span>
+</div>
+<!-- Pin Marker Point -->
+<div class="w-10 h-10 rounded-full bg-error text-on-error flex items-center justify-center shadow-2xl ring-4 ring-surface-container-lowest">
+<span class="material-symbols-outlined text-xl">block</span>
+</div>
+<div class="w-2.5 h-3 bg-error -mt-1 [clip-path:polygon(50%_100%,0_0,100%_0)]"></div>
+<div class="w-6 h-2 rounded-full bg-error/30 blur-[2px] mt-0.5"></div>
+</div>
+</div>
+<!-- PIN 2: AMBER PIN (Jl. Genteng Kali) -->
+<div class="absolute left-[540px] top-[240px] -translate-x-1/2 -translate-y-full z-20 cursor-pointer hover:scale-105 transition-transform" id="pin-genteng">
+<div class="flex flex-col items-center">
+<div class="bg-surface-container-lowest text-on-surface font-label-sm text-[11px] font-semibold px-2 py-1 rounded-lg shadow-md flex items-center gap-1 mb-1 border border-outline-variant/30">
+<span class="w-2 h-2 rounded-full bg-amber-500"></span>
+<span>Narrow Width 75cm</span>
+</div>
+<div class="w-8 h-8 rounded-full bg-[#d99a19] text-primary flex items-center justify-center shadow-lg ring-2 ring-surface-container-lowest">
+<span class="material-symbols-outlined text-base font-bold">straighten</span>
+</div>
+<div class="w-2 h-2 bg-[#d99a19] -mt-1 [clip-path:polygon(50%_100%,0_0,100%_0)]"></div>
+</div>
+</div>
+<!-- PIN 3: GREEN PASSABLE PIN (Balai Kota Surabaya) -->
+<div class="absolute left-[920px] top-[240px] -translate-x-1/2 -translate-y-full z-20 cursor-pointer hover:scale-105 transition-transform" id="pin-balaikota">
+<div class="flex flex-col items-center">
+<div class="bg-surface-container-lowest text-secondary font-label-sm text-[11px] font-bold px-2 py-1 rounded-lg shadow-md flex items-center gap-1 mb-1 border border-secondary/20">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span>Tactile Paving 180cm</span>
+</div>
+<div class="w-8 h-8 rounded-full bg-secondary text-on-secondary flex items-center justify-center shadow-lg ring-2 ring-surface-container-lowest">
+<span class="material-symbols-outlined text-base">check_circle</span>
+</div>
+<div class="w-2 h-2 bg-secondary -mt-1 [clip-path:polygon(50%_100%,0_0,100%_0)]"></div>
+</div>
+</div>
+<!-- PIN 4: AMBER PIN (Jl. Tunjungan Heritage) -->
+<div class="absolute left-[330px] top-[180px] -translate-x-1/2 -translate-y-full z-20 cursor-pointer hover:scale-105 transition-transform" id="pin-tunjungan">
+<div class="flex flex-col items-center">
+<div class="bg-surface-container-lowest text-on-surface font-label-sm text-[11px] font-semibold px-2 py-1 rounded-lg shadow-md flex items-center gap-1 mb-1 border border-outline-variant/30">
+<span class="w-2 h-2 rounded-full bg-amber-500"></span>
+<span>Slope 11% Gradient</span>
+</div>
+<div class="w-8 h-8 rounded-full bg-[#d99a19] text-primary flex items-center justify-center shadow-lg ring-2 ring-surface-container-lowest">
+<span class="material-symbols-outlined text-base">landscape</span>
+</div>
+<div class="w-2 h-2 bg-[#d99a19] -mt-1 [clip-path:polygon(50%_100%,0_0,100%_0)]"></div>
+</div>
+</div>
+<!-- FLOATING MAP COMMAND HEADER (TOP OVERLAY) -->
+<div class="absolute top-4 left-6 right-[440px] z-30 flex flex-col gap-2.5 pointer-events-none">
+<!-- Search Omnibox Card -->
+<div class="pointer-events-auto bg-surface-container-lowest/95 backdrop-blur-md rounded-2xl shadow-[0_8px_24px_-4px_rgba(16,42,67,0.12)] p-2.5 flex items-center gap-3">
+<div class="flex items-center justify-center w-11 h-11 rounded-xl bg-primary-container text-on-primary shrink-0">
+<span class="material-symbols-outlined text-2xl text-secondary-container">travel_explore</span>
+</div>
+<div class="flex-1 relative flex items-center min-w-0">
+<input class="w-full h-11 pr-10 text-on-surface placeholder:text-outline font-body-md text-body-md bg-transparent focus:outline-none font-medium truncate" placeholder="Search sidewalk obstacle, destination, or accessible ramp in Surabaya..." type="text" value="Jl. Pemuda 34, Embong Kaliasin, Surabaya"/>
+<button aria-label="Clear Search Input" class="absolute right-1 w-8 h-8 flex items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors" type="button">
+<span class="material-symbols-outlined text-lg">close</span>
+</button>
+</div>
+<div class="h-8 w-px bg-outline-variant/40 shrink-0"></div>
+<!-- Layer/Map Modes Selector -->
+<div class="flex items-center gap-1 shrink-0 bg-surface-container-low p-1 rounded-xl">
+<button class="h-9 px-3 rounded-lg bg-surface-container-lowest text-primary font-label-sm text-label-sm font-bold shadow-sm flex items-center gap-1.5" type="button">
+<span class="material-symbols-outlined text-base text-secondary">layers</span>
+<span>OpenSidewalk</span>
+</button>
+<button class="h-9 px-3 rounded-lg text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm hover:bg-surface-container-lowest/60 transition-colors flex items-center gap-1.5" type="button">
+<span class="material-symbols-outlined text-base">satellite_alt</span>
+<span>Satellite</span>
+</button>
+<button class="h-9 px-3 rounded-lg text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm hover:bg-surface-container-lowest/60 transition-colors flex items-center gap-1.5" type="button">
+<span class="material-symbols-outlined text-base text-error">grid_view</span>
+<span>Barrier Density</span>
+</button>
+</div>
+</div>
+<!-- Quick Filter Horizontal Pills Bar -->
+<div class="pointer-events-auto flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+<button class="h-10 px-4 rounded-full bg-primary-container text-on-primary font-label-sm text-label-sm font-semibold shadow-md flex items-center gap-2 shrink-0" type="button">
+<span>All Obstacles</span>
+<span class="px-1.5 py-0.2 rounded-full bg-on-primary-container/30 text-on-primary text-[11px] font-bold">18</span>
+</button>
+<button class="h-10 px-3.5 rounded-full bg-surface-container-lowest text-on-surface hover:bg-surface-container-high font-label-sm text-label-sm font-semibold shadow-sm flex items-center gap-2 shrink-0 transition-colors" type="button">
+<span class="w-2.5 h-2.5 rounded-full bg-secondary"></span>
+<span>Passable</span>
+<span class="text-on-surface-variant font-normal">(7)</span>
+</button>
+<button class="h-10 px-3.5 rounded-full bg-surface-container-lowest text-on-surface hover:bg-surface-container-high font-label-sm text-label-sm font-semibold shadow-sm flex items-center gap-2 shrink-0 transition-colors" type="button">
+<span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+<span>Caution / Difficult</span>
+<span class="text-on-surface-variant font-normal">(8)</span>
+</button>
+<button class="h-10 px-3.5 rounded-full bg-error-container text-on-error-container font-label-sm text-label-sm font-bold shadow-sm flex items-center gap-2 shrink-0 ring-2 ring-error/30" type="button">
+<span class="w-2.5 h-2.5 rounded-full bg-error animate-pulse"></span>
+<span>Impassable</span>
+<span class="font-bold">(3)</span>
+</button>
+<button class="h-10 px-3.5 rounded-full bg-surface-container-lowest text-on-surface hover:bg-surface-container-high font-label-sm text-label-sm font-semibold shadow-sm flex items-center gap-2 shrink-0 transition-colors" type="button">
+<span class="material-symbols-outlined text-secondary text-base">verified_user</span>
+<span>Community Verified</span>
+<span class="text-on-surface-variant font-normal">(14)</span>
+</button>
+<button class="h-10 px-3.5 rounded-full bg-surface-container-lowest text-on-surface hover:bg-surface-container-high font-label-sm text-label-sm font-semibold shadow-sm flex items-center gap-2 shrink-0 transition-colors" type="button">
+<span class="material-symbols-outlined text-on-surface-variant text-base">build_circle</span>
+<span>Resolved / Repaired</span>
+<span class="text-on-surface-variant font-normal">(12)</span>
+</button>
+</div>
+</div>
+<!-- FLOATING MAP CANVAS UTILITIES (LEFT SIDEBAR DOCK) -->
+<div class="absolute left-6 bottom-24 z-20 flex flex-col gap-2.5 pointer-events-auto">
+<!-- Quick GPS Locate User with active pulsing ring -->
+<button class="w-12 h-12 rounded-xl bg-surface-container-lowest text-primary hover:text-secondary shadow-[0_4px_16px_rgba(16,42,67,0.12)] flex items-center justify-center transition-transform active:scale-95 group" title="Center map to my wheelchair location" type="button">
+<span class="material-symbols-outlined text-2xl group-hover:scale-110 transition-transform">my_location</span>
+</button>
+<!-- Zoom Controls (+ / -) -->
+<div class="flex flex-col bg-surface-container-lowest rounded-xl shadow-[0_4px_16px_rgba(16,42,67,0.12)] overflow-hidden">
+<button class="w-12 h-11 flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors" title="Zoom in" type="button">
+<span class="material-symbols-outlined text-xl">add</span>
+</button>
+<div class="h-px bg-outline-variant/30 w-8 mx-auto"></div>
+<button class="w-12 h-11 flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors" title="Zoom out" type="button">
+<span class="material-symbols-outlined text-xl">remove</span>
+</button>
+</div>
+<!-- Compass North Reset -->
+<button class="w-12 h-12 rounded-xl bg-surface-container-lowest text-on-surface shadow-[0_4px_16px_rgba(16,42,67,0.12)] flex items-center justify-center" title="Reset North view" type="button">
+<div class="flex flex-col items-center">
+<span class="material-symbols-outlined text-error text-sm font-bold -mb-1">navigation</span>
+<span class="font-label-sm text-[9px] font-bold text-primary">N</span>
+</div>
+</button>
+<!-- Report Hazard Pin Button -->
+<button class="min-h-[48px] px-4 rounded-xl bg-secondary text-on-secondary shadow-[0_6px_20px_rgba(0,106,98,0.35)] flex items-center gap-2 font-label-md text-label-md font-semibold hover:bg-secondary/90 transition-all active:scale-95 mt-2" type="button">
+<span class="material-symbols-outlined text-xl">add_location_alt</span>
+<span class="whitespace-nowrap">Report at Crosshair</span>
+</button>
+</div>
+<!-- OBSTACLE DETAIL INSPECTION DRAWER (RIGHT PANEL, 420px FIXED SLIT) -->
+<aside class="absolute top-0 right-0 bottom-0 w-[420px] bg-surface-container-lowest shadow-[-8px_0_32px_rgba(16,42,67,0.12)] z-40 flex flex-col overflow-y-auto">
+<!-- Critical Hazard Severity Top Header Banner -->
+<div class="p-4 bg-error text-on-error flex items-center justify-between shadow-sm sticky top-0 z-10">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-2xl">error</span>
+<div class="flex flex-col">
+<span class="font-headline-sm text-sm uppercase font-bold tracking-wider">Impassable Obstacle</span>
+<span class="font-label-sm text-[11px] opacity-90">ID #SUB-2026-0889 · Priority P1</span>
+</div>
+</div>
+<button aria-label="Close Inspector Drawer" class="w-8 h-8 rounded-lg bg-on-error/15 hover:bg-on-error/30 flex items-center justify-center transition-colors" type="button">
+<span class="material-symbols-outlined text-lg">chevron_right</span>
+</button>
+</div>
+<!-- Main Drawer Content Body -->
+<div class="p-space-lg flex flex-col gap-space-md flex-1">
+<!-- Incident Headline & Exact Geolocation -->
+<div class="flex flex-col gap-1.5">
+<h2 class="font-headline-sm text-headline-sm text-primary tracking-tight leading-snug">
+            Sidewalk Blocked by Utility Excavation &amp; Missing Ramp
+          </h2>
+<div class="flex items-start gap-1.5 text-on-surface-variant font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-secondary text-lg mt-0.5 shrink-0">pin_drop</span>
+<span class="font-medium text-on-surface">Jl. Pemuda No. 34 (Near Delta Plaza Intersection, Surabaya Pusat)</span>
+</div>
+</div>
+<!-- Reporter Metadata & Trust Badges -->
+<div class="p-3 bg-surface-container-low rounded-xl flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-9 h-9 rounded-full bg-secondary-container text-secondary flex items-center justify-center font-bold text-sm">
+<span class="material-symbols-outlined text-xl">accessible</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-semibold text-primary">Rian Sastrowardoyo</span>
+<span class="font-label-sm text-[11px] text-on-surface-variant">Reported Today, 08:45 AM</span>
+</div>
+</div>
+<div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary-container/70 text-on-secondary-container">
+<span class="material-symbols-outlined text-[13px]">verified</span>
+<span class="font-label-sm text-[11px] font-bold">9 Confirmed</span>
+</div>
+</div>
+<!-- PHOTOREALISTIC OBSTACLE PREVIEW BOX -->
+<div class="flex flex-col gap-1.5">
+<span class="font-label-sm text-label-sm font-semibold text-on-surface-variant uppercase tracking-wider">Crowdsourced Photo Evidence</span>
+<div class="relative w-full h-44 rounded-xl overflow-hidden shadow-md group">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Photorealistic street photography of a blocked concrete pedestrian sidewalk in front of commercial buildings along Jalan Pemuda in Surabaya, Indonesia. Bright morning sunlight illuminates orange utility construction barriers blocking the pedestrian lane with excavated concrete rubble and a missing wheelchair ramp, forcing pedestrians toward the active asphalt roadway." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBHFMsCLySCf2uzWMtFX18TBkBYK-fmLGgjoutprkwX_EReJz0FARR7kYo672VJi7-y7yN0K3TP_jATW5g1AHFx2pXNOop65BVn6Jp9lJ0imRlMN3M6r7AxtSjkxode2p2bX9YZpPAld7Iy0e39v7FoTN9lJXBWy5PkclpkGsChDiRsPpkIgOGibMUmWZDprU-QQVqldc0Z-Q4Y0_uyWLefoxVbb3iAKZbLmPVQCNZF"/>
+<div class="absolute inset-0 bg-gradient-to-t from-primary/80 via-transparent to-transparent"></div>
+<div class="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-on-primary">
+<span class="font-label-sm text-xs flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">camera_alt</span> 1 Photo attached
+              </span>
+<span class="font-label-sm text-[11px] bg-primary/60 backdrop-blur-sm px-2 py-0.5 rounded">GPS Tagged 112.748°E</span>
+</div>
+</div>
+</div>
+<!-- AI COMPUTER VISION DIAGNOSTIC PANEL -->
+<div class="p-3.5 bg-surface-container rounded-xl flex flex-col gap-2.5">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1.5 text-secondary">
+<span class="material-symbols-outlined text-lg">psychology</span>
+<span class="font-label-md text-label-md font-bold text-primary">AI Vision Telemetry</span>
+</div>
+<span class="font-label-sm text-[11px] bg-secondary-container px-2 py-0.5 rounded-full font-bold text-on-secondary-container">94% Confidence</span>
+</div>
+<div class="grid grid-cols-2 gap-2 text-body-sm">
+<div class="bg-surface-container-lowest p-2 rounded-lg flex flex-col">
+<span class="font-label-sm text-[10px] text-on-surface-variant uppercase">Detected Barrier</span>
+<span class="font-label-md text-label-md font-bold text-on-surface mt-0.5">Trench &amp; Fence</span>
+</div>
+<div class="bg-surface-container-lowest p-2 rounded-lg flex flex-col">
+<span class="font-label-sm text-[10px] text-on-surface-variant uppercase">Passable Width</span>
+<span class="font-label-md text-label-md font-bold text-error mt-0.5">0 cm (Zero clearance)</span>
+</div>
+</div>
+<div class="flex items-start gap-2 bg-error-container/60 p-2.5 rounded-lg text-on-error-container font-label-sm text-xs">
+<span class="material-symbols-outlined text-error text-base shrink-0 mt-0.5">warning</span>
+<span>Critical danger: Traversing around this barrier requires entering motorized traffic on Jl. Pemuda. Wheelchair detour strongly recommended.</span>
+</div>
+</div>
+<!-- REROUTE PRIMARY CALL TO ACTION -->
+<div class="flex flex-col gap-2 pt-1">
+<button class="w-full min-h-[52px] rounded-xl bg-primary text-on-primary hover:bg-primary-container font-label-lg text-label-lg font-bold shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]" type="button">
+<span class="material-symbols-outlined text-secondary-container text-xl">alt_route</span>
+<span>Reroute Around Obstacle (+180m)</span>
+</button>
+<span class="text-center font-label-sm text-[11px] text-on-surface-variant">Smooth 140cm sidewalk via Jl. Simpang Dukuh detour lane.</span>
+</div>
+<!-- COMMUNITY VERIFICATION ACTIONS -->
+<div class="flex flex-col gap-2 pt-2">
+<span class="font-label-sm text-label-sm font-semibold text-on-surface-variant uppercase tracking-wider">Crowd Verification Action</span>
+<div class="grid grid-cols-2 gap-2">
+<button class="min-h-[48px] px-3 rounded-xl bg-secondary-container text-on-secondary-container hover:bg-secondary-fixed-dim font-label-md text-label-md font-bold flex items-center justify-center gap-1.5 transition-colors" type="button">
+<span class="material-symbols-outlined text-lg">thumb_up</span>
+<span>Still Exists (9)</span>
+</button>
+<button class="min-h-[48px] px-3 rounded-xl bg-surface-container-lowest text-on-surface hover:bg-surface-container font-label-md text-label-md font-semibold flex items-center justify-center gap-1.5 transition-colors border border-outline-variant/50" type="button">
+<span class="material-symbols-outlined text-lg text-secondary">task_alt</span>
+<span>Mark Cleared</span>
+</button>
+</div>
+<button class="min-h-[40px] px-3 rounded-lg bg-surface-container-low text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm font-medium flex items-center justify-center gap-1.5 transition-colors" type="button">
+<span class="material-symbols-outlined text-base">forward_to_inbox</span>
+<span>Dispatch to Dinas Bina Marga Surabaya</span>
+</button>
+</div>
+</div>
+</aside>
+<!-- MAP LEGEND & STATUS FOOTER DOCK (BOTTOM DOCK) -->
+<div class="absolute bottom-4 left-6 right-[440px] z-30 pointer-events-none">
+<div class="pointer-events-auto bg-surface-container-lowest/95 backdrop-blur-md rounded-2xl shadow-[0_4px_16px_rgba(16,42,67,0.08)] p-3 px-5 flex items-center justify-between gap-4">
+<!-- Legend Items -->
+<div class="flex items-center gap-6 overflow-x-auto">
+<!-- Passable -->
+<div class="flex items-center gap-2 shrink-0">
+<div class="w-3.5 h-3.5 rounded-full bg-secondary flex items-center justify-center text-on-secondary shadow-sm">
+<span class="material-symbols-outlined text-[9px] font-bold">check</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-bold text-on-surface">Passable</span>
+<span class="font-label-sm text-[10px] text-on-surface-variant">Width ≥ 120cm • Slope &lt; 5%</span>
+</div>
+</div>
+<div class="h-6 w-px bg-outline-variant/30 shrink-0"></div>
+<!-- Difficult -->
+<div class="flex items-center gap-2 shrink-0">
+<div class="w-3.5 h-3.5 rounded-full bg-amber-500 flex items-center justify-center text-primary shadow-sm">
+<span class="material-symbols-outlined text-[9px] font-bold">priority_high</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-bold text-on-surface">Difficult / Caution</span>
+<span class="font-label-sm text-[10px] text-on-surface-variant">Width 80-120cm • Slope 5-8%</span>
+</div>
+</div>
+<div class="h-6 w-px bg-outline-variant/30 shrink-0"></div>
+<!-- Impassable -->
+<div class="flex items-center gap-2 shrink-0">
+<div class="w-3.5 h-3.5 rounded-full bg-error flex items-center justify-center text-on-error shadow-sm">
+<span class="material-symbols-outlined text-[9px] font-bold">close</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-bold text-on-surface">Impassable</span>
+<span class="font-label-sm text-[10px] text-on-surface-variant">Width &lt; 80cm • Stairs • Barriers</span>
+</div>
+</div>
+</div>
+<!-- Pilot Calibration Tag -->
+<div class="hidden xl:flex items-center gap-2 shrink-0 text-on-surface-variant">
+<span class="material-symbols-outlined text-secondary text-base">hub</span>
+<span class="font-label-sm text-[11px] font-medium">Calibrated for LOGICODIX 2026 Surabaya Pilot</span>
+</div>
+</div>
+</div>
+</div>
+</div></main></div></body></html>

@@ -1,0 +1,21 @@
+{
+  "name": "logicodix-leluasa",
+  "version": "1.0.0",
+  "description": "Leluasa Accessible Sidewalk Navigation & Mobility System - LOGICODIX 2026",
+  "scripts": {
+    "server": "npm --prefix server run dev",
+    "client": "npm --prefix client run dev",
+    "start": "npm --prefix server run start",
+    "build": "npm --prefix client run build",
+    "ai": "uvicorn app.main:app --reload --port 8000 --app-dir ai-service"
+  },
+  "keywords": [
+    "logicodix",
+    "accessibility",
+    "sidewalk",
+    "wheelchair",
+    "inclusive-mobility"
+  ],
+  "author": "Leluasa Team (Dimas, Erlinda, Caca, Kaka)",
+  "license": "MIT"
+}
