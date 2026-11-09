@@ -7,9 +7,13 @@
   html, body {
     margin: 0;
     padding: 0;
-    background-color: #f7f9ff;
-    color: #001d32;
-    font-family: 'Inter', sans-serif;
+    background-color: #f9f9ff;
+    color: #141b2b;
+    font-family: 'Atkinson Hyperlegible Next', 'Inter', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Manrope', 'Plus Jakarta Sans', sans-serif;
   }
 }
 
@@ -30,6 +34,60 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/* Civic Sapphire Focus-visible global untuk navigasi keyboard aksesibel */
+:focus-visible {
+  outline: 3px solid #1D4ED8 !important;
+  outline-offset: 2px !important;
+}
+
+/* Mode Kontras Tinggi Nyata: Mengganti token warna ke rasio kontras maksimal */
+html.high-contrast,
+.high-contrast {
+  background-color: #000000 !important;
+  color: #FFFFFF !important;
+}
+
+html.high-contrast body,
+.high-contrast body {
+  background-color: #000000 !important;
+  color: #FFFFFF !important;
+}
+
+.high-contrast .bg-surface,
+.high-contrast .bg-surface-container,
+.high-contrast .bg-surface-container-low,
+.high-contrast .bg-surface-container-lowest,
+.high-contrast .bg-surface-container-high,
+.high-contrast .bg-surface-container-highest {
+  background-color: #050505 !important;
+  color: #FFFFFF !important;
+  border-color: #FFFFFF !important;
+}
+
+.high-contrast .text-primary,
+.high-contrast .text-on-surface,
+.high-contrast .text-on-surface-variant {
+  color: #FFFFFF !important;
+}
+
+.high-contrast .text-secondary {
+  color: #4ADE80 !important;
+}
+
+.high-contrast .text-error {
+  color: #FF6B6B !important;
+}
+
+.high-contrast .border-outline-variant,
+.high-contrast .border-outline {
+  border-color: #FFFFFF !important;
+}
+
+.high-contrast :focus-visible {
+  outline: 3px solid #FFFF00 !important;
+  outline-offset: 3px !important;
+}
+
 /* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
@@ -46,10 +104,185 @@
   background: rgba(116, 119, 126, 0.4);
 }
 
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
+/* ============================================================== */
+/* CIVIC SAPPHIRE MOBILITY: SENSORY & TACTILE KEYFRAME ANIMATIONS */
+/* ============================================================== */
+
+/* 1. Tactile Flow & Dashes */
+@keyframes dashFlow {
+  from {
+    stroke-dashoffset: 72;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
 }
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+
+.animate-dash-flow {
+  animation: dashFlow 1.4s linear infinite;
+}
+
+@keyframes routeFlow {
+  0% {
+    stroke-dashoffset: 60;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.flow-primary {
+  stroke-dasharray: 8 8;
+  animation: routeFlow 1.6s linear infinite;
+}
+
+.flow-secondary {
+  stroke-dasharray: 6 6;
+  animation: routeFlow 2.8s linear infinite;
+}
+
+/* 2. Sensory Pulse Rings (Radar & Ultrasonic Echo) */
+@keyframes sensoryPulse {
+  0% {
+    r: 10px;
+    opacity: 0.85;
+    stroke-width: 3.5px;
+  }
+  60% {
+    opacity: 0.4;
+  }
+  100% {
+    r: 44px;
+    opacity: 0;
+    stroke-width: 1px;
+  }
+}
+
+.pulse-ring-1 {
+  animation: sensoryPulse 2.4s cubic-bezier(0.15, 0.85, 0.35, 1) infinite;
+}
+
+.pulse-ring-2 {
+  animation: sensoryPulse 2.4s cubic-bezier(0.15, 0.85, 0.35, 1) infinite;
+  animation-delay: 0.8s;
+}
+
+.pulse-ring-3 {
+  animation: sensoryPulse 2.4s cubic-bezier(0.15, 0.85, 0.35, 1) infinite;
+  animation-delay: 1.6s;
+}
+
+/* 3. Beacon Breathing & Mic Ripples */
+@keyframes beaconBreathe {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 10px rgba(29, 78, 216, 0.7));
+  }
+  50% {
+    transform: scale(1.15);
+    filter: drop-shadow(0 0 18px rgba(56, 189, 248, 0.95));
+  }
+}
+
+.beacon-glow {
+  animation: beaconBreathe 2s ease-in-out infinite;
+}
+
+@keyframes audioRipples {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.65);
+    opacity: 0;
+  }
+}
+
+.mic-ripple {
+  animation: audioRipples 2s ease-out infinite;
+}
+
+/* 4. Tactile Dot Pulses */
+@keyframes tactilePulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.85;
+  }
+}
+
+.tactile-dot-pulse {
+  animation: tactilePulse 2s ease-in-out infinite;
+  transform-origin: center;
+}
+
+/* 5. Radar Wave */
+@keyframes radarWave {
+  0% {
+    r: 8px;
+    opacity: 0.8;
+  }
+  100% {
+    r: 28px;
+    opacity: 0;
+  }
+}
+
+.radar-ring {
+  animation: radarWave 2.4s cubic-bezier(0.2, 0.8, 0.4, 1) infinite;
+  transform-origin: center;
+}
+
+/* 6. Sound Waves & Sensory Sphere Visualizer */
+@keyframes soundWave {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.45;
+  }
+  100% {
+    transform: scale(1.65);
+    opacity: 0;
+  }
+}
+
+.wave-ring-1 {
+  animation: soundWave 3s cubic-bezier(0.2, 0.8, 0.4, 1) infinite;
+}
+
+.wave-ring-2 {
+  animation: soundWave 3s cubic-bezier(0.2, 0.8, 0.4, 1) infinite;
+  animation-delay: 0.8s;
+}
+
+.wave-ring-3 {
+  animation: soundWave 3s cubic-bezier(0.2, 0.8, 0.4, 1) infinite;
+  animation-delay: 1.6s;
+}
+
+@keyframes sensoryBreathe {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 35px rgba(29, 78, 216, 0.35);
+  }
+  50% {
+    transform: scale(1.06);
+    box-shadow: 0 0 55px rgba(2, 132, 199, 0.6);
+  }
+}
+
+.sensory-sphere {
+  animation: sensoryBreathe 4s ease-in-out infinite;
+  background: radial-gradient(circle at 35% 35%, #38bdf8 0%, #1d4ed8 70%, #001551 100%);
 }

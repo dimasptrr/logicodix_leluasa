@@ -1,0 +1,260 @@
+<!DOCTYPE html><html class="light" lang="id"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Leluasa - Panduan Suara &amp; Haptik</title>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Fonts: Manrope & Atkinson Hyperlegible Next -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:ital,wght@0,400;0,700;1,400;1,700&amp;family=Manrope:wght@400;600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Tailwind CSS with configuration -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "tertiary-fixed": "#ffe083",
+            "on-tertiary-fixed-variant": "#574500",
+            "on-primary-fixed": "#001551",
+            "surface-dim": "#d3daef",
+            "on-tertiary": "#ffffff",
+            "primary-fixed-dim": "#b7c4ff",
+            "surface-container": "#e9edff",
+            "surface-container-high": "#e1e8fd",
+            "on-secondary": "#ffffff",
+            "on-primary-fixed-variant": "#0039b5",
+            "on-background": "#141b2b",
+            "on-surface-variant": "#434655",
+            "secondary-container": "#7cf994",
+            "outline": "#747686",
+            "on-primary-container": "#cad3ff",
+            "primary": "#0037b0",
+            "on-tertiary-fixed": "#231b00",
+            "error": "#ba1a1a",
+            "tertiary-fixed-dim": "#eec200",
+            "on-secondary-fixed-variant": "#005320",
+            "surface-container-low": "#f1f3ff",
+            "tertiary": "#735c00",
+            "inverse-surface": "#293040",
+            "inverse-on-surface": "#edf0ff",
+            "surface-bright": "#f9f9ff",
+            "outline-variant": "#c4c5d7",
+            "secondary-fixed": "#7ffc97",
+            "on-error": "#ffffff",
+            "primary-container": "#1d4ed8",
+            "on-secondary-container": "#007230",
+            "inverse-primary": "#b7c4ff",
+            "secondary-fixed-dim": "#62df7d",
+            "surface-container-highest": "#dce2f7",
+            "error-container": "#ffdad6",
+            "surface-tint": "#2151da",
+            "on-primary": "#ffffff",
+            "on-error-container": "#93000a",
+            "on-tertiary-container": "#4e3e00",
+            "on-secondary-fixed": "#002109",
+            "surface": "#f9f9ff",
+            "background": "#f9f9ff",
+            "on-surface": "#141b2b",
+            "primary-fixed": "#dce1ff",
+            "tertiary-container": "#cea700",
+            "secondary": "#006e2d",
+            "surface-container-lowest": "#ffffff",
+            "surface-variant": "#dce2f7"
+          },
+          "borderRadius": {
+            "DEFAULT": "1rem",
+            "lg": "2rem",
+            "xl": "3rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-xl": "2.25rem",
+            "space-sm": "0.625rem",
+            "space-xs": "0.375rem",
+            "space-md": "1rem",
+            "gutter": "1rem",
+            "margin": "1.25rem",
+            "space-lg": "1.5rem"
+          },
+          "fontFamily": {
+            "body-lg": ["Atkinson Hyperlegible Next"],
+            "headline-md": ["Manrope"],
+            "headline-sm": ["Manrope"],
+            "label-md": ["Atkinson Hyperlegible Next"],
+            "label-lg": ["Atkinson Hyperlegible Next"],
+            "headline-lg": ["Manrope"],
+            "body-md": ["Atkinson Hyperlegible Next"],
+            "headline-lg-mobile": ["Manrope"]
+          },
+          "fontSize": {
+            "body-lg": ["18px", { "lineHeight": "28px", "letterSpacing": "0.01em", "fontWeight": "400" }],
+            "headline-md": ["22px", { "lineHeight": "30px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+            "headline-sm": ["18px", { "lineHeight": "26px", "letterSpacing": "0", "fontWeight": "700" }],
+            "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "700" }],
+            "label-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "700" }],
+            "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+            "body-md": ["16px", { "lineHeight": "24px", "letterSpacing": "0.01em", "fontWeight": "400" }],
+            "headline-lg-mobile": ["26px", { "lineHeight": "34px", "letterSpacing": "-0.01em", "fontWeight": "800" }]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    @keyframes soundWave {
+      0% {
+        transform: scale(0.85);
+        opacity: 0.85;
+      }
+      50% {
+        opacity: 0.45;
+      }
+      100% {
+        transform: scale(1.65);
+        opacity: 0;
+      }
+    }
+    .wave-ring-1 {
+      animation: soundWave 3s cubic-bezier(0.2, 0.8, 0.4, 1) infinite;
+    }
+    .wave-ring-2 {
+      animation: soundWave 3s cubic-bezier(0.2, 0.8, 0.4, 1) infinite;
+      animation-delay: 0.8s;
+    }
+    .wave-ring-3 {
+      animation: soundWave 3s cubic-bezier(0.2, 0.8, 0.4, 1) infinite;
+      animation-delay: 1.6s;
+    }
+    @keyframes sensoryBreathe {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 35px rgba(29, 78, 216, 0.35);
+      }
+      50% {
+        transform: scale(1.06);
+        box-shadow: 0 0 55px rgba(2, 132, 199, 0.6);
+      }
+    }
+    .sensory-sphere {
+      animation: sensoryBreathe 4s ease-in-out infinite;
+      background: radial-gradient(circle at 35% 35%, #38bdf8 0%, #1d4ed8 70%, #001551 100%);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-primary-fixed selection:text-on-primary-fixed pb-28">
+<!-- TOP APP BAR -->
+<header class="sticky top-0 z-40 bg-surface dark:bg-inverse-surface shadow-sm dark:shadow-none">
+<div class="flex justify-between items-center w-full px-5 py-3 max-w-md mx-auto">
+<div class="text-headline-sm font-headline-sm font-extrabold tracking-tight text-primary dark:text-inverse-primary flex items-center gap-2.5"><img alt="Leluasa Logo" class="w-8 h-8 rounded-full object-contain shadow-xs" src="https://lh3.googleusercontent.com/aida/ALJJyrBr8Jbxi8hjCVJv90gcibf6BauO9cWvM6sksEA6neOUalXQkL4CfSjikXjjU66PZu13-wBl5bnhirgUce10hXN1dKRGa98fz2A4iZFn0QnOgEWr4wLaWaS8e8lY5Yx63_KjhqzvkuL_Qc-ltD0i3WEyC1JOrVNYSZKqmy67JtVfH0EPaiiWErZvgdCp7SF51gc0mz4zbmmdXBzekVLCwzRCfneBQDM_6wUDhVXg9G5K"><div class="flex flex-col leading-tight"><span class="text-headline-sm font-headline-sm font-extrabold tracking-tight text-primary dark:text-inverse-primary">Leluasa</span><span class="text-xs text-on-surface-variant font-medium tracking-wide">All Access, All Ways.</span></div></div>
+<div class="flex items-center gap-2">
+<button aria-label="Status Sensor Aktif" class="p-2.5 rounded-full hover:bg-surface-container transition-colors duration-150 active:scale-95 text-primary flex items-center justify-center" type="button">
+<span class="material-symbols-outlined text-[24px]">sensors</span>
+</button>
+</div>
+</div>
+</header>
+<!-- MAIN SENSORY VIEWPORT -->
+<main class="w-full max-w-md mx-auto px-5 flex-1 flex flex-col items-center justify-between pt-2 pb-4">
+<!-- SUBTLE STATUS BADGE -->
+<div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-surface-container-high text-primary border border-primary/20 shadow-xs">
+<span class="w-2.5 h-2.5 rounded-full bg-secondary animate-pulse"></span>
+<span class="font-label-md text-label-md">Sensor Spasial Terhubung</span>
+</div>
+<!-- RADIAL SONAR & SENSORY SPHERE VISUALIZER -->
+<div class="relative w-full aspect-square max-w-[280px] my-4 flex items-center justify-center">
+<!-- Outer Soundwave Pulse Rings -->
+<div class="wave-ring-1 absolute inset-0 rounded-full border-2 border-primary/40 pointer-events-none"></div>
+<div class="wave-ring-2 absolute inset-0 rounded-full border-2 border-primary/30 pointer-events-none"></div>
+<div class="wave-ring-3 absolute inset-0 rounded-full border-2 border-primary-container/20 pointer-events-none"></div>
+<!-- Tactile Guideline Ring -->
+<div class="absolute w-48 h-48 rounded-full border border-dashed border-primary/30 flex items-center justify-center"></div>
+<!-- Central Sensory Tactile Sphere -->
+<div aria-label="Denyut Sensorik Aktif" class="sensory-sphere w-36 h-36 rounded-full flex flex-col items-center justify-center text-on-primary cursor-pointer active:scale-95 transition-transform duration-200 select-none shadow-xl relative z-10" role="button">
+<span class="material-symbols-outlined text-[44px] text-white drop-shadow-md">graphic_eq</span>
+<span class="font-label-md text-label-md mt-1 tracking-wide text-white/90 font-bold">120 Hz</span>
+</div>
+</div>
+<!-- MINIMAL REAL-TIME VOICE FEEDBACK READOUT -->
+<div class="w-full text-center px-3 mb-4">
+<p class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface font-extrabold tracking-tight leading-snug">
+        “Lurus 30 meter di atas ubin pemandu.”
+      </p>
+<div class="inline-flex items-center gap-1.5 text-on-surface-variant font-label-md text-label-md mt-2">
+<span class="material-symbols-outlined text-[18px] text-secondary">check_circle</span>
+<span class="">Jalur trotoar terverifikasi bebas rintangan</span>
+</div>
+</div>
+<!-- ESSENTIAL CONTROLS: 3 LARGE HIGH-CONTRAST TACTILE TOGGLES -->
+<div aria-label="Pengaturan Sensorik Cepat" class="w-full space-y-2.5 mb-5" role="region">
+<!-- 1. Suara Detail (Text-to-Speech) -->
+<button class="w-full min-h-[54px] bg-surface-container-lowest rounded-full px-5 py-3 flex items-center justify-between border-2 border-on-surface/10 hover:border-primary active:scale-[0.98] transition-all shadow-sm focus:outline focus:outline-[3px] focus:outline-primary" type="button">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[24px] text-primary">record_voice_over</span>
+<span class="font-label-lg text-label-lg text-on-surface">Suara Detail</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md text-primary font-bold">Aktif</span>
+<span class="w-7 h-4 bg-primary rounded-full relative inline-flex items-center px-0.5">
+<span class="w-3 h-3 bg-white rounded-full translate-x-3 transition-transform"></span>
+</span>
+</div>
+</button>
+<!-- 2. Getaran Taktil (Haptic Guidance) -->
+<button class="w-full min-h-[54px] bg-surface-container-lowest rounded-full px-5 py-3 flex items-center justify-between border-2 border-on-surface/10 hover:border-primary active:scale-[0.98] transition-all shadow-sm focus:outline focus:outline-[3px] focus:outline-primary" type="button">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[24px] text-primary">vibration</span>
+<span class="font-label-lg text-label-lg text-on-surface">Getaran Taktil</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md text-primary font-bold">Aktif</span>
+<span class="w-7 h-4 bg-primary rounded-full relative inline-flex items-center px-0.5">
+<span class="w-3 h-3 bg-white rounded-full translate-x-3 transition-transform"></span>
+</span>
+</div>
+</button>
+<!-- 3. Deteksi Halangan AI (Sonar Warning) -->
+<button class="w-full min-h-[54px] bg-surface-container-lowest rounded-full px-5 py-3 flex items-center justify-between border-2 border-on-surface/10 hover:border-primary active:scale-[0.98] transition-all shadow-sm focus:outline focus:outline-[3px] focus:outline-primary" type="button">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[24px] text-primary">radar</span>
+<span class="font-label-lg text-label-lg text-on-surface">Deteksi Halangan AI</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md text-primary font-bold">Aktif</span>
+<span class="w-7 h-4 bg-primary rounded-full relative inline-flex items-center px-0.5">
+<span class="w-3 h-3 bg-white rounded-full translate-x-3 transition-transform"></span>
+</span>
+</div>
+</button>
+</div>
+<!-- ONE MASSIVE ACTION BUTTON: BICARA SEKARANG -->
+<button aria-label="Tekan atau tahan untuk berbicara dengan asisten Leluasa" class="w-full min-h-[56px] bg-primary text-on-primary rounded-full px-6 py-4 flex items-center justify-center gap-3 font-label-lg text-label-lg shadow-lg hover:bg-primary-container active:scale-95 transition-all duration-150 focus:outline focus:outline-[3px] focus:outline-primary-container" type="button">
+<span class="material-symbols-outlined text-[26px]">mic</span>
+<span class="tracking-wide">Bicara Sekarang</span>
+</button>
+</main>
+<!-- SHARED BOTTOM NAVIGATION BAR -->
+<!-- Logic: Destination rule applies (Top-level destination screen for Voice & Guidance). Active Tab: 'Suara' strictly mapped. -->
+<nav aria-label="Navigasi Utama" class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-3 max-w-md mx-auto bg-surface-container-lowest dark:bg-inverse-surface shadow-[0_-4px_16px_rgba(17,24,39,0.08)] dark:shadow-none">
+<!-- Tab 1: Navigasi -->
+<a class="flex flex-col items-center justify-center gap-1 text-on-surface dark:text-inverse-on-surface px-4 py-2 min-h-[52px] hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors duration-150 active:scale-95 focus:outline focus:outline-[3px] focus:outline-primary" href="#">
+<span class="material-symbols-outlined text-[24px]">explore</span>
+<span class="font-label-lg text-label-lg">Navigasi</span>
+</a>
+<!-- Tab 2: Rute -->
+<a class="flex flex-col items-center justify-center gap-1 text-on-surface dark:text-inverse-on-surface px-4 py-2 min-h-[52px] hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors duration-150 active:scale-95 focus:outline focus:outline-[3px] focus:outline-primary" href="#">
+<span class="material-symbols-outlined text-[24px]">alt_route</span>
+<span class="font-label-lg text-label-lg">Rute</span>
+</a>
+<!-- Tab 3: Suara (Active Tab) -->
+<a aria-current="page" class="flex flex-col items-center justify-center gap-1 bg-primary text-on-primary dark:bg-primary-container dark:text-on-primary-container rounded-full px-5 py-2.5 min-h-[52px] transition-colors duration-150 active:scale-95 focus:outline focus:outline-[3px] focus:outline-primary" href="#">
+<span class="material-symbols-outlined text-[24px]">volume_up</span>
+<span class="font-label-lg text-label-lg font-bold">Suara</span>
+</a>
+</nav>
+
+
+</body></html>
