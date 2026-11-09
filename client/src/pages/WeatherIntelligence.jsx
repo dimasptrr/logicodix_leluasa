@@ -1,21 +1,46 @@
 import React, { useState, useEffect } from 'react';
-import { fetchWeather } from '../services/api.js';
+import { fetchWeather } from '../features/dashboard/services/safeApi.js';
+import MockDataBadge from '../components/MockDataBadge.jsx';
 
 export default function WeatherIntelligence({ setActiveTab }) {
   const [weather, setWeather] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState(null);
+
+  const loadWeather = async () => {
+    setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetchWeather();
+      setWeather(res.data);
+    } catch (err) {
+      setErrorMessage('Gagal memuat telemetri sensor cuaca. Silakan coba kembali.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    fetchWeather().then(res => setWeather(res.data)).catch(console.error);
+    loadWeather();
   }, []);
 
   return (
     <div className="p-3 sm:p-space-md lg:p-space-xl flex flex-col gap-space-md sm:gap-space-lg lg:gap-space-xl max-w-7xl mx-auto w-full animate-fadeIn pb-8 lg:pb-0">
       {/* Header */}
       <div className="flex flex-col gap-1">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-error-container text-on-error-container font-label-sm text-xs font-bold w-fit">
-          <span className="material-symbols-outlined text-sm">thunderstorm</span>
-          <span>CUACA MOBILITAS REAL-TIME · SURABAYA</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-container text-on-primary-container font-label-sm text-xs font-bold w-fit">
+            <span className="material-symbols-outlined text-sm">thunderstorm</span>
+            <span>CUACA MOBILITAS REAL-TIME · SURABAYA</span>
+          </div>
+          <MockDataBadge />
         </div>
+        {errorMessage && (
+          <div className="p-3 sm:p-4 rounded-xl bg-warning-container text-on-warning-container border border-warning/40 text-xs flex items-center justify-between shadow-xs my-2">
+            <span>{errorMessage}</span>
+            <button onClick={loadWeather} className="px-3 py-1.5 rounded-lg bg-primary text-on-primary font-bold">Coba Lagi</button>
+          </div>
+        )}
         <h1 className="font-headline-lg text-xl sm:text-2xl lg:text-3xl text-primary font-bold tracking-tight">
           Intelijen Cuaca Mikro & Traksi Trotoar
         </h1>
@@ -41,7 +66,7 @@ export default function WeatherIntelligence({ setActiveTab }) {
                 )}
               </div>
               <span className={`px-2.5 py-0.5 sm:py-1 rounded-full font-label-sm text-[10px] sm:text-xs font-bold ${
-                weather?.precipitationProb > 40 ? 'bg-error-container text-on-error-container' : 'bg-secondary-container text-on-secondary-container'
+                weather?.precipitationProb > 40 ? 'bg-warning-container text-on-warning-container' : 'bg-secondary-container text-on-secondary-container'
               }`}>
                 {weather?.alertMessage || 'Waktu Bepergian Optimal'}
               </span>

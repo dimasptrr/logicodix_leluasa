@@ -9,12 +9,12 @@ export default function Sidebar({
 }) {
   const navItems = [
     { id: 'home', label: 'Beranda (Dashboard)', icon: 'space_dashboard' },
-    { id: 'explore-map', label: 'Jelajah Peta', icon: 'map' },
-    { id: 'plan-route', label: 'Rencanakan Rute', icon: 'alt_route' },
-    { id: 'report-obstacle', label: 'Lapor Rintangan', icon: 'fmd_bad', isAction: true },
-    { id: 'reports-impact', label: 'Laporan & Dampak', icon: 'assessment' },
+    { id: 'explore-map', label: 'Peta Navigasi', icon: 'map' },
+    { id: 'plan-route', label: 'Rute & Perbandingan Akses', icon: 'alt_route' },
+    { id: 'report-obstacle', label: 'Buat Laporan', icon: 'notification_important', isAction: true },
+    { id: 'reports-impact', label: 'Riwayat & Verifikasi Komunitas', icon: 'history' },
     { id: 'weather-intelligence', label: 'Intelijen Cuaca', icon: 'routine' },
-    { id: 'voice-assistant', label: 'Asisten Suara', icon: 'graphic_eq' },
+    { id: 'voice-assistant', label: 'Asisten Suara AI', icon: 'graphic_eq' },
   ];
 
   const handleItemClick = (id) => {
@@ -36,9 +36,9 @@ export default function Sidebar({
             </div>
             <div className="flex flex-col">
               <div className="flex items-center gap-space-xs">
-                <span className="font-headline-sm text-headline-sm text-primary tracking-tight font-bold">Leluasa</span>
+                <span className="font-headline-sm text-headline-sm text-primary tracking-tight font-extrabold">Leluasa</span>
               </div>
-              <span className="font-label-sm text-on-surface-variant text-xs">Bergerak Bebas. Menavigasi Inklusif.</span>
+              <span className="font-label-sm text-on-surface-variant text-xs">All Access, All Ways.</span>
             </div>
           </div>
 
@@ -59,7 +59,7 @@ export default function Sidebar({
         </div>
 
         {/* Navigation Items */}
-        <nav className="flex flex-col gap-1 mt-space-sm">
+        <nav className="flex flex-col gap-1.5 mt-space-sm">
           {navItems.map((item) => {
             const isActive = activeTab === item.id;
             if (item.isAction) {
@@ -67,19 +67,21 @@ export default function Sidebar({
                 <button
                   key={item.id}
                   onClick={() => handleItemClick(item.id)}
-                  className={`flex items-center justify-between min-h-[48px] px-3.5 py-2.5 rounded-xl font-label-md text-label-md transition-all text-left ${
+                  aria-label={item.label}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`flex items-center justify-between min-h-[52px] px-4 py-3 rounded-full font-label-md text-label-md transition-all text-left focus:outline focus:outline-[3px] focus:outline-primary ${
                     isActive
-                      ? 'bg-primary-container text-on-primary font-bold shadow-[0_2px_8px_-2px_rgba(16,42,67,0.1)]'
-                      : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+                      ? 'bg-primary text-on-primary font-bold shadow-[0_4px_12px_rgba(0,55,176,0.25)]'
+                      : 'text-on-surface hover:bg-surface-container'
                   }`}
                 >
                   <div className="flex items-center gap-space-sm">
-                    <span className={`material-symbols-outlined text-xl ${isActive ? 'text-secondary-container' : 'text-secondary'}`}>
+                    <span className={`material-symbols-outlined text-2xl ${isActive ? 'text-secondary-container' : 'text-primary'}`}>
                       {item.icon}
                     </span>
                     <span>{item.label}</span>
                   </div>
-                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-secondary text-on-secondary font-label-sm text-label-sm shadow-[0_2px_6px_rgba(0,106,98,0.35)]">
+                  <span className="flex items-center justify-center w-7 h-7 rounded-full bg-secondary text-on-secondary font-label-md text-sm font-bold shadow-xs">
                     +
                   </span>
                 </button>
@@ -90,13 +92,15 @@ export default function Sidebar({
               <button
                 key={item.id}
                 onClick={() => handleItemClick(item.id)}
-                className={`flex items-center gap-space-sm min-h-[48px] px-3.5 py-2.5 rounded-xl font-label-md text-label-md transition-all text-left ${
+                aria-label={item.label}
+                aria-current={isActive ? 'page' : undefined}
+                className={`flex items-center gap-space-sm min-h-[52px] px-4 py-3 rounded-full font-label-md text-label-md transition-all text-left focus:outline focus:outline-[3px] focus:outline-primary ${
                   isActive
-                    ? 'bg-primary-container text-on-primary font-bold shadow-[0_2px_8px_-2px_rgba(16,42,67,0.1)]'
-                    : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+                    ? 'bg-primary text-on-primary font-bold shadow-[0_4px_12px_rgba(0,55,176,0.25)]'
+                    : 'text-on-surface hover:bg-surface-container'
                 }`}
               >
-                <span className={`material-symbols-outlined text-xl ${isActive ? 'text-secondary-container' : 'text-on-surface-variant'}`}>
+                <span className={`material-symbols-outlined text-2xl ${isActive ? 'text-secondary-container' : 'text-on-surface-variant'}`}>
                   {item.icon}
                 </span>
                 <span>{item.label}</span>

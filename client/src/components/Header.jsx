@@ -38,9 +38,10 @@ export default function Header({
           <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-on-secondary shadow-xs">
             <span className="material-symbols-outlined text-xl font-bold">accessible</span>
           </div>
-          <span className="font-headline-sm text-base text-primary font-bold tracking-tight hidden sm:inline">
-            Leluasa
-          </span>
+                    <div className="hidden sm:flex flex-col leading-tight">
+            <span className="font-headline-sm text-base text-primary font-bold tracking-tight">Leluasa</span>
+            <span className="font-label-sm text-[10px] text-on-surface-variant">All Access, All Ways.</span>
+          </div>
         </div>
       </div>
 
@@ -72,8 +73,10 @@ export default function Header({
               <button
                 onClick={() => setMobileSearchActive(false)}
                 className="w-8 h-8 flex items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container"
+                type="button"
+                aria-label="Tutup pencarian seluler"
               >
-                <span className="material-symbols-outlined text-lg">close</span>
+                <span className="material-symbols-outlined text-lg" aria-hidden="true">close</span>
               </button>
             )}
           </div>
@@ -81,24 +84,25 @@ export default function Header({
       </div>
 
       {/* Header Right Action Group */}
-      <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-        {/* Network Status Badge (Tablet / Desktop) */}
-        <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary-container/60 text-secondary">
-          <span className="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
-          <span className="font-label-sm text-xs font-semibold whitespace-nowrap">
-            94% Jaringan Aktif
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        {/* Sensor & Network Status Badge (Tablet / Desktop - Civic Sapphire) */}
+        <div className="hidden md:flex items-center gap-2 px-3.5 py-2 rounded-full bg-surface-container text-primary border border-primary/20 shadow-xs">
+          <span className="w-2.5 h-2.5 rounded-full bg-secondary-container animate-pulse"></span>
+          <span className="font-label-md text-xs font-bold whitespace-nowrap text-primary">
+            Sonar Aktif
           </span>
+          <span className="material-symbols-outlined text-primary text-[18px]">sensors</span>
         </div>
 
         {/* Voice Command Button */}
         <button
           aria-label="Perintah Suara"
           onClick={onOpenVoice}
-          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shadow-xs"
+          className="min-h-[48px] min-w-[48px] flex items-center justify-center rounded-full bg-surface-container-lowest text-primary hover:bg-surface-container transition-all active:scale-95 shadow-xs focus:outline focus:outline-[3px] focus:outline-primary"
           type="button"
-          title="Tekan V untuk Asisten Suara"
+          title="Tekan V untuk Asisten Suara Sensorik"
         >
-          <span className="material-symbols-outlined text-xl">keyboard_voice</span>
+          <span className="material-symbols-outlined text-2xl">sensors</span>
         </button>
 
         {/* Notifications Button */}
@@ -108,13 +112,13 @@ export default function Header({
             setUnreadCount(0);
             if (onOpenNotifications) onOpenNotifications();
           }}
-          className="relative min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shadow-xs"
+          className="relative min-h-[48px] min-w-[48px] flex items-center justify-center rounded-full bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all active:scale-95 shadow-xs focus:outline focus:outline-[3px] focus:outline-primary"
           type="button"
           title="Pemberitahuan"
         >
-          <span className="material-symbols-outlined text-xl">notifications</span>
+          <span className="material-symbols-outlined text-2xl">notifications</span>
           {unreadCount > 0 && (
-            <span className="absolute top-2 right-2 flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-error text-on-error font-label-sm text-[9px] font-bold">
+            <span className="absolute top-2 right-2 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-on-primary font-label-md text-[10px] font-bold">
               {unreadCount}
             </span>
           )}
@@ -124,11 +128,11 @@ export default function Header({
         <button
           aria-label="Preferensi Aksesibilitas"
           onClick={onOpenAccessibility}
-          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors shadow-xs"
+          className="min-h-[48px] min-w-[48px] flex items-center justify-center rounded-full bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all active:scale-95 shadow-xs focus:outline focus:outline-[3px] focus:outline-primary"
           type="button"
           title="Pengaturan Aksesibilitas"
         >
-          <span className="material-symbols-outlined text-xl">accessibility_new</span>
+          <span className="material-symbols-outlined text-2xl">accessibility_new</span>
         </button>
       </div>
     </header>
