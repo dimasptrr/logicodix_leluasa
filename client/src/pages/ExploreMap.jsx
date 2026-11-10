@@ -113,10 +113,10 @@ export default function ExploreMap({ setActiveTab }) {
       const iconSymbol = isImpassable ? 'block' : isDifficult ? 'build' : 'accessible';
 
       const labelBadge = isImpassable
-        ? `<div class="bg-error text-white font-bold text-[10px] px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1 mb-1 whitespace-nowrap"><span class="material-symbols-outlined text-[12px]">cancel</span><span>✕ ${obs.title || 'Tangga 4 Trap'}</span></div>`
+        ? `<div class="bg-error text-white font-bold text-[10px] px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1 mb-1 whitespace-nowrap"><span class="material-symbols-outlined text-[12px]">cancel</span><span>${obs.title || 'Tangga 4 Trap'}</span></div>`
         : isDifficult
-        ? `<div class="bg-warning text-on-warning font-bold text-[10px] px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1 mb-1 whitespace-nowrap"><span class="material-symbols-outlined text-[12px]">warning</span><span>⚠ Sulit (${obs.title || 'Ubin Rusak'})</span></div>`
-        : `<div class="bg-secondary text-white font-bold text-[10px] px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1 mb-1 whitespace-nowrap"><span class="material-symbols-outlined text-[12px]">check_circle</span><span>✓ Bisa dilewati</span></div>`;
+        ? `<div class="bg-warning text-on-warning font-bold text-[10px] px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1 mb-1 whitespace-nowrap"><span class="material-symbols-outlined text-[12px]">warning</span><span>Sulit (${obs.title || 'Ubin Rusak'})</span></div>`
+        : `<div class="bg-secondary text-white font-bold text-[10px] px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1 mb-1 whitespace-nowrap"><span class="material-symbols-outlined text-[12px]">check_circle</span><span>Bisa dilewati</span></div>`;
 
       const html = `
         <div class="flex flex-col items-center cursor-pointer group hover:scale-110 transition-transform">
@@ -248,7 +248,7 @@ export default function ExploreMap({ setActiveTab }) {
         </div>
         <div class="w-2.5 h-3 bg-secondary -mt-1 [clip-path:polygon(50%_100%,0_0,100%_0)] z-20"></div>
         <div class="mt-1 bg-primary text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full shadow-xl whitespace-nowrap z-30 ring-1 ring-white/30">
-          📍 ${label}
+          ${label}
         </div>
       </div>
     `;
@@ -292,7 +292,7 @@ export default function ExploreMap({ setActiveTab }) {
             mapInstanceRef.current.setView([latitude, longitude], 17, { animate: true });
           }
         }
-        setActionFeedback(`📍 Lokasi Terkunci: ${latitude.toFixed(4)}, ${longitude.toFixed(4)} (±${Math.round(accuracy)}m)`);
+        setActionFeedback(`Lokasi Terkunci: ${latitude.toFixed(4)}, ${longitude.toFixed(4)} (±${Math.round(accuracy)}m)`);
         setTimeout(() => setActionFeedback(''), 4500);
       },
       (error) => {
@@ -315,7 +315,7 @@ export default function ExploreMap({ setActiveTab }) {
       );
       utterance.lang = 'id-ID';
       window.speechSynthesis.speak(utterance);
-      setActionFeedback('🔊 Membacakan panduan audio rute ramah akses...');
+      setActionFeedback('Membacakan panduan audio rute ramah akses...');
       setTimeout(() => setActionFeedback(''), 4000);
     }
   };
@@ -386,7 +386,7 @@ export default function ExploreMap({ setActiveTab }) {
               <span className="text-[10px] text-on-surface-variant font-medium">All Access, All Ways.</span>
             </div>
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary-container/50 border border-outline-variant/30 text-[11px] font-bold text-primary">
-              <span aria-hidden="true">☀️</span>
+              <span className="material-symbols-outlined text-xs text-amber-600" aria-hidden="true">wb_sunny</span>
               <span>Cerah 31°C</span>
             </div>
           </div>
@@ -420,7 +420,7 @@ export default function ExploreMap({ setActiveTab }) {
               <span>Sonar Aktif</span>
             </div>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-low border border-outline-variant/30 text-[11px] font-bold text-primary shadow-xs">
-              <span aria-hidden="true">☀️</span>
+              <span className="material-symbols-outlined text-xs text-amber-600" aria-hidden="true">wb_sunny</span>
               <span>Cerah 31°C</span>
             </div>
 
@@ -762,8 +762,14 @@ export default function ExploreMap({ setActiveTab }) {
                 </p>
                 <button
                   type="button"
-                  onClick={() => setActiveTab('plan-route')}
-                  className="w-full mt-1 min-h-[38px] rounded-xl bg-primary text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm hover:opacity-90 transition-transform active:scale-98"
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      window.__leluasaTargetRoute = 'detour-bollard';
+                      window.dispatchEvent(new CustomEvent('leluasa:select-route', { detail: { routeKey: 'detour-bollard' } }));
+                    }
+                    setActiveTab('plan-route');
+                  }}
+                  className="w-full mt-1 min-h-[38px] rounded-xl bg-primary text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm hover:opacity-90 transition-transform active:scale-98 cursor-pointer"
                 >
                   <span>Buka Panduan Rute Pengalihan</span>
                   <span className="material-symbols-outlined text-sm">arrow_forward</span>

@@ -1,601 +1,1182 @@
-import React, { useState, useEffect } from 'react';
-import { fetchWeather, fetchStats } from '../features/dashboard/services/safeApi.js';
+import React, { useState, useEffect, useRef } from 'react';
+import L from 'leaflet';
 import MockDataBadge from '../components/MockDataBadge.jsx';
 
-export default function Dashboard({ setActiveTab, onOpenVoice }) {
-  const [weather, setWeather] = useState(null);
-  const [stats, setStats] = useState(null);
-  const [searchInput, setSearchInput] = useState('');
-  const [activeLayer, setActiveLayer] = useState('surface');
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState(null);
+// Data Lokasi Surabaya Populer untuk Pencarian & Multi-Stop
+const SURABAYA_DESTINATIONS = [
+  {
+    id: 'rsud-soetomo',
+    name: 'RSUD Dr. Soetomo',
+    category: 'Fasilitas Kesehatan',
+    address: 'Jl. Mayjen Prof. Dr. Moestopo No. 6-8',
+    lat: -7.2678,
+    lng: 112.7582,
+    accessibility: '100% Rampa & Lift',
+    time: '10 Menit',
+    distance: '650 m'
+  },
+  {
+    id: 'sentra-kuliner',
+    name: 'Sentra Kuliner Pemuda',
+    category: 'Sentra Kuliner & UMKM',
+    address: 'Jl. Pemuda Sisi Selatan',
+    lat: -7.2662,
+    lng: 112.7485,
+    accessibility: 'Trotoar Lebar Bebas Parkir Liar',
+    time: '6 Menit',
+    distance: '380 m'
+  },
+  {
+    id: 'halte-pemuda',
+    name: 'Halte Integrasi Balai Pemuda',
+    category: 'Halte Trans Semanggi',
+    address: 'Jl. Pemuda No. 45, Embong Kaliasin',
+    lat: -7.2655,
+    lng: 112.7515,
+    accessibility: 'Elevator & Ubin Pemandu Kuning',
+    time: '8 Menit',
+    distance: '420 m'
+  },
+  {
+    id: 'balai-kota',
+    name: 'Balai Kota Surabaya',
+    category: 'Pusat Pemerintahan',
+    address: 'Jl. Taman Surya No. 1',
+    lat: -7.2628,
+    lng: 112.7530,
+    accessibility: 'Arkade Teduh & Rampa 1:12',
+    time: '14 Menit',
+    distance: '850 m'
+  },
+  {
+    id: 'tunjungan-plaza',
+    name: 'Tunjungan Plaza Mall',
+    category: 'Pusat Perbelanjaan',
+    address: 'Jl. Jenderal Basuki Rahmat',
+    lat: -7.2618,
+    lng: 112.7392,
+    accessibility: 'Jembatan Penyeberangan Berlift',
+    time: '18 Menit',
+    distance: '1,1 km'
+  }
+];
 
-  const loadData = async () => {
-    setIsLoading(true);
-    setLoadError(null);
-    try {
-      const [weatherRes, statsRes] = await Promise.all([
-        fetchWeather(),
-        fetchStats()
-      ]);
-      setWeather(weatherRes.data);
-      setStats(statsRes.data);
-    } catch (err) {
-      setLoadError('Gagal memuat sebagian data dashboard. Silakan coba kembali.');
-    } finally {
-      setIsLoading(false);
+export default function Dashboard({ setActiveTab, onOpenVoice }) {
+  // State Navigasi Tujuan & Multi-Stop
+  const [hasSelectedDestination, setHasSelectedDestination] = useState(false);
+  const [customOrigin, setCustomOrigin] = useState(null); // null = default GPS, atau objek lokasi kustom
+  const [isEditingOrigin, setIsEditingOrigin] = useState(false);
+  const [stop1, setStop1] = useState(null); // Lokasi tujuan 1
+  const [stop2, setStop2] = useState(null); // Lokasi tujuan 2 (Multi-stop)
+  const [isAddingStop2, setIsAddingStop2] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchTarget, setSearchTarget] = useState('stop1'); // 'origin' | 'stop1' | 'stop2'
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+
+  // State Kontrol Rute HUD
+  const [selectedRouteKey, setSelectedRouteKey] = useState('ubin'); // 'ubin' | 'ramp'
+  const [hapticEnabled, setHapticEnabled] = useState(true);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simulationStep, setSimulationStep] = useState(0);
+  const [audioFeedback, setAudioFeedback] = useState('');
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [mapZoom, setMapZoom] = useState(1);
+  const [mapRotation, setMapRotation] = useState(0);
+  const [isAudioMuted, setIsAudioMuted] = useState(false);
+  const [userLocationName, setUserLocationName] = useState('Surabaya Pusat');
+  const [userCoords, setUserCoords] = useState({ lat: -7.2655, lng: 112.7515 });
+
+  // Refs Peta Leaflet Utama
+  const leafletMapRef = useRef(null);
+  const leafletInstanceRef = useRef(null);
+  const markersLayerRef = useRef(null);
+
+  // Auto-deteksi lokasi GPS riil pengguna browser
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          setUserCoords({ lat: latitude, lng: longitude });
+          setUserLocationName(`Surabaya (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
+        },
+        () => {
+          setUserLocationName('Surabaya Pusat');
+        },
+        { timeout: 7000 }
+      );
+    }
+  }, []);
+
+  // Inisialisasi Peta Leaflet Utama saat belum memilih tujuan
+  useEffect(() => {
+    if (hasSelectedDestination) {
+      if (leafletInstanceRef.current) {
+        leafletInstanceRef.current.remove();
+        leafletInstanceRef.current = null;
+      }
+      return;
+    }
+
+    if (!leafletMapRef.current || leafletInstanceRef.current) return;
+
+    const map = L.map(leafletMapRef.current, {
+      center: [userCoords.lat, userCoords.lng],
+      zoom: 15,
+      zoomControl: false,
+      attributionControl: true
+    });
+
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> Surabaya',
+      maxZoom: 19
+    }).addTo(map);
+
+    markersLayerRef.current = L.layerGroup().addTo(map);
+    leafletInstanceRef.current = map;
+
+    return () => {
+      map.remove();
+      leafletInstanceRef.current = null;
+    };
+  }, [hasSelectedDestination, userCoords]);
+
+  // Pasang Pin Lokasi di Peta Leaflet
+  useEffect(() => {
+    if (!leafletInstanceRef.current || !markersLayerRef.current || hasSelectedDestination) return;
+
+    const layer = markersLayerRef.current;
+    layer.clearLayers();
+
+    // 1. Pin Titik Awal (Default GPS atau Titik Kustom)
+    const originLat = customOrigin ? customOrigin.lat : userCoords.lat;
+    const originLng = customOrigin ? customOrigin.lng : userCoords.lng;
+    const originTitle = customOrigin ? `Titik Awal: ${customOrigin.name}` : 'Lokasi Anda Saat Ini (GPS)';
+
+    const userMarkerHtml = `
+      <div class="relative flex items-center justify-center -translate-x-1/2 -translate-y-1/2 cursor-pointer">
+        <div class="absolute w-10 h-10 bg-primary/30 rounded-full animate-ping"></div>
+        <div class="w-8 h-8 rounded-full bg-primary border-3 border-white shadow-xl flex items-center justify-center text-white font-bold">
+          <span class="material-symbols-outlined text-[16px]">navigation</span>
+        </div>
+      </div>
+    `;
+    const userIcon = L.divIcon({ className: 'user-pin', html: userMarkerHtml, iconSize: [0, 0] });
+    L.marker([originLat, originLng], { icon: userIcon })
+      .bindTooltip(originTitle, { permanent: false, direction: 'top' })
+      .addTo(layer);
+
+    // 2. Pin Destinasi Surabaya
+    SURABAYA_DESTINATIONS.forEach((dest) => {
+      const isSelected = stop1?.id === dest.id || stop2?.id === dest.id;
+      const destMarkerHtml = `
+        <div class="flex flex-col items-center -translate-x-1/2 -translate-y-full cursor-pointer hover:scale-110 transition-transform">
+          <div class="px-2.5 py-0.5 rounded-full ${isSelected ? 'bg-secondary' : 'bg-primary'} text-white font-bold text-[10px] shadow-lg whitespace-nowrap mb-1">
+            ${dest.name}
+          </div>
+          <div class="w-8 h-8 rounded-full ${isSelected ? 'bg-secondary' : 'bg-surface-container-lowest border-2 border-primary'} text-primary flex items-center justify-center shadow-md">
+            <span class="material-symbols-outlined text-base ${isSelected ? 'text-white' : 'text-primary'}">
+              ${dest.id.includes('rsud') ? 'local_hospital' : dest.id.includes('kuliner') ? 'restaurant' : 'location_on'}
+            </span>
+          </div>
+        </div>
+      `;
+      const icon = L.divIcon({ className: `dest-pin-${dest.id}`, html: destMarkerHtml, iconSize: [0, 0] });
+      const marker = L.marker([dest.lat, dest.lng], { icon }).addTo(layer);
+
+      marker.on('click', () => {
+        handleSelectLocation(dest);
+      });
+    });
+  }, [hasSelectedDestination, userCoords, stop1, stop2, customOrigin]);
+
+  const handleSelectLocation = (dest) => {
+    if (searchTarget === 'origin') {
+      setCustomOrigin(dest);
+      setIsEditingOrigin(false);
+      setSearchQuery('');
+      setIsSearchFocused(false);
+      setSearchTarget('stop1');
+    } else if (searchTarget === 'stop2' || (stop1 && isAddingStop2 && !stop2)) {
+      setStop2(dest);
+      setSearchQuery('');
+      setIsSearchFocused(false);
+    } else {
+      setStop1(dest);
+      setSearchQuery('');
+      setIsSearchFocused(false);
     }
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const originDisplay = customOrigin
+    ? customOrigin.name
+    : `Lokasi Saya Saat Ini (GPS: ${userLocationName})`;
 
-  const handleQuickDestination = (dest) => {
-    setSearchInput(dest);
-    setActiveTab('plan-route');
+  const originLabel = customOrigin ? customOrigin.name : 'Lokasi Saya';
+
+  // Kalkulasi info rute aktif
+  const currentRouteTitle = stop2
+    ? `${originLabel} → ${stop1?.name} → ${stop2?.name}`
+    : stop1
+    ? `${originLabel} → ${stop1?.name}`
+    : 'Menuju Halte Balai Pemuda Surabaya';
+
+  const currentRouteSubtitle = stop2
+    ? `2 Perhentian: ${stop1?.address.split(',')[0]} → ${stop2?.address.split(',')[0]}`
+    : stop1
+    ? `${stop1?.address} (${stop1?.accessibility})`
+    : 'Jl. Pemuda ke Halte Balai Pemuda';
+
+  const estimatedTime = stop2 ? '16 Menit' : stop1 ? stop1.time : '8 Menit';
+  const estimatedDistance = stop2 ? '1,1 km' : stop1 ? stop1.distance : '420 m';
+
+  const handleApplyRoute = () => {
+    if (!stop1) return;
+    setHasSelectedDestination(true);
+
+    if ('vibrate' in navigator && hapticEnabled) {
+      navigator.vibrate([80, 40, 80]);
+    }
   };
 
+  const handleResetDestination = () => {
+    setHasSelectedDestination(false);
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+  };
+
+  const handleToggleHaptic = () => {
+    const next = !hapticEnabled;
+    setHapticEnabled(next);
+    if (next && 'vibrate' in navigator) {
+      navigator.vibrate([80, 40, 80]);
+    }
+  };
+
+  // Logika Pemutaran Suara Toggle
+  const handleToggleAudio = () => {
+    if (!('speechSynthesis' in window)) {
+      setAudioFeedback('Browser Anda tidak mendukung output sintesis suara.');
+      setTimeout(() => setAudioFeedback(''), 3000);
+      return;
+    }
+
+    if (isAudioMuted) {
+      setIsAudioMuted(false);
+    }
+
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      setAudioFeedback('Suara dihentikan. Klik lagi untuk mengulang penjelasan rute.');
+      setTimeout(() => setAudioFeedback(''), 3500);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const text = `Panduan Leluasa: ${currentRouteTitle}. Estimasi waktu tiba ${estimatedTime}, jarak ${estimatedDistance}. Ubin pemandu teratur tanpa rintangan galian.`;
+
+    setAudioFeedback(`Memutar penjelasan: ${currentRouteTitle}`);
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'id-ID';
+    utterance.rate = 1.0;
+
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      setAudioFeedback('');
+    };
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+      setAudioFeedback('');
+    };
+
+    window.speechSynthesis.speak(utterance);
+    setIsSpeaking(true);
+  };
+
+  const handleStartSimulation = () => {
+    setIsSimulating(true);
+    setSimulationStep(1);
+
+    if (!isSpeaking) {
+      handleToggleAudio();
+    }
+
+    const interval = setInterval(() => {
+      setSimulationStep((prev) => {
+        if ('vibrate' in navigator && hapticEnabled) {
+          navigator.vibrate([70, 30, 70]);
+        }
+        if (prev >= 4) {
+          clearInterval(interval);
+          setIsSimulating(false);
+          return 0;
+        }
+        return prev + 1;
+      });
+    }, 2800);
+  };
+
+  const filteredDestinations = SURABAYA_DESTINATIONS.filter(d =>
+    d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    d.address.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
-    <div className="p-3 sm:p-space-md lg:p-space-xl flex flex-col gap-space-md sm:gap-space-lg lg:gap-space-xl max-w-7xl mx-auto w-full animate-fadeIn pb-6 lg:pb-0">
-      {/* Friendly Error State */}
-      {loadError && (
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-warning-container text-on-warning-container border border-warning/40 flex items-center justify-between gap-3 shadow-xs">
-          <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold">
-            <span className="material-symbols-outlined text-lg">info</span>
-            <span>{loadError}</span>
+    <div className="min-h-[calc(100vh-5rem)] h-full flex flex-col justify-between w-full max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3 pb-20 lg:pb-3 animate-fadeIn">
+      
+      {/* Toast Notifikasi Status Suara Realtime */}
+      {audioFeedback && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed top-20 left-1/2 -translate-x-1/2 z-50 p-3.5 sm:p-4 rounded-2xl bg-primary text-on-primary shadow-2xl max-w-lg w-[90%] flex items-start gap-3 border border-secondary/40 text-xs sm:text-sm font-semibold animate-fadeIn"
+        >
+          <span className="material-symbols-outlined text-secondary-container text-xl shrink-0 mt-0.5" aria-hidden="true">
+            {isSpeaking ? 'volume_up' : 'info'}
+          </span>
+          <div className="flex-1">
+            <span className="text-[11px] uppercase tracking-wider text-secondary-container font-bold block mb-0.5">
+              {isSpeaking ? 'Sedang Memutar Panduan Suara' : 'Status Panduan Suara'}
+            </span>
+            <p>{audioFeedback}</p>
           </div>
           <button
-            onClick={loadData}
-            className="px-3 py-1.5 rounded-xl bg-primary text-on-primary font-label-sm text-xs font-bold hover:opacity-90 transition-opacity"
             type="button"
+            onClick={() => setAudioFeedback('')}
+            className="text-on-primary/70 hover:text-on-primary cursor-pointer"
+            aria-label="Tutup notifikasi panduan suara"
           >
-            Coba Lagi
+            <span className="material-symbols-outlined text-base" aria-hidden="true">close</span>
           </button>
         </div>
       )}
-      {/* PANEL PENCARIAN & SAMBUTAN */}
-      <section className="relative overflow-hidden rounded-2xl bg-surface-container-lowest p-4 sm:p-space-lg lg:p-space-xl shadow-[0_8px_24px_-4px_rgba(16,42,67,0.06)] flex flex-col gap-space-md lg:gap-space-lg">
-        <div className="absolute -right-12 -top-12 w-64 h-64 rounded-full bg-secondary-container/40 blur-3xl pointer-events-none"></div>
-        <div className="absolute right-48 -bottom-10 w-48 h-48 rounded-full bg-primary-fixed/50 blur-2xl pointer-events-none"></div>
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-space-sm sm:gap-space-md">
-          <div className="flex flex-col gap-1 max-w-2xl">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full bg-surface-container text-secondary font-label-sm text-[11px] sm:text-xs font-semibold">
-                <span className="w-2 h-2 rounded-full bg-secondary animate-ping"></span>
-                Sesi Surabaya Aktif
+      {/* Grid Utama 2 Kolom: Kiri (Pencarian & Kontrol) & Kanan (Peta Interaktif / Rute HUD) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 flex-1 items-stretch">
+        
+        {/* ======================================================== */}
+        {/* KOLOM KIRI (lg:col-span-5 xl:col-span-4): Control Hub   */}
+        {/* ======================================================== */}
+        <aside className="lg:col-span-5 xl:col-span-4 flex flex-col justify-between gap-3.5 w-full">
+          
+          <div className="flex flex-col gap-3.5">
+            {/* Hub Header & Status Bar */}
+            <div className="bg-surface-container-lowest p-4 rounded-[1.5rem] border border-outline-variant shadow-[0_4px_12px_rgba(17,24,39,0.06)] flex flex-col gap-2.5 transition-shadow hover:shadow-md duration-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-secondary ring-4 ring-secondary/20 inline-block animate-breathing-green" aria-hidden="true"></span>
+                  <span className="text-label-md font-label-md text-on-surface font-bold tracking-tight text-xs sm:text-sm">
+                    {hasSelectedDestination ? 'Navigasi Rute Aktif' : 'Peta Navigasi Surabaya'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <MockDataBadge />
+                </div>
+              </div>
+              <h1 className="text-headline-sm font-headline-sm text-primary font-bold text-base sm:text-lg">
+                {hasSelectedDestination ? 'Panduan Rute Taktil Surabaya' : 'Cari & Tentukan Rute Tujuan'}
+              </h1>
+            </div>
+
+            {/* KARTU PENCARIAN RUTE & MULTI-STOP (Mirip Google Maps) */}
+            <div className="bg-surface-container-lowest rounded-[1.5rem] border border-outline-variant shadow-sm p-4 flex flex-col gap-3">
+              <span className="text-xs font-bold text-primary flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-base text-secondary">alt_route</span>
+                <span>Rencana Perjalanan (Maksimal 2 Stop)</span>
               </span>
-              <MockDataBadge />
-              <span className="font-label-sm text-[11px] sm:text-xs text-on-surface-variant">Akurasi GPS: ±1.2m</span>
-            </div>
-            <h1 className="font-headline-lg text-xl sm:text-2xl lg:text-3xl text-primary tracking-tight font-bold">
-              Selamat pagi, Dian! 🌅
-            </h1>
-            <p className="font-body-md text-xs sm:text-sm text-on-surface-variant">
-              Mau bepergian ke mana hari ini? Temukan rute trotoar ramah kursi roda dan jelajahi Surabaya dengan aman, nyaman & mandiri.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container-low text-on-surface font-label-sm text-xs shadow-xs">
-              <span className="material-symbols-outlined text-secondary text-base">keyboard</span>
-              <span>Tekan <kbd className="px-1.5 py-0.5 rounded bg-surface-container-lowest font-mono text-primary font-bold shadow-xs">V</kbd> untuk Suara</span>
-            </div>
-          </div>
-        </div>
 
-        {/* Kolom Pencarian Aksesibel */}
-        <div className="relative z-10 flex flex-col gap-space-sm">
-          <div className="relative flex items-center w-full">
-            <span className="material-symbols-outlined absolute left-3.5 sm:left-4 text-secondary text-xl sm:text-2xl pointer-events-none">
-              search
-            </span>
-            <input
-              id="global-destination-input"
-              className="w-full h-12 sm:h-14 pl-10 sm:pl-12 pr-24 sm:pr-28 rounded-xl bg-surface text-on-surface placeholder:text-outline font-body-md text-xs sm:text-sm shadow-[0_2px_8px_-2px_rgba(16,42,67,0.06)] focus:outline-none focus:bg-surface-container-lowest transition-all"
-              placeholder="Cari faskes, stasiun, rampa trotoar, gedung..."
-              type="text"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && setActiveTab('plan-route')}
-            />
-            <div className="absolute right-1.5 sm:right-2 flex items-center gap-1">
-              <button
-                aria-label="Pencarian suara"
-                onClick={onOpenVoice}
-                className="w-9 sm:w-10 h-9 sm:h-10 flex items-center justify-center rounded-lg bg-secondary text-on-secondary hover:bg-secondary-container hover:text-on-secondary-container transition-colors shadow-xs"
-                type="button"
-                title="Input Suara"
-              >
-                <span className="material-symbols-outlined text-lg sm:text-xl">mic</span>
-              </button>
-              <button
-                aria-label="Preferensi rute"
-                onClick={() => setActiveTab('plan-route')}
-                className="w-9 sm:w-10 h-9 sm:h-10 flex items-center justify-center rounded-lg bg-surface-container-low text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors"
-                type="button"
-                title="Preferensi Rute"
-              >
-                <span className="material-symbols-outlined text-lg sm:text-xl">tune</span>
-              </button>
-            </div>
-          </div>
+              {/* Titik Awal (Default GPS, Dapat Dipindah/Kustom) */}
+              <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-surface-container-low border border-outline-variant/30 text-xs">
+                <div className="w-3 h-3 rounded-full bg-primary ring-4 ring-primary/20 shrink-0"></div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-bold text-on-surface-variant block">Titik Awal</span>
+                    {customOrigin ? (
+                      <button
+                        type="button"
+                        onClick={() => { setCustomOrigin(null); setIsEditingOrigin(false); }}
+                        className="text-[10px] text-primary hover:underline font-bold cursor-pointer"
+                        title="Kembalikan ke Lokasi GPS Anda"
+                      >
+                        Reset ke GPS
+                      </button>
+                    ) : null}
+                  </div>
+                  {isEditingOrigin ? (
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="Ketik lokasi awal di Surabaya..."
+                      value={searchTarget === 'origin' ? searchQuery : ''}
+                      onFocus={() => { setSearchTarget('origin'); setIsSearchFocused(true); }}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-transparent font-medium text-on-surface placeholder:text-outline focus:outline-none mt-0.5"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-between gap-1 mt-0.5">
+                      <span className="font-bold text-on-surface truncate">{originDisplay}</span>
+                      <button
+                        type="button"
+                        onClick={() => { setIsEditingOrigin(true); setSearchTarget('origin'); setIsSearchFocused(true); }}
+                        className="px-2 py-0.5 rounded-md bg-surface-container hover:bg-surface-container-high text-primary font-bold text-[10px] shrink-0 cursor-pointer"
+                        title="Pilih Titik Awal Lain"
+                      >
+                        Ubah
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold shrink-0">
+                  {customOrigin ? 'Kustom' : 'GPS'}
+                </span>
+              </div>
 
-          {/* Destinasi Cepat (Termasuk Destinasi Stitch & Surabaya) */}
-          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 pt-0.5 no-scrollbar">
-            <button
-              onClick={() => handleQuickDestination('Halte TransJakarta')}
-              className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary text-white font-label-md text-xs font-bold shadow-xs hover:bg-primary-container transition-colors"
-              type="button"
-            >
-              <span className="material-symbols-outlined text-sm">directions_bus</span>
-              <span>Halte TransJakarta (Stitch)</span>
-            </button>
-            <button
-              onClick={() => handleQuickDestination('Stasiun Cikini')}
-              className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary-fixed text-on-primary-fixed font-label-md text-xs font-bold hover:opacity-90 transition-opacity"
-              type="button"
-            >
-              <span className="material-symbols-outlined text-sm">train</span>
-              <span>Stasiun Cikini (Stitch)</span>
-            </button>
-            <button
-              onClick={() => handleQuickDestination('RSUD Dr. Soetomo')}
-              className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full bg-surface-container-low text-on-surface font-label-md text-xs font-semibold hover:bg-surface-container transition-colors border border-outline-variant/30"
-              type="button"
-            >
-              <span>🏥 RSUD Dr. Soetomo</span>
-            </button>
-            <button
-              onClick={() => handleQuickDestination('Balai Pemuda, Jl. Gubernur Suryo')}
-              className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full bg-surface-container-low text-on-surface font-label-md text-xs font-semibold hover:bg-surface-container transition-colors border border-outline-variant/30"
-              type="button"
-            >
-              <span className="material-symbols-outlined text-sm">my_location</span>
-              <span>Balai Pemuda</span>
-            </button>
-          </div>
-
-          {/* Akses Cepat ke Tampilan Mockup Utama (Gambar 1, 2, 3) */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-outline-variant/20">
-            <button
-              onClick={() => setActiveTab('explore-map')}
-              className="p-3 rounded-xl bg-primary text-white font-bold text-xs flex items-center justify-between gap-2 shadow-xs hover:bg-primary/90 transition-all group text-left"
-              type="button"
-            >
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-lg text-secondary-container">map</span>
-                <div>
-                  <div className="leading-tight">Peta Navigasi</div>
-                  <div className="text-[10px] text-white/80 font-normal">Peta interaktif & sidebar rintangan</div>
+              {/* Stop 1 (Tujuan Pertama) */}
+              <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-surface-container-lowest border-2 border-primary shadow-xs text-xs relative">
+                <div className="w-3 h-3 rounded-full bg-secondary ring-4 ring-secondary/20 shrink-0"></div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-[10px] uppercase font-bold text-secondary block">Tujuan 1 (Wajib)</span>
+                  {stop1 ? (
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-bold text-on-surface truncate">{stop1.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setStop1(null)}
+                        className="text-on-surface-variant hover:text-error text-xs font-bold px-1"
+                        title="Hapus Tujuan 1"
+                      >
+                        <span className="material-symbols-outlined text-sm">close</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder="Ketik atau klik pin di peta..."
+                      value={searchTarget === 'stop1' ? searchQuery : ''}
+                      onFocus={() => { setSearchTarget('stop1'); setIsSearchFocused(true); }}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-transparent font-medium text-on-surface placeholder:text-outline focus:outline-none"
+                    />
+                  )}
                 </div>
               </div>
-              <span className="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('report-obstacle')}
-              className="p-3 rounded-xl bg-amber-100 text-amber-900 font-bold text-xs flex items-center justify-between gap-2 border border-amber-300 hover:bg-amber-200 transition-all group text-left"
-              type="button"
-            >
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-lg text-amber-700">notification_important</span>
-                <div>
-                  <div className="leading-tight">Buat Laporan 3-Langkah</div>
-                  <div className="text-[10px] text-amber-800 font-normal">Foto GPS, AI review & terbitkan</div>
+
+              {/* Stop 2 (Perhentian Kedua - Opsional) */}
+              {isAddingStop2 ? (
+                <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-surface-container-lowest border border-outline-variant text-xs relative animate-fadeIn">
+                  <div className="w-3 h-3 rounded-full bg-amber-500 ring-4 ring-amber-500/20 shrink-0"></div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[10px] uppercase font-bold text-amber-600 block">Tujuan 2 (Perhentian Tambahan)</span>
+                    {stop2 ? (
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-bold text-on-surface truncate">{stop2.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => setStop2(null)}
+                          className="text-on-surface-variant hover:text-error text-xs font-bold px-1"
+                          title="Hapus Tujuan 2"
+                        >
+                          Batal
+                        </button>
+                      </div>
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder="Contoh: Sentra Kuliner Pemuda..."
+                        value={searchTarget === 'stop2' ? searchQuery : ''}
+                        onFocus={() => { setSearchTarget('stop2'); setIsSearchFocused(true); }}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full bg-transparent font-medium text-on-surface placeholder:text-outline focus:outline-none"
+                      />
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setIsAddingStop2(false); setStop2(null); }}
+                    className="text-on-surface-variant hover:text-error text-xs font-bold"
+                    title="Batal Tambah Stop 2"
+                  >
+                    Batal
+                  </button>
                 </div>
-              </div>
-              <span className="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('plan-route')}
-              className="p-3 rounded-xl bg-surface-container-low text-primary font-bold text-xs flex items-center justify-between gap-2 border border-outline-variant/30 hover:bg-surface-container transition-all group text-left"
-              type="button"
-            >
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-lg text-secondary">alt_route</span>
-                <div>
-                  <div className="leading-tight">Rute & Navigasi Sensori</div>
-                  <div className="text-[10px] text-on-surface-variant font-normal">Pilihan rute & HUD aktif</div>
-                </div>
-              </div>
-              <span className="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* PETA & KARTU INTELIJEN KONTEKSTUAL (2 KOLOM) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-md lg:gap-space-lg items-start">
-        {/* KOLOM KIRI: PREVIEW PETA INTERAKTIF (60%) */}
-        <section className="lg:col-span-7 flex flex-col rounded-2xl bg-surface-container-lowest overflow-hidden shadow-[0_8px_24px_-4px_rgba(16,42,67,0.08)]">
-          {/* Header Peta */}
-          <div className="p-3 sm:p-space-md bg-surface-container-low flex items-center justify-between">
-            <div className="flex items-center gap-2 sm:gap-space-sm">
-              <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-on-secondary shrink-0">
-                <span className="material-symbols-outlined text-base sm:text-lg">explore</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="font-headline-sm text-sm sm:text-base text-primary font-bold">Koridor Pusat Surabaya</span>
-                <span className="font-label-sm text-[10px] sm:text-xs text-on-surface-variant">Jaringan Sensor & Trotoar Real-time</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setActiveTab('explore-map')}
-                className="px-2.5 py-1 rounded-md bg-surface-container-lowest text-secondary font-label-sm text-xs font-semibold hover:bg-surface-container transition-colors shadow-xs flex items-center gap-1"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-xs">fullscreen</span>
-                <span className="hidden sm:inline">Peta Penuh</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('explore-map')}
-                className="px-2.5 py-1 rounded-md bg-secondary text-on-secondary font-label-sm text-xs font-semibold hover:opacity-90 transition-opacity shadow-xs flex items-center gap-1"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-xs">near_me</span>
-                <span>Pusatkan</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Area Peta Vektor Ilustratif */}
-          <div className="relative w-full h-[320px] sm:h-[400px] lg:h-[460px] bg-surface-container-high overflow-hidden select-none">
-            <svg className="absolute inset-0 w-full h-full object-cover" preserveAspectRatio="none" viewBox="0 0 700 460" xmlns="http://www.w3.org/2000/svg">
-              <rect fill="#eaf2f8" height="460" width="700"></rect>
-              <rect fill="#d3ecd9" height="90" opacity="0.8" rx="8" width="130" x="70" y="50"></rect>
-              <text fill="#1b5e20" fontFamily="Plus Jakarta Sans" fontSize="10" fontWeight="600" x="80" y="70">Taman Apsari</text>
-              <rect fill="#d3ecd9" height="130" opacity="0.6" rx="8" width="160" x="480" y="240"></rect>
-              <text fill="#1b5e20" fontFamily="Plus Jakarta Sans" fontSize="10" fontWeight="600" x="495" y="260">Kompleks RSUD Soetomo</text>
-
-              <path d="M 0 110 L 700 110" fill="none" stroke="#cbd5e1" strokeWidth="26"></path>
-              <path d="M 190 0 L 190 460" fill="none" stroke="#cbd5e1" strokeWidth="28"></path>
-              <path d="M 430 0 L 430 460" fill="none" stroke="#cbd5e1" strokeWidth="24"></path>
-              <path d="M 0 290 L 700 290" fill="none" stroke="#cbd5e1" strokeWidth="22"></path>
-              <path d="M 190 110 L 430 290" fill="none" stroke="#cbd5e1" strokeWidth="18"></path>
-
-              <text fill="#475569" fontFamily="Inter" fontSize="11" fontWeight="600" x="20" y="105">Jl. Gubernur Suryo</text>
-              <text fill="#475569" fontFamily="Inter" fontSize="11" fontWeight="600" transform="rotate(90, 200, 45)" x="200" y="45">Jl. Basuki Rahmat</text>
-              <text fill="#475569" fontFamily="Inter" fontSize="11" fontWeight="600" transform="rotate(90, 440, 45)" x="440" y="45">Jl. Panglima Sudirman</text>
-              <text fill="#475569" fontFamily="Inter" fontSize="11" fontWeight="600" x="20" y="285">Jl. Pemuda</text>
-              <text fill="#475569" fontFamily="Inter" fontSize="10" fontWeight="600" transform="rotate(37, 260, 170)" x="260" y="170">Jl. Yos Sudarso</text>
-
-              {/* Jalur Hijau: Aman & Luas */}
-              <path d="M 198 122 L 198 280 L 420 280 L 420 380 L 490 380" fill="none" opacity="0.95" stroke="#16A34A" strokeLinecap="round" strokeLinejoin="round" strokeWidth="6"></path>
-              <path d="M 198 122 L 198 280 L 420 280 L 420 380 L 490 380" fill="none" opacity="0.3" stroke="#DCFCE7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="10"></path>
-
-              {/* Segmen Waspada / Sulit */}
-              <path d="M 190 110 L 420 280" fill="none" stroke="#FACC15" strokeDasharray="7 5" strokeLinecap="round" strokeWidth="5"></path>
-
-              {/* Segmen Merah Terblokir / Tidak bisa dilewati */}
-              <path d="M 70 280 L 180 280" fill="none" stroke="#ba1a1a" strokeLinecap="round" strokeWidth="6"></path>
-              <line stroke="#ba1a1a" strokeWidth="4" x1="120" x2="132" y1="272" y2="288"></line>
-              <line stroke="#ba1a1a" strokeWidth="4" x1="132" x2="120" y1="272" y2="288"></line>
-
-              {/* Pin Pengguna Saat Ini */}
-              <circle cx="198" cy="122" fill="#16A34A" opacity="0.25" r="14"></circle>
-              <circle cx="198" cy="122" fill="#16A34A" r="8"></circle>
-              <circle cx="198" cy="122" fill="#ffffff" r="4"></circle>
-
-              {/* Pin Destinasi */}
-              <circle cx="490" cy="380" fill="#2563EB" r="10"></circle>
-              <circle cx="490" cy="380" fill="#DCFCE7" r="5"></circle>
-            </svg>
-
-            {/* Label Pin di Peta */}
-            <div className="absolute top-[60px] sm:top-[85px] left-[90px] sm:left-[130px] z-20 flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full bg-secondary text-on-secondary shadow-md font-label-sm text-[10px] sm:text-xs font-semibold cursor-pointer">
-              <span className="material-symbols-outlined text-[10px] sm:text-xs">accessible</span>
-              <span>Anda: Balai Pemuda</span>
-            </div>
-
-            {/* Kartu Pin Terblokir Merah */}
-            <div
-              onClick={() => setActiveTab('explore-map')}
-              className="absolute top-[160px] sm:top-[230px] left-[10px] sm:left-[20px] z-20 flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface-container-lowest text-error shadow-md cursor-pointer hover:scale-105 transition-transform"
-            >
-              <span className="w-2 h-2 rounded-full bg-error animate-pulse"></span>
-              <span className="material-symbols-outlined text-sm sm:text-base">block</span>
-              <div className="flex flex-col leading-tight">
-                <span className="font-label-sm text-[10px] sm:text-xs font-bold text-error">Terblokir</span>
-                <span className="font-body-sm text-[9px] sm:text-[10px] text-on-surface-variant">Jl. Pemuda 42</span>
-              </div>
-            </div>
-
-            {/* Kontrol Zoom Mengambang */}
-            <div className="absolute top-3 right-3 z-20 flex flex-col gap-1.5">
-              <div className="flex flex-col rounded-xl bg-surface-container-lowest shadow-md overflow-hidden">
+              ) : (
                 <button
-                  aria-label="Perbesar peta"
-                  className="w-8 sm:w-10 h-8 sm:h-10 flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors"
                   type="button"
+                  onClick={() => { setIsAddingStop2(true); setSearchTarget('stop2'); }}
+                  className="py-1.5 px-3 rounded-xl border border-dashed border-primary/50 text-primary hover:bg-primary/5 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-base sm:text-lg">add</span>
+                  <span className="material-symbols-outlined text-base">add_location_alt</span>
+                  <span>+ Tambah Perhentian (Stop 2)</span>
                 </button>
-                <div className="h-px bg-surface-container"></div>
+              )}
+
+              {/* Hasil Pencarian Dropdown Cepat */}
+              {isSearchFocused && searchQuery && (
+                <div className="p-2 rounded-xl bg-surface-container-lowest border border-outline-variant shadow-lg max-h-48 overflow-y-auto space-y-1">
+                  <span className="text-[10px] font-bold text-on-surface-variant uppercase px-2 block">Pilih Lokasi Surabaya:</span>
+                  {filteredDestinations.map(item => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleSelectLocation(item)}
+                      className="w-full p-2 text-left rounded-lg hover:bg-surface-container flex items-center justify-between text-xs cursor-pointer"
+                    >
+                      <div>
+                        <span className="font-bold text-primary block">{item.name}</span>
+                        <span className="text-[10px] text-on-surface-variant block">{item.address}</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-secondary">{item.distance}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Rekomendasi Cepat (Pills) */}
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1">
+                <span className="text-[10px] font-bold text-on-surface-variant shrink-0">Cepat:</span>
+                {SURABAYA_DESTINATIONS.slice(0, 3).map(dest => (
+                  <button
+                    key={dest.id}
+                    type="button"
+                    onClick={() => handleSelectLocation(dest)}
+                    className="px-2.5 py-1 rounded-full bg-surface-container hover:bg-primary hover:text-white text-[11px] font-bold text-on-surface transition-all whitespace-nowrap shrink-0 cursor-pointer"
+                  >
+                    {dest.name.split(' ')[0]} {dest.name.split(' ')[1] || ''}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tombol Terapkan Rute */}
+              {stop1 && !hasSelectedDestination && (
                 <button
-                  aria-label="Perkecil peta"
-                  className="w-8 sm:w-10 h-8 sm:h-10 flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors"
                   type="button"
+                  onClick={handleApplyRoute}
+                  className="w-full mt-1 min-h-[46px] rounded-xl bg-primary text-on-primary font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md hover:bg-primary-container active:scale-98 transition-all cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-base sm:text-lg">remove</span>
+                  <span className="material-symbols-outlined text-lg">directions</span>
+                  <span>Lihat Rute Navigasi Taktil ({estimatedTime})</span>
                 </button>
-              </div>
+              )}
+
+              {hasSelectedDestination && (
+                <button
+                  type="button"
+                  onClick={handleResetDestination}
+                  className="w-full py-2 rounded-xl border border-primary/30 text-primary hover:bg-primary/5 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-base">map</span>
+                  <span>← Kembali ke Peta Utama / Ubah Tujuan</span>
+                </button>
+              )}
             </div>
 
-            {/* Pilihan Layer Aktif */}
-            <div className="absolute bottom-3 left-3 z-20 flex items-center gap-1 overflow-x-auto no-scrollbar max-w-[calc(100%-2rem)]">
-              <button
-                onClick={() => setActiveLayer('surface')}
-                className={`px-2 py-0.5 rounded-full backdrop-blur font-label-sm text-[10px] sm:text-xs shadow-xs flex items-center gap-1 ${
-                  activeLayer === 'surface' ? 'bg-primary text-on-primary font-bold' : 'bg-surface-container-lowest/90 text-primary'
-                }`}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-secondary"></span>
-                <span>Permukaan</span>
-              </button>
-              <button
-                onClick={() => setActiveLayer('ramps')}
-                className={`px-2 py-0.5 rounded-full backdrop-blur font-label-sm text-[10px] sm:text-xs shadow-xs flex items-center gap-1 ${
-                  activeLayer === 'ramps' ? 'bg-primary text-on-primary font-bold' : 'bg-surface-container-lowest/90 text-primary'
-                }`}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-warning"></span>
-                <span>Rampa</span>
-              </button>
-            </div>
+            {/* Active Turn-by-Turn Guidance Card (Ditampilkan saat Rute Aktif) */}
+            {hasSelectedDestination && (
+              <div className="bg-surface-container-lowest rounded-[1.5rem] border-2 border-primary shadow-[0_12px_28px_rgba(17,24,39,0.10)] flex flex-col gap-3 relative overflow-hidden p-4 sm:p-5 transition-all duration-200">
+                
+                {/* Top Status Indicator with Time & Distance */}
+                <div className="flex items-center justify-between pb-3 border-b border-surface-container">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-xl sm:text-2xl font-headline-md text-primary font-extrabold">
+                      {estimatedTime}
+                    </span>
+                    <span className="text-xs sm:text-sm text-on-surface-variant font-bold">
+                      ({estimatedDistance})
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-3 py-1 bg-secondary/10 text-secondary rounded-full border border-secondary/30 shadow-xs">
+                    <span className="w-2.5 h-2.5 rounded-full bg-secondary inline-block animate-breathing-green" aria-hidden="true"></span>
+                    <span className="text-[11px] sm:text-xs font-bold">100% Ramah Roda</span>
+                  </div>
+                </div>
+
+                {/* Big Direction Arrow & Turn Instruction */}
+                <div className="flex items-start gap-3.5 my-1">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-primary text-on-primary flex items-center justify-center shrink-0 shadow-md">
+                    <span className="material-symbols-outlined text-2xl sm:text-3xl" style={{ fontVariationSettings: "'FILL' 1" }} aria-hidden="true">
+                      turn_right
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-base sm:text-lg font-headline-sm text-on-surface font-extrabold leading-tight">
+                      {simulationStep > 0 ? `Langkah ${simulationStep}: Lanjutkan 20m` : 'Belok Kanan 45m'}
+                    </h2>
+                    <p className="text-xs sm:text-sm text-on-surface-variant font-medium mt-1 truncate">
+                      {currentRouteSubtitle}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 3 BADGE KONDISI TROTOAR: DIUBAH 1 BARIS KEBAWAH (VERTIKAL) SESUAI INSTRUKSI */}
+                <div className="flex flex-col gap-2.5 pt-3 pb-1 border-t border-surface-container">
+                  {/* Row 1: Green Safe Badge */}
+                  <div className="bg-[#10b981]/10 border-l-4 border-[#10b981] px-3.5 py-2 rounded-r-xl flex items-center justify-between shadow-xs">
+                    <div className="flex items-center gap-2.5 text-[#006e2d]">
+                      <span className="material-symbols-outlined text-lg font-bold" aria-hidden="true">verified_user</span>
+                      <div>
+                        <span className="text-xs font-extrabold block">Bebas Halangan</span>
+                        <span className="text-[11px] text-on-surface font-medium block">Trotoar Rata 2.4m Mulus</span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#10b981]/20 text-[#006e2d]">
+                      100% Aman
+                    </span>
+                  </div>
+
+                  {/* Row 2: Yellow Guiding Block Badge */}
+                  <div className="bg-[#f59e0b]/10 border-l-4 border-[#f59e0b] px-3.5 py-2 rounded-r-xl flex items-center justify-between shadow-xs">
+                    <div className="flex items-center gap-2.5 text-[#735c00]">
+                      <span className="material-symbols-outlined text-lg font-bold" aria-hidden="true">texture</span>
+                      <div>
+                        <span className="text-xs font-extrabold block">Ubin Pemandu</span>
+                        <span className="text-[11px] text-on-surface font-medium block">Jalur Kuning Bertekstur Teratur</span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#f59e0b]/20 text-[#735c00]">
+                      Taktil Siap
+                    </span>
+                  </div>
+
+                  {/* Row 3: Red Hazard Warning Badge */}
+                  <div className="bg-[#ef4444]/10 border-l-4 border-[#ef4444] px-3.5 py-2 rounded-r-xl flex items-center justify-between shadow-xs">
+                    <div className="flex items-center gap-2.5 text-error">
+                      <span className="material-symbols-outlined text-lg font-bold" aria-hidden="true">warning</span>
+                      <div>
+                        <span className="text-xs font-extrabold block">Hindari Sisi Kiri</span>
+                        <span className="text-[11px] text-on-surface font-medium block">Kabel Proyek &amp; Pohon Rendah</span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#ef4444]/20 text-error">
+                      Sensor 120m
+                    </span>
+                  </div>
+                </div>
+
+                {/* Tactile Haptic Vibration Toggle & Audio Toggle (Play / Stop / Replay) */}
+                <div className="flex items-center justify-between pt-2 border-t border-surface-container">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleToggleHaptic}
+                      aria-label={hapticEnabled ? 'Nonaktifkan getaran taktil' : 'Aktifkan getaran taktil'}
+                      className={`h-9 px-3 rounded-full flex items-center gap-1.5 font-bold text-xs transition-all duration-200 cursor-pointer ${
+                        hapticEnabled
+                          ? 'bg-primary/10 text-primary border border-primary/30'
+                          : 'bg-surface-container text-on-surface-variant'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-base" aria-hidden="true">vibration</span>
+                      <span>{hapticEnabled ? 'Haptic Aktif' : 'Haptic Mati'}</span>
+                    </button>
+
+                    {/* Tombol Speaker: Play / Stop / Replay */}
+                    <button
+                      type="button"
+                      onClick={handleToggleAudio}
+                      aria-label={isSpeaking ? 'Hentikan panduan audio' : 'Putar panduan audio rute'}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer ${
+                        isSpeaking
+                          ? 'bg-error text-white ring-2 ring-error/40 animate-pulse'
+                          : 'bg-surface-container hover:bg-surface-container-high text-primary'
+                      }`}
+                      title={isSpeaking ? 'Klik: Hentikan Suara' : 'Klik: Dengarkan Panduan Suara'}
+                    >
+                      <span className="material-symbols-outlined text-base" aria-hidden="true">
+                        {isSpeaking ? 'stop' : 'volume_up'}
+                      </span>
+                    </button>
+                  </div>
+
+                  <span className="text-xs font-bold text-secondary flex items-center gap-1.5 px-2.5 py-1 bg-secondary/10 rounded-full">
+                    <span className="w-2 h-2 rounded-full bg-secondary inline-block animate-breathing-green" aria-hidden="true"></span>
+                    <span className="truncate max-w-[130px]">{userLocationName}</span>
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Legenda & Status Jaringan */}
-          <div className="p-2.5 sm:p-space-md bg-surface-container-low flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs">
-              <div className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-secondary"></span>
-                <span className="text-[11px] font-semibold text-on-surface">✓ Bisa dilewati</span>
+          {/* Voice Command AI Interactive Bar */}
+          <div className="bg-surface-container-lowest p-2 rounded-2xl border border-outline-variant shadow-xs flex items-center justify-between gap-2 mt-auto">
+            <button
+              type="button"
+              onClick={() => {
+                if (onOpenVoice) onOpenVoice();
+              }}
+              className="flex-1 min-h-[46px] px-4 bg-primary text-on-primary font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 hover:bg-primary-container focus:outline-none focus:ring-4 focus:ring-primary shadow-xs transition-all duration-200 cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }} aria-hidden="true">
+                mic
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px]" aria-hidden="true">auto_awesome</span>
+                <span>Asisten AI</span>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                const next = !isAudioMuted;
+                setIsAudioMuted(next);
+                if (window.speechSynthesis) window.speechSynthesis.cancel();
+                setIsSpeaking(false);
+                setAudioFeedback(next ? 'Suara panduan dibisukan (Mute)' : 'Suara panduan diaktifkan');
+                setTimeout(() => setAudioFeedback(''), 3000);
+              }}
+              aria-label={isAudioMuted ? 'Aktifkan Suara Panduan' : 'Bisukan Suara Panduan'}
+              className={`w-11 h-11 flex items-center justify-center rounded-xl transition-all duration-200 cursor-pointer ${
+                isAudioMuted ? 'bg-error/10 text-error ring-1 ring-error/40' : 'bg-surface-container hover:bg-surface-container-high text-primary'
+              }`}
+              title={isAudioMuted ? 'Suara Dibisukan (Klik untuk Aktifkan)' : 'Suara Aktif (Klik untuk Bisukan)'}
+            >
+              <div className="flex items-center justify-center gap-0.5 h-5 w-5" aria-hidden="true">
+                <span className={`w-[2px] rounded-full sound-bar-1 h-2 ${isAudioMuted ? 'bg-error' : 'bg-primary'}`}></span>
+                <span className={`w-[2px] rounded-full sound-bar-2 h-4 ${isAudioMuted ? 'bg-error' : 'bg-primary'}`}></span>
+                <span className={`w-[2px] rounded-full sound-bar-3 h-3 ${isAudioMuted ? 'bg-error' : 'bg-primary'}`}></span>
+                <span className={`w-[2px] rounded-full sound-bar-4 h-2 ${isAudioMuted ? 'bg-error' : 'bg-primary'}`}></span>
               </div>
-              <div className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-warning"></span>
-                <span className="text-[11px] font-semibold text-on-surface">⚠ Sulit</span>
+            </button>
+          </div>
+        </aside>
+
+        {/* ======================================================== */}
+        {/* KOLOM KANAN (lg:col-span-7 xl:col-span-8): Dynamic Map   */}
+        {/* ======================================================== */}
+        <section
+          aria-label="Kanvas Peta Navigasi Interaktif"
+          className="lg:col-span-7 xl:col-span-8 flex flex-col relative bg-surface-container-low rounded-[2rem] border-2 border-outline-variant overflow-hidden shadow-lg h-full min-h-[420px] sm:min-h-[500px] lg:min-h-[640px] flex-1"
+        >
+          {/* ===================================================== */}
+          {/* TAMPILAN 1: PETA UTAMA INTERAKTIF (SEBELUM MEMILIH TUJUAN) */}
+          {/* ===================================================== */}
+          {!hasSelectedDestination && (
+            <div className="relative w-full h-full flex-1 flex flex-col">
+              {/* Header Floating Peta Awal */}
+              <div className="absolute top-3 left-3 right-3 sm:top-4 sm:left-4 sm:right-4 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+                <div className="pointer-events-auto bg-surface-container-lowest/95 backdrop-blur-md px-3.5 py-2 rounded-full border border-outline-variant shadow-md flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-secondary inline-block animate-ping"></span>
+                  <span className="text-xs font-extrabold text-on-surface">Peta Navigasi Surabaya</span>
+                  <span className="text-[10px] text-on-surface-variant">• Klik lokasi untuk memilih rute</span>
+                </div>
+
+                <div className="pointer-events-auto flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (leafletInstanceRef.current) {
+                        leafletInstanceRef.current.setView([userCoords.lat, userCoords.lng], 16);
+                      }
+                    }}
+                    className="h-9 px-3 bg-surface-container-lowest/95 backdrop-blur-md text-primary font-bold text-xs rounded-full border border-outline-variant shadow-md flex items-center gap-1 hover:bg-surface-container transition-all cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-base">my_location</span>
+                    <span className="hidden sm:inline">Posisi Saya</span>
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-error"></span>
-                <span className="text-[11px] font-semibold text-on-surface">✕ Tidak bisa dilewati</span>
+
+              {/* Kontainer Leaflet Peta Utama */}
+              <div ref={leafletMapRef} className="w-full h-full flex-1 min-h-[380px] sm:min-h-[480px] z-0" />
+
+              {/* Info Bottom Floating Bar Peta Awal */}
+              <div className="p-3 bg-surface-container-lowest/95 backdrop-blur-md border-t border-outline-variant z-20 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="font-semibold text-on-surface">
+                  Pilih titik tujuan di panel kiri atau klik langsung pin lokasi di peta Surabaya.
+                </span>
+                {stop1 && (
+                  <button
+                    type="button"
+                    onClick={handleApplyRoute}
+                    className="px-4 py-2 rounded-xl bg-primary text-white font-bold text-xs shadow-md hover:bg-primary-container active:scale-95 transition-all cursor-pointer"
+                  >
+                    Tampilkan Rute ke {stop1.name} →
+                  </button>
+                )}
               </div>
             </div>
-            <span className="text-[10px] sm:text-[11px] text-on-surface-variant flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-secondary"></span>
-              Jaringan DPUPR Surabaya 2026
-            </span>
-          </div>
+          )}
+
+          {/* ===================================================== */}
+          {/* TAMPILAN 2: RUTE DASHBOARD SEDERHANA (SETELAH MEMILIH TUJUAN) */}
+          {/* ===================================================== */}
+          {hasSelectedDestination && (
+            <div className="relative w-full h-full flex-1 flex flex-col">
+              {/* Top Canvas Header Overlay */}
+              <div className="absolute top-3 left-3 right-3 sm:top-4 sm:left-4 sm:right-4 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+                {/* Live Trip Indicator */}
+                <div className="pointer-events-auto bg-surface-container-lowest/95 backdrop-blur-md px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-full border border-outline-variant shadow-md flex items-center gap-2.5 sm:gap-3">
+                  <span className="flex h-3 w-3 relative shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-secondary"></span>
+                  </span>
+                  <div className="text-left min-w-0">
+                    <span className="text-xs sm:text-sm font-extrabold text-on-surface block truncate">
+                      {currentRouteTitle}
+                    </span>
+                    <span className="text-[10px] sm:text-[11px] text-on-surface-variant block font-medium">
+                      Akurasi GPS ± 0.8 meter · {userLocationName} (LiDAR Aktif)
+                    </span>
+                  </div>
+                </div>
+
+                {/* Quick Tools: Umumkan & Simulasi Rute */}
+                <div className="pointer-events-auto flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleToggleAudio}
+                    aria-label={isSpeaking ? 'Hentikan pengumuman suara' : 'Dengarkan pengumuman suara rute'}
+                    className={`h-10 sm:h-11 px-3 backdrop-blur-md font-bold text-xs sm:text-sm rounded-full border shadow-md flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer ${
+                      isSpeaking
+                        ? 'bg-error text-white border-error animate-pulse'
+                        : 'bg-surface-container-lowest/95 text-primary border-outline-variant hover:bg-surface-container'
+                    }`}
+                    title={isSpeaking ? 'Klik: Hentikan Pengumuman' : 'Klik: Dengarkan Pengumuman (Dapat Dihentikan & Diulang)'}
+                  >
+                    <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }} aria-hidden="true">
+                      {isSpeaking ? 'stop' : 'volume_up'}
+                    </span>
+                    <span className="hidden sm:inline">{isSpeaking ? 'Stop Suara' : 'Umumkan'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleStartSimulation}
+                    aria-label={isSimulating ? 'Simulasi berjalan' : 'Mulai simulasi rute'}
+                    className="h-10 sm:h-11 px-3.5 sm:px-4 bg-primary text-on-primary font-bold text-xs sm:text-sm rounded-full shadow-md hover:bg-primary-container transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-lg" aria-hidden="true">
+                      {isSimulating ? 'sync' : 'play_arrow'}
+                    </span>
+                    <span>{isSimulating ? 'Simulasi...' : 'Simulasi Rute'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Map Graphic Canvas (Scalable Tactile Vector Cartography Rute Sederhana) */}
+              <div
+                className="relative w-full h-full flex-1 bg-[#e5e9f5] overflow-hidden select-none transition-transform duration-300"
+                style={{ minHeight: '440px', transform: `scale(${mapZoom}) rotate(${mapRotation}deg)`, transformOrigin: 'center center' }}
+              >
+                {/* City Streets SVG Pattern & Grid */}
+                <svg
+                  className="absolute inset-0 w-full h-full object-cover"
+                  height="100%"
+                  width="100%"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <defs>
+                    <pattern id="sidewalkGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+                      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#d5dbec" strokeWidth="1.5" />
+                    </pattern>
+                    <linearGradient id="routeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#1D4ED8" />
+                      <stop offset="60%" stopColor="#10B981" />
+                      <stop offset="100%" stopColor="#059669" />
+                    </linearGradient>
+                    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                      <feGaussianBlur stdDeviation="5" result="blur" />
+                      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
+                  </defs>
+
+                  <rect width="100%" height="100%" fill="url(#sidewalkGrid)" />
+
+                  <g transform="translate(60, 0)">
+                    {/* Blok 1: Balai Pemuda */}
+                    <rect x="50" y="40" width="220" height="180" rx="20" fill="#ffffff" stroke="#c4c5d7" strokeWidth="2" />
+                    <text x="70" y="80" fill="#747686" fontFamily="Manrope" fontSize="12" fontWeight="700">
+                      Balai Pemuda Surabaya
+                    </text>
+                    <text x="70" y="100" fill="#434655" fontFamily="Atkinson Hyperlegible Next" fontSize="11">
+                      Area Ramah Kursi Roda
+                    </text>
+
+                    {/* Blok 2: Kompleks Sentral Bisnis */}
+                    <rect x="340" y="40" width="340" height="150" rx="20" fill="#ffffff" stroke="#c4c5d7" strokeWidth="2" />
+                    <text x="360" y="75" fill="#747686" fontFamily="Manrope" fontSize="12" fontWeight="700">
+                      Kompleks Bisnis Jl. Pemuda
+                    </text>
+                    <text x="360" y="95" fill="#434655" fontFamily="Atkinson Hyperlegible Next" fontSize="11">
+                      Ramp Elevasi Miring 4.5°
+                    </text>
+
+                    {/* Blok 3: Sentra Kuliner */}
+                    <rect x="50" y="290" width="240" height="260" rx="20" fill="#ffffff" stroke="#c4c5d7" strokeWidth="2" />
+                    <text x="70" y="325" fill="#747686" fontFamily="Manrope" fontSize="12" fontWeight="700">
+                      Sentra Kuliner Pemuda
+                    </text>
+                    <text x="70" y="345" fill="#434655" fontFamily="Atkinson Hyperlegible Next" fontSize="11">
+                      Jalur Bebas Parkir Liar
+                    </text>
+
+                    {/* Blok 4: Halte & Stasiun */}
+                    <rect x="370" y="270" width="360" height="280" rx="20" fill="#ffffff" stroke="#c4c5d7" strokeWidth="2" />
+                    <text x="390" y="305" fill="#747686" fontFamily="Manrope" fontSize="12" fontWeight="700">
+                      Halte Integrasi Pemuda
+                    </text>
+                    <text x="390" y="325" fill="#006e2d" fontFamily="Atkinson Hyperlegible Next" fontSize="11" fontWeight="700">
+                      Lift &amp; Pemandu Taktil Siap
+                    </text>
+
+                    {/* Jalur Jalan Horizontal & Vertikal */}
+                    <rect x="-110" y="228" width="120%" height="48" fill="#e9edff" />
+                    <line x1="-110" y1="252" x2="120%" y2="252" stroke="#ffffff" strokeWidth="3" strokeDasharray="16, 12" />
+
+                    <rect x="290" y="0" width="56" height="100%" fill="#e9edff" />
+                    <line x1="318" y1="0" x2="318" y2="100%" stroke="#ffffff" strokeWidth="3" strokeDasharray="16, 12" />
+
+                    {/* Underlay Guiding Block Kuning */}
+                    <path
+                      d="M 120 238 L 310 238 L 310 390 L 520 390"
+                      fill="none"
+                      stroke="#f59e0b"
+                      strokeWidth="12"
+                      strokeLinecap="round"
+                      opacity="0.3"
+                    />
+
+                    {/* Glow Corridor Biru */}
+                    <path
+                      d="M 120 238 L 310 238 L 310 390 L 520 390"
+                      fill="none"
+                      stroke="#1D4ED8"
+                      strokeWidth="14"
+                      filter="url(#glow)"
+                      opacity="0.25"
+                    />
+
+                    {/* Active Moving Dash Route (Animate Route Flow) */}
+                    <path
+                      className="animate-route-flow"
+                      d="M 120 238 L 310 238 L 310 390 L 520 390"
+                      fill="none"
+                      stroke="#0037b0"
+                      strokeWidth="6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      opacity="0.95"
+                    />
+
+                    {/* Route Inner Highlight */}
+                    <path
+                      className="animate-route-flow"
+                      d="M 120 238 L 310 238 L 310 390 L 520 390"
+                      fill="none"
+                      stroke="#7cf994"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      opacity="0.9"
+                    />
+                  </g>
+                </svg>
+
+                {/* Pin 1: Posisi Anda Saat Ini (Radar Pulse) */}
+                <div className="absolute" style={{ top: '220px', left: '74px' }} title="Posisi Anda Saat Ini">
+                  <div className="relative flex items-center justify-center">
+                    <div className="absolute w-16 h-16 bg-primary rounded-full pulse-radar"></div>
+                    <div className="absolute w-16 h-16 bg-primary/30 rounded-full pulse-radar-delay"></div>
+                    <div className="relative w-8 h-8 rounded-full bg-primary border-4 border-white shadow-xl flex items-center justify-center text-white z-10 transition-transform duration-200 hover:scale-110">
+                      <span className="material-symbols-outlined text-[16px]" aria-hidden="true">navigation</span>
+                    </div>
+                    <div className="absolute -top-7 whitespace-nowrap bg-on-surface text-surface text-[11px] font-extrabold px-2.5 py-0.5 rounded-full shadow-md font-label-md animate-float z-10">
+                      Anda di Sini
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pin 2: Hazard Hotspot (Sonar Pulse Merah) */}
+                <div className="absolute" style={{ top: '210px', left: '215px' }}>
+                  <div className="relative group cursor-pointer flex items-center justify-center">
+                    <div className="absolute w-12 h-12 bg-error rounded-full pulse-warning-sonar pointer-events-none"></div>
+                    <div className="w-9 h-9 rounded-full bg-error border-2 border-white shadow-lg flex items-center justify-center text-white ring-2 ring-error/40 hover:scale-110 transition-all duration-200 z-10">
+                      <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }} aria-hidden="true">
+                        warning
+                      </span>
+                    </div>
+                    {/* Tooltip Hover Box */}
+                    <div className="absolute bottom-11 -left-20 bg-surface-container-lowest border-2 border-error p-2.5 rounded-xl shadow-xl w-48 pointer-events-none opacity-90 group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-200 z-20">
+                      <span className="text-error font-extrabold text-[11px] block">PERINGATAN SENSOR</span>
+                      <p className="text-on-surface text-[12px] font-bold">Kabel Proyek Melintang</p>
+                      <p className="text-[11px] text-on-surface-variant">Disarankan belok ke ubin kanan</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pin 3: Amber Guiding Block Pin (Floating) */}
+                <div className="absolute animate-float" style={{ top: '300px', left: '280px' }}>
+                  <div className="flex items-center gap-1.5 bg-[#f59e0b] hover:bg-[#d97706] text-white font-extrabold text-[11px] px-2.5 py-1 rounded-full shadow-md border-2 border-white cursor-pointer transition-all duration-200 hover:scale-105">
+                    <span className="material-symbols-outlined text-sm" aria-hidden="true">texture</span>
+                    <span>Ubin Bertekstur Teratur</span>
+                  </div>
+                </div>
+
+                {/* Pin 4: Green Destination Marker Card */}
+                <div className="absolute animate-float-delayed" style={{ top: '340px', left: '460px' }}>
+                  <div className="bg-surface-container-lowest p-2.5 rounded-2xl border-2 border-secondary shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02]">
+                    <div className="flex items-center gap-1.5 text-secondary font-bold text-[12px]">
+                      <span className="material-symbols-outlined text-base" aria-hidden="true">check_circle</span>
+                      <span>Tujuan Tercapai</span>
+                    </div>
+                    <p className="text-on-surface font-extrabold text-xs sm:text-sm">
+                      {stop1 ? stop1.name : 'Halte Integrasi Balai Pemuda'}
+                    </p>
+                    <span className="text-[11px] text-on-surface-variant font-medium">
+                      {stop2 ? `Lanjut ke Stop 2: ${stop2.name}` : 'Elevator Aksesibel 10m ke depan'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Right Side Floating Map Controls */}
+                <div className="absolute right-3 sm:right-4 top-24 flex flex-col gap-2 z-20">
+                  {/* Compass */}
+                  <button
+                    type="button"
+                    onClick={() => setMapRotation((prev) => (prev === 0 ? 30 : 0))}
+                    aria-label="Putar kompas"
+                    className={`w-10 h-10 sm:w-12 sm:h-12 bg-surface-container-lowest/95 backdrop-blur-md rounded-full border shadow-md flex items-center justify-center transition-all duration-200 cursor-pointer ${
+                      mapRotation !== 0 ? 'text-secondary border-secondary ring-2 ring-secondary/30' : 'text-primary border-outline-variant hover:bg-surface-container'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-primary text-xl sm:text-2xl font-bold transition-transform duration-300" style={{ transform: `rotate(${-mapRotation}deg)` }} aria-hidden="true">
+                      explore
+                    </span>
+                  </button>
+
+                  {/* Re-center */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMapZoom(1);
+                      setMapRotation(0);
+                      setAudioFeedback('Peta dikembalikan ke posisi awal.');
+                      setTimeout(() => setAudioFeedback(''), 2500);
+                    }}
+                    aria-label="Pusatkan Ulang"
+                    className="w-10 h-10 sm:w-12 sm:h-12 bg-surface-container-lowest/95 backdrop-blur-md text-primary rounded-full border border-outline-variant shadow-md flex items-center justify-center hover:bg-surface-container hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-xl sm:text-2xl" style={{ fontVariationSettings: "'FILL' 1" }} aria-hidden="true">
+                      my_location
+                    </span>
+                  </button>
+
+                  {/* Zoom In */}
+                  <button
+                    type="button"
+                    onClick={() => setMapZoom((prev) => Math.min(prev + 0.15, 1.6))}
+                    aria-label="Perbesar Peta"
+                    className="w-10 h-10 sm:w-12 sm:h-12 bg-surface-container-lowest/95 backdrop-blur-md text-on-surface rounded-full border border-outline-variant shadow-md flex items-center justify-center hover:bg-surface-container hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-xl sm:text-2xl" aria-hidden="true">add</span>
+                  </button>
+
+                  {/* Zoom Out */}
+                  <button
+                    type="button"
+                    onClick={() => setMapZoom((prev) => Math.max(prev - 0.15, 0.75))}
+                    aria-label="Perkecil Peta"
+                    className="w-10 h-10 sm:w-12 sm:h-12 bg-surface-container-lowest/95 backdrop-blur-md text-on-surface rounded-full border border-outline-variant shadow-md flex items-center justify-center hover:bg-surface-container hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-xl sm:text-2xl" aria-hidden="true">remove</span>
+                  </button>
+
+                  {/* Toggle Layer: Navigasi ke Peta OpenStreetMap Interaktif Penuh */}
+                  <button
+                    type="button"
+                    onClick={() => setHasSelectedDestination(false)}
+                    aria-label="Buka Peta Navigasi Lengkap"
+                    className="w-10 h-10 sm:w-12 sm:h-12 bg-surface-container-lowest/95 backdrop-blur-md text-primary rounded-full border border-outline-variant shadow-md flex items-center justify-center hover:bg-surface-container hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer"
+                    title="Buka Peta Utama"
+                  >
+                    <span className="material-symbols-outlined text-xl sm:text-2xl" aria-hidden="true">layers</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Bottom Floating Route Alternative Summary Cards */}
+              <div className="p-3.5 sm:p-4 bg-surface-container-lowest/95 backdrop-blur-md border-t border-outline-variant z-20 flex flex-col md:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-2 self-start md:self-center">
+                  <span className="text-xs sm:text-sm font-bold text-on-surface">Pilihan Alternatif:</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-space-md w-full flex-1">
+                  {/* Option 1 */}
+                  <div
+                    onClick={() => setSelectedRouteKey('ubin')}
+                    tabIndex="0"
+                    role="button"
+                    className={`min-h-[64px] px-4 py-2.5 rounded-2xl border-2 flex items-center justify-between cursor-pointer shadow-xs transition-all ${
+                      selectedRouteKey === 'ubin'
+                        ? 'border-primary bg-primary/5 shadow-md'
+                        : 'border-outline-variant bg-surface-container-lowest hover:border-primary/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-full bg-[#f59e0b] text-white flex items-center justify-center shrink-0 font-bold shadow-xs">
+                        <span className="material-symbols-outlined text-xl" aria-hidden="true">texture</span>
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-xs sm:text-sm font-bold text-on-surface block">Rute Ubin Pemandu</span>
+                        <p className="text-[11px] text-on-surface-variant font-medium truncate">
+                          Via Jalur Kuning Bertekstur · Elevasi 0°
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0 ml-2">
+                      <span className="text-xs sm:text-sm font-extrabold text-primary block">{estimatedTime}</span>
+                      <span className="text-[10px] text-on-surface-variant">{estimatedDistance}</span>
+                    </div>
+                  </div>
+
+                  {/* Option 2 */}
+                  <div
+                    onClick={() => setSelectedRouteKey('ramp')}
+                    tabIndex="0"
+                    role="button"
+                    className={`min-h-[64px] px-4 py-2.5 rounded-2xl border-2 flex items-center justify-between cursor-pointer shadow-xs transition-all ${
+                      selectedRouteKey === 'ramp'
+                        ? 'border-primary bg-primary/5 shadow-md'
+                        : 'border-outline-variant bg-surface-container-lowest hover:border-primary/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-full bg-secondary text-white flex items-center justify-center shrink-0 font-bold shadow-xs">
+                        <span className="material-symbols-outlined text-xl" aria-hidden="true">accessible</span>
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-xs sm:text-sm font-bold text-on-surface block">Rute Ramp Halus</span>
+                        <p className="text-[11px] text-on-surface-variant font-medium truncate">
+                          Ramp Lebar 1.8m · Hindari Keramaian
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0 ml-2">
+                      <span className="text-xs sm:text-sm font-extrabold text-on-surface block">12 Mnt</span>
+                      <span className="text-[10px] text-on-surface-variant">590 m</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
-
-        {/* KOLOM KANAN: KARTU INTELIJEN KONTEKSTUAL (40%) */}
-        <div className="lg:col-span-5 flex flex-col gap-space-md">
-          {/* KARTU A: Peringatan Intelijen Cuaca */}
-          <div className="rounded-2xl bg-surface-container-lowest p-4 sm:p-space-md shadow-[0_4px_16px_rgba(16,42,67,0.06)] flex flex-col gap-space-sm relative overflow-hidden">
-            <div className="absolute right-0 top-0 w-32 h-32 bg-secondary-container/20 rounded-bl-full pointer-events-none"></div>
-            <div className="flex items-center justify-between">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-error-container text-on-error-container font-label-sm text-xs font-bold">
-                <span className="material-symbols-outlined text-sm sm:text-base">rainy</span>
-                <span>{weather?.alertMessage || 'Potensi Hujan dalam 35 Menit'}</span>
-              </div>
-              <span className="font-label-sm text-xs text-on-surface-variant">{weather?.district || 'Surabaya Pusat'}</span>
-            </div>
-
-            <div className="flex items-baseline justify-between mt-1">
-              <div className="flex items-baseline gap-2">
-                <span className="font-display-lg text-2xl sm:text-3xl lg:text-4xl text-primary font-bold">{weather?.temperature || 29}°C</span>
-                <span className="font-label-md text-xs sm:text-sm text-on-surface-variant">{weather?.condition || 'Gerimis Ringan'}</span>
-              </div>
-              <div className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-surface-container font-label-sm text-xs text-secondary font-bold">
-                <span className="material-symbols-outlined text-sm">water_drop</span>
-                <span>{weather?.precipitationProb || 78}% Peluang</span>
-              </div>
-            </div>
-
-            {/* Catatan Anjuran */}
-            <div className="p-3 rounded-xl bg-surface-container-low flex flex-col gap-1.5">
-              <div className="flex items-start gap-2">
-                <span className="material-symbols-outlined text-secondary text-base shrink-0 mt-0.5">info</span>
-                <p className="font-body-sm text-xs text-on-surface">
-                  Hujan ringan membuat ubin keramik dekoratif trotoar sepanjang <span className="font-semibold text-primary">Jl. Basuki Rahmat</span> licin. Disarankan melewati koridor berkanopi atau bahu jalan aspal.
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setActiveTab('weather-intelligence')}
-              className="w-full min-h-[44px] rounded-xl bg-surface-container text-secondary font-label-md text-xs font-bold hover:bg-secondary-container hover:text-on-secondary-container transition-colors flex items-center justify-center gap-2"
-              type="button"
-            >
-              <span className="material-symbols-outlined text-base">umbrella</span>
-              <span>Cek Rute Bebas Cuaca Buruk</span>
-            </button>
-          </div>
-
-          {/* KARTU B: Rekomendasi Rute Terbaik AI */}
-          <div className="rounded-2xl bg-surface-container-lowest p-4 sm:p-space-md shadow-[0_4px_16px_rgba(16,42,67,0.06)] flex flex-col gap-space-sm">
-            <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-xs font-bold">
-                <span className="material-symbols-outlined text-xs">auto_awesome</span>
-                <span>Rute Rekomendasi AI</span>
-              </span>
-              <span className="font-label-sm text-[11px] text-secondary font-semibold">Diperbarui 3 menit lalu</span>
-            </div>
-
-            <div className="flex flex-col">
-              <span className="font-headline-sm text-sm sm:text-base text-primary font-bold">Balai Pemuda ➔ RSUD Dr. Soetomo</span>
-              <span className="font-label-sm text-xs text-on-surface-variant">Optimal untuk Kursi Roda Listrik & Manual</span>
-            </div>
-
-            {/* Baris Metrik */}
-            <div className="grid grid-cols-3 gap-2 py-1">
-              <div className="flex flex-col items-center p-2 rounded-xl bg-surface-container-low text-center">
-                <span className="font-headline-sm text-sm sm:text-base text-primary font-bold">1.6 km</span>
-                <span className="font-label-sm text-[10px] text-on-surface-variant">Jarak</span>
-              </div>
-              <div className="flex flex-col items-center p-2 rounded-xl bg-surface-container-low text-center">
-                <span className="font-headline-sm text-sm sm:text-base text-primary font-bold">22 mnt</span>
-                <span className="font-label-sm text-[10px] text-on-surface-variant">Waktu Tempuh</span>
-              </div>
-              <div className="flex flex-col items-center p-2 rounded-xl bg-secondary-container/40 text-center">
-                <span className="font-headline-sm text-sm sm:text-base text-secondary font-bold">98%</span>
-                <span className="font-label-sm text-[10px] text-secondary font-semibold">Skor Aman</span>
-              </div>
-            </div>
-
-            {/* Tombol Aksi */}
-            <div className="flex items-center gap-2 pt-1">
-              <button
-                onClick={() => setActiveTab('plan-route')}
-                className="flex-1 min-h-[44px] sm:min-h-[48px] rounded-xl bg-primary text-on-primary font-label-md text-xs sm:text-sm font-bold hover:bg-primary-container transition-colors flex items-center justify-center gap-2 shadow-md"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-base sm:text-lg">navigation</span>
-                <span>Mulai Panduan Navigasi</span>
-              </button>
-              <button
-                aria-label="Bandingkan rute alternatif"
-                onClick={() => setActiveTab('plan-route')}
-                className="min-h-[44px] sm:min-h-[48px] px-3 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container transition-colors flex items-center justify-center"
-                type="button"
-                title="Bandingkan Rute Alternatif"
-              >
-                <span className="material-symbols-outlined text-lg">compare_arrows</span>
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
 
-      {/* BARIS AKSI NAVIGASI CEPAT */}
-      <section className="flex flex-col gap-space-sm">
-        <div className="flex items-center justify-between">
-          <h2 className="font-headline-sm text-base sm:text-lg text-primary font-bold">Aksi Navigasi Cepat</h2>
-          <span className="font-label-sm text-[11px] text-on-surface-variant">Target sentuh minimal 48px</span>
+      {/* Footer Leluasa */}
+      <footer className="mt-auto pt-3 pb-2 border-t border-outline-variant/20 flex items-center text-on-surface-variant text-xs">
+        <div className="flex items-center gap-2">
+          <img src="/logo.png" alt="Logo Leluasa" className="w-5 h-5 rounded-full object-contain" />
+          <span className="font-bold text-primary">Leluasa</span>
+          <span>·</span>
+          <span>2026 Leluasa All Access, All Ways.</span>
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-sm sm:gap-space-md">
-          {/* Aksi 1 */}
-          <div
-            onClick={() => setActiveTab('plan-route')}
-            className="group flex flex-col justify-between p-4 min-h-[120px] sm:min-h-[140px] rounded-2xl bg-surface-container-lowest hover:bg-surface-container transition-all shadow-xs hover:shadow-md cursor-pointer"
-          >
-            <div className="flex items-start justify-between">
-              <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-xl bg-secondary-container text-secondary flex items-center justify-center group-hover:scale-105 transition-transform">
-                <span className="material-symbols-outlined text-xl sm:text-2xl">alt_route</span>
-              </div>
-              <span className="material-symbols-outlined text-outline text-lg group-hover:translate-x-1 transition-transform">
-                arrow_forward
-              </span>
-            </div>
-            <div className="flex flex-col mt-2">
-              <span className="font-headline-sm text-sm sm:text-base text-primary font-bold">Rencanakan Rute Baru</span>
-              <span className="font-body-sm text-[11px] text-on-surface-variant">Atur toleransi rintangan & kemiringan</span>
-            </div>
-          </div>
-
-          {/* Aksi 2 */}
-          <div
-            onClick={() => setActiveTab('report-obstacle')}
-            className="group flex flex-col justify-between p-4 min-h-[120px] sm:min-h-[140px] rounded-2xl bg-surface-container-lowest hover:bg-surface-container transition-all shadow-xs hover:shadow-md relative overflow-hidden cursor-pointer"
-          >
-            <div className="absolute -right-2 -top-2 w-16 h-16 bg-primary-container/40 rounded-full blur-xl pointer-events-none"></div>
-            <div className="flex items-start justify-between">
-              <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-xl bg-primary-container text-primary flex items-center justify-center group-hover:scale-105 transition-transform">
-                <span className="material-symbols-outlined text-xl sm:text-2xl">photo_camera</span>
-              </div>
-              <span className="px-2 py-0.5 rounded-full bg-primary text-on-primary font-label-sm text-[9px] font-bold">
-                Cepat 30 dtk
-              </span>
-            </div>
-            <div className="flex flex-col mt-2">
-              <span className="font-headline-sm text-sm sm:text-base text-primary font-bold">Lapor Rintangan</span>
-              <span className="font-body-sm text-[11px] text-on-surface-variant">Foto trotoar terblokir & rampa curam</span>
-            </div>
-          </div>
-
-          {/* Aksi 3 */}
-          <div
-            onClick={() => setActiveTab('explore-map')}
-            className="group flex flex-col justify-between p-4 min-h-[120px] sm:min-h-[140px] rounded-2xl bg-surface-container-lowest hover:bg-surface-container transition-all shadow-xs hover:shadow-md cursor-pointer"
-          >
-            <div className="flex items-start justify-between">
-              <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-xl bg-surface-container text-primary flex items-center justify-center group-hover:scale-105 transition-transform">
-                <span className="material-symbols-outlined text-xl sm:text-2xl">domain_verification</span>
-              </div>
-              <span className="material-symbols-outlined text-outline text-lg group-hover:translate-x-1 transition-transform">
-                arrow_forward
-              </span>
-            </div>
-            <div className="flex flex-col mt-2">
-              <span className="font-headline-sm text-sm sm:text-base text-primary font-bold">Jelajah Fasilitas Publik</span>
-              <span className="font-body-sm text-[11px] text-on-surface-variant">Pintu masuk, lift & rampa terverifikasi</span>
-            </div>
-          </div>
-
-          {/* Aksi 4 */}
-          <div
-            onClick={onOpenVoice}
-            className="group flex flex-col justify-between p-4 min-h-[120px] sm:min-h-[140px] rounded-2xl bg-surface-container-lowest hover:bg-surface-container transition-all shadow-xs hover:shadow-md cursor-pointer"
-          >
-            <div className="flex items-start justify-between">
-              <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-xl bg-primary-container text-secondary-container flex items-center justify-center group-hover:scale-105 transition-transform">
-                <span className="material-symbols-outlined text-xl sm:text-2xl">graphic_eq</span>
-              </div>
-              <span className="material-symbols-outlined text-outline text-lg group-hover:translate-x-1 transition-transform">
-                arrow_forward
-              </span>
-            </div>
-            <div className="flex flex-col mt-2">
-              <span className="font-headline-sm text-sm sm:text-base text-primary font-bold">Tanya Asisten AI Suara</span>
-              <span className="font-body-sm text-[11px] text-on-surface-variant">Panduan audio navigasi hands-free</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* DAMPAK SOSIAL KOMUNITAS & VERIFIKASI WARGA */}
-      <section className="p-4 sm:p-space-lg rounded-2xl bg-surface-container-low flex flex-col gap-space-sm sm:gap-space-md">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-space-xs sm:gap-space-sm">
-          <div className="flex items-center gap-space-sm">
-            <div className="w-9 sm:w-10 h-9 sm:h-10 rounded-xl bg-secondary flex items-center justify-center text-on-secondary shrink-0">
-              <span className="material-symbols-outlined text-lg sm:text-xl">groups</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="font-headline-sm text-sm sm:text-base text-primary font-bold">Dampak Sosial Trotoar di Surabaya</span>
-              <span className="font-label-sm text-[11px] text-on-surface-variant">Terhubung langsung ke Tim Perbaikan DPUPR Surabaya</span>
-            </div>
-          </div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-lowest text-secondary font-label-sm text-[11px] font-bold shadow-xs w-fit">
-            <span className="material-symbols-outlined text-sm">military_tech</span>
-            <span>LOGICODIX 2026</span>
-          </div>
-        </div>
-
-        {/* Grid Statistik */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-space-md">
-          <div className="flex flex-col p-3 sm:p-space-md rounded-xl bg-surface-container-lowest shadow-xs">
-            <span className="font-headline-lg text-lg sm:text-2xl text-primary font-bold">{stats?.sidewalkKmMapped?.toLocaleString() || '1.420'} km</span>
-            <span className="font-label-md text-[11px] sm:text-xs text-on-surface font-semibold">Km Trotoar Terpetakan</span>
-            <span className="font-body-sm text-[10px] text-on-surface-variant mt-0.5">18 kecamatan</span>
-          </div>
-          <div className="flex flex-col p-3 sm:p-space-md rounded-xl bg-surface-container-lowest shadow-xs">
-            <span className="font-headline-lg text-lg sm:text-2xl text-primary font-bold">{stats?.obstaclesReported || '384'}</span>
-            <span className="font-label-md text-[11px] sm:text-xs text-on-surface font-semibold">Rintangan Dilaporkan</span>
-            <span className="font-body-sm text-[10px] text-on-surface-variant mt-0.5">30 hari terakhir</span>
-          </div>
-          <div className="flex flex-col p-3 sm:p-space-md rounded-xl bg-surface-container-lowest shadow-xs">
-            <span className="font-headline-lg text-lg sm:text-2xl text-secondary font-bold">{stats?.communityVerified || '291'}</span>
-            <span className="font-label-md text-[11px] sm:text-xs text-on-surface font-semibold">Diverifikasi Warga</span>
-            <span className="font-body-sm text-[10px] text-on-surface-variant mt-0.5">Oleh sesama pengguna</span>
-          </div>
-          <div className="flex flex-col p-3 sm:p-space-md rounded-xl bg-surface-container-lowest shadow-xs">
-            <span className="font-headline-lg text-lg sm:text-2xl text-primary font-bold">{stats?.dpuprRepaired || '148'}</span>
-            <span className="font-label-md text-[11px] sm:text-xs text-on-surface font-semibold">Diperbaiki DPUPR</span>
-            <span className="font-body-sm text-[10px] text-on-surface-variant mt-0.5">Rampa dipulihkan</span>
-          </div>
-        </div>
-      </section>
+      </footer>
     </div>
   );
 }

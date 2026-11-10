@@ -196,7 +196,7 @@ Status DPUPR: Diteruskan ke Tim Pemeliharaan Kota Surabaya`;
                     <span className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-bold ${
                       report.severity === 'impassable' ? 'bg-error-container text-on-error-container' : report.severity === 'difficult' ? 'bg-warning-container text-on-warning-container' : 'bg-secondary-container text-on-secondary-container'
                     }`}>
-                      {report.severity === 'impassable' ? '✕ Tidak bisa dilewati' : report.severity === 'difficult' ? '⚠ Sulit' : '✓ Bisa dilewati'}
+                      {report.severity === 'impassable' ? 'Tidak bisa dilewati' : report.severity === 'difficult' ? 'Sulit' : 'Bisa dilewati'}
                     </span>
                     <span className="text-[10px] text-on-surface-variant">ID #{report.id}</span>
                   </div>

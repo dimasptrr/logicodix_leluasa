@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function Header({
   searchQuery,
@@ -8,10 +8,31 @@ export default function Header({
   onOpenAccessibility,
   onOpenNotifications,
   onOpenMobileMenu,
-  onNavigateHome
+  onNavigateHome,
+  // Props opsional (bila dikirim dari App)
+  activeTab,
+  setActiveTab
 }) {
+  const [currentTab, setCurrentTab] = useState(activeTab || 'home');
   const [unreadCount, setUnreadCount] = useState(2);
-  const [mobileSearchActive, setMobileSearchActive] = useState(false);
+  const [isHighContrast, setIsHighContrast] = useState(false);
+
+  // Sinkronkan tab aktif bila ada perubahan via props atau event window
+  useEffect(() => {
+    if (activeTab) {
+      setCurrentTab(activeTab);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    const handleNav = (e) => {
+      if (e.detail?.tab) {
+        setCurrentTab(e.detail.tab);
+      }
+    };
+    window.addEventListener('leluasa:navigate', handleNav);
+    return () => window.removeEventListener('leluasa:navigate', handleNav);
+  }, []);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && onSearchSubmit) {
@@ -19,120 +40,186 @@ export default function Header({
     }
   };
 
+  // Navigasi tab ke halaman tujuan (didukung via props, bridge global, atau event)
+  const navigate = (tabId) => {
+    setCurrentTab(tabId);
+    if (typeof setActiveTab === 'function') {
+      setActiveTab(tabId);
+    } else if (typeof window !== 'undefined' && typeof window.__setLeluasaTab === 'function') {
+      window.__setLeluasaTab(tabId);
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('leluasa:navigate', { detail: { tab: tabId } }));
+    }
+  };
+
+  const handleLogoClick = () => {
+    navigate('home');
+    if (onNavigateHome) onNavigateHome();
+  };
+
+  const handleToggleHighContrast = () => {
+    const next = !isHighContrast;
+    setIsHighContrast(next);
+    document.documentElement.classList.toggle('high-contrast', next);
+  };
+
+  // Link navigasi atas untuk laptop/desktop (seluruh halaman dapat diakses dari navbar atas)
+  const navLinks = [
+    { id: 'home',                 label: 'Dashboard' },
+    { id: 'explore-map',          label: 'Peta Navigasi' },
+    { id: 'plan-route',           label: 'Rute & Perbandingan' },
+    { id: 'reports-impact',       label: 'Riwayat Komunitas' },
+    { id: 'weather-intelligence', label: 'Intelijen Cuaca' },
+  ];
+
+  const resolvedActiveTab = activeTab || currentTab;
+
   return (
-    <header className="fixed top-0 left-0 lg:left-80 right-0 h-16 sm:h-20 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(16,42,67,0.04)] z-40 px-3 sm:px-space-md lg:px-space-xl flex items-center justify-between gap-2 sm:gap-space-lg transition-all">
-      {/* Mobile Menu & Brand (Visible on < lg) */}
-      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+    <header className="fixed top-0 left-0 right-0 h-16 sm:h-[72px] bg-surface-container-lowest/97 backdrop-blur-xl shadow-[0_1px_6px_rgba(16,42,67,0.07)] z-40 flex items-center px-3 sm:px-6 lg:px-8 gap-3 border-b border-outline-variant/20">
+
+      {/* Logo / Brand — Mengarah ke Beranda (Dashboard) */}
+      <button
+        type="button"
+        onClick={handleLogoClick}
+        aria-label="Kembali ke beranda Leluasa"
+        className="flex items-center gap-2.5 shrink-0 group focus:outline focus:outline-[3px] focus:outline-primary focus:outline-offset-2 rounded-lg"
+      >
+        <img
+          src="/logo.png"
+          alt="Logo Leluasa"
+          className="w-8 h-8 rounded-full object-contain shadow-sm group-hover:scale-105 transition-transform"
+        />
+        <span className="font-headline-sm text-base sm:text-lg font-extrabold text-primary tracking-tight">
+          Leluasa
+        </span>
+      </button>
+
+      {/* Search Bar */}
+      <div className="relative flex-1 min-w-0 max-w-xs xl:max-w-sm">
+        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[20px]" aria-hidden="true">
+          search
+        </span>
+        <input
+          className="w-full h-10 pl-9 pr-4 rounded-xl bg-surface-container text-on-surface placeholder:text-outline text-sm focus:outline-none focus:ring-2 focus:ring-primary transition-all"
+          placeholder="Cari jalan, halte, trotoar..."
+          type="text"
+          aria-label="Cari destinasi ramah akses"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={handleKeyDown}
+        />
+      </div>
+
+      {/* Desktop Nav Links: Mengarah ke halaman yang tepat dan terverifikasi */}
+      <nav aria-label="Navigasi Utama" className="hidden lg:flex items-end gap-0 h-full">
+        {navLinks.map((link) => {
+          const isActive = resolvedActiveTab === link.id;
+          return (
+            <button
+              key={link.id}
+              type="button"
+              onClick={() => navigate(link.id)}
+              className={`h-full px-4 text-sm font-semibold transition-colors whitespace-nowrap focus:outline focus:outline-[3px] focus:outline-primary focus-visible:outline-offset-[-3px] border-b-2 cursor-pointer ${
+                isActive
+                  ? 'text-primary border-primary font-bold'
+                  : 'text-on-surface-variant border-transparent hover:text-on-surface'
+              }`}
+              aria-current={isActive ? 'page' : undefined}
+            >
+              {link.label}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Right Action Group */}
+      <div className="flex items-center gap-1 sm:gap-2 ml-auto shrink-0">
+
+        {/* Icon controls: contrast, text-size, notifications (1 fitur untuk 1 tombol unik) */}
+        <div className="hidden md:flex items-center">
+          {/* 1. Toggle Kontras Tinggi Langsung */}
+          <button
+            aria-label={isHighContrast ? 'Nonaktifkan Mode Kontras Tinggi' : 'Aktifkan Mode Kontras Tinggi'}
+            onClick={handleToggleHighContrast}
+            className={`min-h-[40px] min-w-[40px] flex items-center justify-center rounded-full transition-all active:scale-95 focus:outline focus:outline-[3px] focus:outline-primary ${
+              isHighContrast ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container'
+            }`}
+            type="button"
+            title="Klik untuk Kontras Tinggi Nyata"
+          >
+            <span className="material-symbols-outlined text-[22px]" aria-hidden="true">contrast</span>
+          </button>
+
+          {/* 2. Panel Notifikasi Sistem */}
+          <button
+            aria-label={`Pemberitahuan${unreadCount > 0 ? `, ${unreadCount} belum dibaca` : ''}`}
+            onClick={() => {
+              setUnreadCount(0);
+              if (onOpenNotifications) onOpenNotifications();
+            }}
+            className="relative min-h-[40px] min-w-[40px] flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-all active:scale-95 focus:outline focus:outline-[3px] focus:outline-primary"
+            type="button"
+            title="Pemberitahuan Sistem"
+          >
+            <span className="material-symbols-outlined text-[22px]" aria-hidden="true">notifications</span>
+            {unreadCount > 0 && (
+              <span
+                className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center rounded-full bg-error text-white font-bold text-[9px]"
+                aria-hidden="true"
+              >
+                {unreadCount}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* 4. Modal Pengaturan Profil Aksesibilitas */}
+        <button
+          aria-label="Buka Modal Preferensi Aksesibilitas"
+          onClick={onOpenAccessibility}
+          className="flex items-center gap-1.5 min-h-[38px] px-3 rounded-full border border-outline-variant text-on-surface hover:bg-surface-container font-semibold text-sm transition-all active:scale-95 focus:outline focus:outline-[3px] focus:outline-primary"
+          type="button"
+          title="Buka Pengaturan Profil Pengguna & Alat Bantu"
+        >
+          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">accessibility_new</span>
+          <span className="hidden sm:inline text-xs font-semibold">Aksesibilitas</span>
+        </button>
+
+        {/* 5. CTA Tunggal: Lapor Hambatan Baru */}
+        <button
+          type="button"
+          onClick={() => navigate('report-obstacle')}
+          aria-label="Buka formulir lapor hambatan baru"
+          className="flex items-center gap-1.5 min-h-[40px] px-4 rounded-full bg-primary text-on-primary font-bold text-sm shadow-sm hover:opacity-90 active:scale-95 transition-all focus:outline focus:outline-[3px] focus:outline-primary focus:outline-offset-2 whitespace-nowrap cursor-pointer"
+        >
+          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">notification_important</span>
+          <span className="hidden sm:inline text-xs font-bold">Lapor Hambatan</span>
+        </button>
+
+        {/* 6. Avatar Pengguna: Mengarah ke Halaman Riwayat & Kontribusi Profil */}
+        <button
+          type="button"
+          onClick={() => navigate('reports-impact')}
+          aria-label="Buka profil kontributor dan riwayat laporan"
+          title="Profil Dian Kartika - Riwayat & Kontribusi"
+          className="hidden lg:flex w-9 h-9 rounded-full bg-secondary-container border-2 border-secondary/30 items-center justify-center cursor-pointer hover:scale-105 active:scale-95 transition-all overflow-hidden focus:outline focus:outline-[3px] focus:outline-primary"
+        >
+          <img
+            src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80"
+            alt="Foto Profil Dian Kartika"
+            className="w-full h-full object-cover"
+          />
+        </button>
+
+        {/* Mobile hamburger */}
         <button
           onClick={onOpenMobileMenu}
           aria-label="Buka menu navigasi"
-          className="lg:hidden min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-surface-container-lowest text-primary hover:bg-surface-container transition-colors shadow-xs"
-        >
-          <span className="material-symbols-outlined text-2xl">menu</span>
-        </button>
-
-        <div
-          onClick={onNavigateHome}
-          className="flex lg:hidden items-center gap-1.5 cursor-pointer"
-        >
-          <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-on-secondary shadow-xs">
-            <span className="material-symbols-outlined text-xl font-bold">accessible</span>
-          </div>
-                    <div className="hidden sm:flex flex-col leading-tight">
-            <span className="font-headline-sm text-base text-primary font-bold tracking-tight">Leluasa</span>
-            <span className="font-label-sm text-[10px] text-on-surface-variant">All Access, All Ways.</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Global Destination Search Input */}
-      <div className={`flex-1 max-w-xl transition-all ${mobileSearchActive ? 'fixed inset-x-2 top-2 z-50 bg-surface-container-lowest p-2 rounded-2xl shadow-xl' : 'relative'}`}>
-        <div className="relative flex items-center w-full">
-          <span className="material-symbols-outlined absolute left-3.5 text-on-surface-variant pointer-events-none text-xl">
-            search
-          </span>
-          <input
-            className="w-full h-11 sm:h-12 pl-10 sm:pl-12 pr-10 sm:pr-12 rounded-xl bg-surface-container-lowest text-on-surface placeholder:text-outline font-body-sm text-xs sm:text-sm shadow-[0_2px_8px_-2px_rgba(16,42,67,0.06)] focus:outline-none focus:ring-2 focus:ring-secondary transition-all"
-            placeholder="Cari tujuan Surabaya, rumah sakit, rampa trotoar..."
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-          <div className="absolute right-1.5 flex items-center gap-0.5">
-            <button
-              aria-label="Pencarian suara"
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-on-surface-variant hover:text-secondary hover:bg-surface-container transition-colors"
-              type="button"
-              onClick={onOpenVoice}
-              title="Perintah suara"
-            >
-              <span className="material-symbols-outlined text-lg">mic</span>
-            </button>
-            {mobileSearchActive && (
-              <button
-                onClick={() => setMobileSearchActive(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container"
-                type="button"
-                aria-label="Tutup pencarian seluler"
-              >
-                <span className="material-symbols-outlined text-lg" aria-hidden="true">close</span>
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Header Right Action Group */}
-      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        {/* Sensor & Network Status Badge (Tablet / Desktop - Civic Sapphire) */}
-        <div className="hidden md:flex items-center gap-2 px-3.5 py-2 rounded-full bg-surface-container text-primary border border-primary/20 shadow-xs">
-          <span className="w-2.5 h-2.5 rounded-full bg-secondary-container animate-pulse"></span>
-          <span className="font-label-md text-xs font-bold whitespace-nowrap text-primary">
-            Sonar Aktif
-          </span>
-          <span className="material-symbols-outlined text-primary text-[18px]">sensors</span>
-        </div>
-
-        {/* Voice Command Button */}
-        <button
-          aria-label="Perintah Suara"
-          onClick={onOpenVoice}
-          className="min-h-[48px] min-w-[48px] flex items-center justify-center rounded-full bg-surface-container-lowest text-primary hover:bg-surface-container transition-all active:scale-95 shadow-xs focus:outline focus:outline-[3px] focus:outline-primary"
+          className="lg:hidden min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-colors focus:outline focus:outline-[3px] focus:outline-primary"
           type="button"
-          title="Tekan V untuk Asisten Suara Sensorik"
         >
-          <span className="material-symbols-outlined text-2xl">sensors</span>
-        </button>
-
-        {/* Notifications Button */}
-        <button
-          aria-label="Pemberitahuan"
-          onClick={() => {
-            setUnreadCount(0);
-            if (onOpenNotifications) onOpenNotifications();
-          }}
-          className="relative min-h-[48px] min-w-[48px] flex items-center justify-center rounded-full bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all active:scale-95 shadow-xs focus:outline focus:outline-[3px] focus:outline-primary"
-          type="button"
-          title="Pemberitahuan"
-        >
-          <span className="material-symbols-outlined text-2xl">notifications</span>
-          {unreadCount > 0 && (
-            <span className="absolute top-2 right-2 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-on-primary font-label-md text-[10px] font-bold">
-              {unreadCount}
-            </span>
-          )}
-        </button>
-
-        {/* Accessibility Preferences Trigger */}
-        <button
-          aria-label="Preferensi Aksesibilitas"
-          onClick={onOpenAccessibility}
-          className="min-h-[48px] min-w-[48px] flex items-center justify-center rounded-full bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all active:scale-95 shadow-xs focus:outline focus:outline-[3px] focus:outline-primary"
-          type="button"
-          title="Pengaturan Aksesibilitas"
-        >
-          <span className="material-symbols-outlined text-2xl">accessibility_new</span>
+          <span className="material-symbols-outlined text-[26px]" aria-hidden="true">menu</span>
         </button>
       </div>
     </header>

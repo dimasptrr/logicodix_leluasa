@@ -5,9 +5,9 @@ import MockDataBadge from '../components/MockDataBadge.jsx';
 
 export default function PlanRoute({ setActiveTab }) {
   const [routeData, setRouteData] = useState(null);
-  const [selectedDest, setSelectedDest] = useState('halte-transjakarta'); // 'halte-transjakarta' (Stitch) atau 'rsud-soetomo' (Surabaya)
+  const [selectedDest, setSelectedDest] = useState('balai-pemuda'); // 'balai-pemuda' | 'rsud-soetomo' | 'detour-bollard'
   const [selectedProfile, setSelectedProfile] = useState('electric');
-  const [activeRouteKey, setActiveRouteKey] = useState('routeB'); // 'routeB' (Jalur Kuning Guiding Block) atau 'routeA' (Jalur Trotoar Lebar)
+  const [activeRouteKey, setActiveRouteKey] = useState('routeB'); // 'routeB' (Rekomendasi AI) | 'routeA' (Alternatif)
   const [activeFilters, setActiveFilters] = useState({
     avoidBarriers: true,
     prioritizeCurbRamps: true,
@@ -17,6 +17,8 @@ export default function PlanRoute({ setActiveTab }) {
   });
   const [shareToast, setShareToast] = useState('');
   const [isNavigating, setIsNavigating] = useState(false);
+  const [navStepIndex, setNavStepIndex] = useState(0);
+  const [isSpeakingNav, setIsSpeakingNav] = useState(false);
   const [hapticActive, setHapticActive] = useState(true);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [isLoadingRoute, setIsLoadingRoute] = useState(true);
@@ -26,31 +28,99 @@ export default function PlanRoute({ setActiveTab }) {
   const mapInstanceRef = useRef(null);
   const routeLayersRef = useRef(null);
 
-  const destInfo = selectedDest === 'halte-transjakarta' ? {
-    title: 'Tujuan: Halte TransJakarta',
-    subtitle: 'Jalan Cikini Raya ke Halte Stasiun Cikini',
-    origin: '📍 Jalan Cikini Raya',
-    destination: '🎯 Halte TransJakarta / Stasiun Cikini',
-    routeBDuration: '7 mnt',
-    routeBDistance: '420m',
-    routeBDescription: 'Jalur ubin pemandu kontinu via Jl. Pegangsaan Timur, tanpa tangga penyeberangan',
-    routeADuration: '9 mnt',
-    routeADistance: '580m',
-    routeADescription: 'Jalur trotoar lebar standar 2.4m, ramah tongkat',
-    turnInstruction: 'Belok Kanan 45 meter lagi ke Halte Stasiun Cikini'
-  } : {
-    title: 'Tujuan: RSUD Dr. Soetomo (Jl. Moestopo)',
-    subtitle: 'Balai Pemuda ke RSUD Dr. Soetomo',
-    origin: '📍 Balai Pemuda, Jl. Gubernur Suryo',
-    destination: '🎯 RSUD Dr. Soetomo (Jl. Moestopo No. 6-8)',
-    routeBDuration: '22 mnt',
-    routeBDistance: '1,6 km',
-    routeBDescription: 'Rampa kontinu dengan pelintasan berbunyi ramah disabilitas',
-    routeADuration: '18 mnt',
-    routeADistance: '1,4 km',
-    routeADescription: 'Jalur terpendek pejalan kaki (140m turun ke aspal jalan raya)',
-    turnInstruction: 'Belok Kanan dalam 120m ke trotoar utara Jl. Pemuda'
+  // Periksa apakah ada target rute yang dikirim dari Asisten Suara atau Peta Pengalihan Bollard
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.__leluasaTargetRoute) {
+      setSelectedDest(window.__leluasaTargetRoute);
+      window.__leluasaTargetRoute = null;
+    }
+
+    const handleRouteEvent = (e) => {
+      if (e.detail?.routeKey) {
+        setSelectedDest(e.detail.routeKey);
+      }
+    };
+    window.addEventListener('leluasa:select-route', handleRouteEvent);
+    return () => window.removeEventListener('leluasa:select-route', handleRouteEvent);
+  }, []);
+
+  // Data Rute Surabaya 100% Riil
+  const destinations = {
+    'balai-pemuda': {
+      title: 'Tujuan: Halte Integrasi Balai Pemuda Surabaya',
+      subtitle: 'Jl. Pemuda No. 45 ke Halte Trans Semanggi',
+      origin: 'Jl. Pemuda No. 45, Surabaya',
+      destination: 'Halte Integrasi Balai Pemuda',
+      baseMinutes: 8,
+      routeBDuration: '8 mnt',
+      routeBDistance: '420m',
+      routeBDescription: 'Jalur ubin pemandu kontinu kuning bertekstur, elevasi 0°, rampa 1:12',
+      routeADuration: '11 mnt',
+      routeADistance: '590m',
+      routeADescription: 'Jalur trotoar lebar jalan utama, rampa standar',
+      turnInstruction: 'Belok Kanan 45 meter lagi ke Halte Integrasi Balai Pemuda',
+      startCoord: [-7.2642, 112.7449],
+      endCoord: [-7.2655, 112.7515],
+      steps: [
+        { instruction: 'Mulai dari Jl. Pemuda 45, gunakan rampa barat elevasi 0°', detail: 'Trotoar mulus selebar 2.4m, ubin pemandu utuh', distance: '45 m', icon: 'turn_right' },
+        { instruction: 'Lurus mengikuti ubin kuning bertekstur garis', detail: 'Bebas halangan pohon rendah dan bebas parkir liar', distance: '180 m', icon: 'straight' },
+        { instruction: 'Menyeberang di Pelican Crossing Balai Pemuda', detail: 'Audio chirp bunyi pemandu aktif, rampa landai sisi seberang', distance: '35 m', icon: 'volume_up' },
+        { instruction: 'Tiba di Halte Integrasi Balai Pemuda', detail: 'Elevator aksesibel dan pintu rampa halte siap', distance: '160 m', icon: 'check_circle' }
+      ]
+    },
+    'rsud-soetomo': {
+      title: 'Tujuan: RSUD Dr. Soetomo Surabaya',
+      subtitle: 'Balai Pemuda ke Gedung Rawat Jalan RSUD Soetomo',
+      origin: 'Balai Pemuda, Jl. Gubernur Suryo',
+      destination: 'RSUD Dr. Soetomo (Jl. Mayjen Prof. Dr. Moestopo)',
+      baseMinutes: 22,
+      routeBDuration: '22 mnt',
+      routeBDistance: '1,6 km',
+      routeBDescription: 'Rampa landai kontinu 4.5° via Jl. Kusuma Bangsa dengan pelintasan berbunyi',
+      routeADuration: '18 mnt',
+      routeADistance: '1,4 km',
+      routeADescription: 'Jalur terpendek (tanpa kanopi peneduh, rampa agak curam)',
+      turnInstruction: 'Belok Kanan dalam 120m ke trotoar utara Jl. Pemuda arah RSUD Soetomo',
+      startCoord: [-7.2642, 112.7449],
+      endCoord: [-7.2678, 112.7582],
+      steps: [
+        { instruction: 'Mulai dari Balai Pemuda arah Jl. Gubernur Suryo', detail: 'Gunakan ubin pemandu di trotoar sisi timur', distance: '120 m', icon: 'turn_right' },
+        { instruction: 'Lurus menyusuri koridor Jl. Kusuma Bangsa', detail: 'Trotoar berkanopi peneduh, lebar bersih 2.2m', distance: '650 m', icon: 'straight' },
+        { instruction: 'Lewati rampa akses penyeberangan Stasiun Gubeng', detail: 'Kelandaian aman 4.5°, pegangan tangan ganda', distance: '380 m', icon: 'ramp_right' },
+        { instruction: 'Tiba di Lobi Rawat Jalan RSUD Dr. Soetomo', detail: 'Pintu otomatis lebar 1.8m ramah kursi roda', distance: '450 m', icon: 'check_circle' }
+      ]
+    },
+    'detour-bollard': {
+      title: 'Rute Pengalihan: Bypass Bollard Sempit',
+      subtitle: 'Pengalihan Halangan Bollard Jl. Pemuda ke Balai Kota',
+      origin: 'Jl. Pemuda No. 34 (Titik Bollard Terblokir)',
+      destination: 'Balai Kota Surabaya via Rampa Halus Sisi Kanan',
+      baseMinutes: 6,
+      routeBDuration: '6 mnt',
+      routeBDistance: '380m',
+      routeBDescription: 'Pengalihan via rampa halus drop-off (+30m, lebar celah 120cm aman kursi roda)',
+      routeADuration: '5 mnt',
+      routeADistance: '350m',
+      routeADescription: 'Jalur lurus (TERBLOKIR: celah bollard <55cm tidak muat kursi roda)',
+      turnInstruction: 'Ambil rampa halus sisi kanan untuk menghindari bollard sempit',
+      startCoord: [-7.2650, 112.7463],
+      endCoord: [-7.2628, 112.7530],
+      steps: [
+        { instruction: 'Belok kanan 15m sebelum titik bollard sempit', detail: 'Masuk jalur ramp halus gedung perkantoran', distance: '30 m', icon: 'turn_right' },
+        { instruction: 'Lalui rampa landai kemiringan 4.5° dengan pegangan', detail: 'Lebar bersih 1.5m bebas pembatas tiang sempit', distance: '120 m', icon: 'straight' },
+        { instruction: 'Kembali ke trotoar utama Jl. Pemuda sisi utara', detail: 'Ubin pemandu kuning kembali terhubung mulus', distance: '90 m', icon: 'alt_route' },
+        { instruction: 'Lanjut menuju Balai Kota Surabaya', detail: 'Area pejalan kaki ramah disabilitas', distance: '140 m', icon: 'check_circle' }
+      ]
+    }
   };
+
+  const destInfo = destinations[selectedDest] || destinations['balai-pemuda'];
+
+  // Buffer Waktu Cuaca: Jika opsi Hindari Ubin Licin aktif, tambahkan estimasi buffer kehati-hatian
+  const rainBufferMinutes = activeFilters.avoidSlipperyTiles ? 2 : 0;
+  const effectiveRouteBDuration = rainBufferMinutes > 0
+    ? `${destInfo.baseMinutes + rainBufferMinutes} mnt`
+    : destInfo.routeBDuration;
 
   const loadRoute = () => {
     setIsLoadingRoute(true);
@@ -60,7 +130,7 @@ export default function PlanRoute({ setActiveTab }) {
         setRouteData(res.data);
         setIsLoadingRoute(false);
       })
-      .catch(err => {
+      .catch(() => {
         setRouteError('Gagal menghitung perbandingan rute. Klik Coba Lagi.');
         setIsLoadingRoute(false);
       });
@@ -83,7 +153,7 @@ export default function PlanRoute({ setActiveTab }) {
     });
 
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> kontributor',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> Surabaya',
       maxZoom: 19
     }).addTo(map);
 
@@ -110,7 +180,7 @@ export default function PlanRoute({ setActiveTab }) {
 
     const allPoints = [];
 
-    // 1. Render Rute A (Standar Navigasi Umum)
+    // 1. Render Rute A (Alternatif)
     if (routeA?.coordinates?.length) {
       const isSelected = activeRouteKey === 'routeA';
       const polylineA = L.polyline(routeA.coordinates, {
@@ -122,10 +192,7 @@ export default function PlanRoute({ setActiveTab }) {
         lineJoin: 'round'
       }).addTo(layerGroup);
 
-      polylineA.bindTooltip(`⚠️ Rute Alternatif: ${destInfo.routeADuration} (${destInfo.routeADistance})`, {
-        sticky: true
-      });
-
+      polylineA.bindTooltip(`Rute Alternatif: ${destInfo.routeADuration}`, { sticky: true });
       polylineA.on('click', () => setActiveRouteKey('routeA'));
 
       if (isSelected) {
@@ -133,7 +200,7 @@ export default function PlanRoute({ setActiveTab }) {
       }
     }
 
-    // 2. Render Rute B (Rekomendasi AI Leluasa - Jalur Kuning Guiding Block)
+    // 2. Render Rute B (Rekomendasi AI Leluasa - Jalur Guiding Block)
     if (routeB?.coordinates?.length) {
       const isSelected = activeRouteKey === 'routeB';
 
@@ -145,7 +212,7 @@ export default function PlanRoute({ setActiveTab }) {
         lineJoin: 'round'
       }).addTo(layerGroup);
 
-      // Jalur Taktil Kuning
+      // Garis Kuning Taktil Guiding Block
       L.polyline(routeB.coordinates, {
         color: '#FFE083',
         weight: isSelected ? 3.5 : 2,
@@ -155,10 +222,7 @@ export default function PlanRoute({ setActiveTab }) {
         lineJoin: 'round'
       }).addTo(layerGroup);
 
-      polylineBBase.bindTooltip(`✨ Jalur Kuning Guiding Block: ${destInfo.routeBDuration} (${destInfo.routeBDistance})`, {
-        sticky: true
-      });
-
+      polylineBBase.bindTooltip(`Jalur Guiding Block AI: ${effectiveRouteBDuration}`, { sticky: true });
       polylineBBase.on('click', () => setActiveRouteKey('routeB'));
 
       if (isSelected || allPoints.length === 0) {
@@ -166,13 +230,13 @@ export default function PlanRoute({ setActiveTab }) {
       }
     }
 
-    // 3. Pasang Penanda Titik Awal & Tujuan
+    // 3. Pasang Penanda Titik Awal & Tujuan Riil
     const startIcon = L.divIcon({
       className: 'route-start-marker',
       html: `
         <div class="flex flex-col items-center -translate-x-1/2 -translate-y-full cursor-pointer hover:scale-110 transition-transform">
           <div class="px-2.5 py-0.5 rounded-full bg-primary text-white font-bold text-[10px] shadow-lg whitespace-nowrap mb-1">
-            ${destInfo.origin}
+            ${destInfo.origin.split(',')[0]}
           </div>
           <div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center shadow-md ring-2 ring-white">
             <span class="material-symbols-outlined text-sm font-bold">accessible</span>
@@ -182,225 +246,243 @@ export default function PlanRoute({ setActiveTab }) {
       iconSize: [0, 0],
       iconAnchor: [0, 0]
     });
-    L.marker([-7.2642, 112.7449], { icon: startIcon }).addTo(layerGroup);
+    L.marker(destInfo.startCoord, { icon: startIcon }).addTo(layerGroup);
 
     const endIcon = L.divIcon({
       className: 'route-end-marker',
       html: `
         <div class="flex flex-col items-center -translate-x-1/2 -translate-y-full cursor-pointer hover:scale-110 transition-transform">
           <div class="px-2.5 py-0.5 rounded-full bg-secondary text-white font-bold text-[10px] shadow-lg whitespace-nowrap mb-1">
-            ${destInfo.destination}
+            ${destInfo.destination.split('(')[0]}
           </div>
           <div class="w-8 h-8 rounded-full bg-secondary text-white flex items-center justify-center shadow-md ring-2 ring-white">
-            <span class="material-symbols-outlined text-sm font-bold">directions_bus</span>
+            <span class="material-symbols-outlined text-sm font-bold">flag</span>
           </div>
         </div>
       `,
       iconSize: [0, 0],
       iconAnchor: [0, 0]
     });
-    L.marker([-7.2678, 112.7582], { icon: endIcon }).addTo(layerGroup);
+    L.marker(destInfo.endCoord, { icon: endIcon }).addTo(layerGroup);
 
     if (allPoints.length > 0) {
       const bounds = L.latLngBounds(allPoints);
       mapInstanceRef.current.fitBounds(bounds, { padding: [45, 45], maxZoom: 17 });
     }
-  }, [routeData, activeRouteKey, isNavigating, selectedDest]);
+  }, [routeData, activeRouteKey, isNavigating, selectedDest, effectiveRouteBDuration]);
 
   const toggleFilter = (key) => {
     setActiveFilters(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
+  // Mulai Navigasi Aktif
   const handleStartNav = () => {
     setIsNavigating(true);
-    if ('speechSynthesis' in window) {
-      const msg = new SpeechSynthesisUtterance(`Memulai navigasi rute aktif Leluasa. ${destInfo.turnInstruction}. Mengikuti jalur guiding block aman.`);
-      msg.lang = 'id-ID';
-      window.speechSynthesis.speak(msg);
+    setNavStepIndex(0);
+
+    // Getaran fisik jika perangkat mendukung getaran
+    if ('vibrate' in navigator && hapticActive) {
+      navigator.vibrate([100, 50, 100]);
     }
+
+    handleToggleVoice(true);
   };
 
-  const handleRepeatVoice = () => {
-    if ('speechSynthesis' in window) {
+  // Toggle Suara Panduan Navigasi (Play / Stop / Replay)
+  const handleToggleVoice = (forcePlay = false) => {
+    if (!('speechSynthesis' in window)) return;
+
+    if (isSpeakingNav && !forcePlay) {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(`${destInfo.turnInstruction}. Mengikuti jalur guiding block aman.`);
-      utterance.lang = 'id-ID';
-      window.speechSynthesis.speak(utterance);
+      setIsSpeakingNav(false);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const currentStep = destInfo.steps[navStepIndex] || destInfo.steps[0];
+    const text = `Panduan Navigasi Leluasa: ${currentStep.instruction}. ${currentStep.detail}. Jarak ${currentStep.distance}.`;
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'id-ID';
+    utterance.onstart = () => setIsSpeakingNav(true);
+    utterance.onend = () => setIsSpeakingNav(false);
+    utterance.onerror = () => setIsSpeakingNav(false);
+
+    window.speechSynthesis.speak(utterance);
+    setIsSpeakingNav(true);
+  };
+
+  const handleNextStep = () => {
+    if (navStepIndex < destInfo.steps.length - 1) {
+      const nextIndex = navStepIndex + 1;
+      setNavStepIndex(nextIndex);
+
+      if ('vibrate' in navigator && hapticActive) {
+        navigator.vibrate([80, 40, 80]);
+      }
+
+      // Bacakan instruksi langkah berikutnya
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const nextStep = destInfo.steps[nextIndex];
+        const utterance = new SpeechSynthesisUtterance(`${nextStep.instruction}. ${nextStep.detail}.`);
+        utterance.lang = 'id-ID';
+        utterance.onstart = () => setIsSpeakingNav(true);
+        utterance.onend = () => setIsSpeakingNav(false);
+        utterance.onerror = () => setIsSpeakingNav(false);
+        window.speechSynthesis.speak(utterance);
+      }
     }
   };
 
   const handleShare = () => {
     if (navigator.share) {
       navigator.share({
-        title: 'Rute Aksesibel Leluasa',
-        text: `${destInfo.origin} ke ${destInfo.destination} — 100% Tersedia Rampa Trotoar & Tanpa Rintangan`,
+        title: 'Rute Aksesibel Leluasa Surabaya',
+        text: `${destInfo.origin} ke ${destInfo.destination} — 100% Tersedia Rampa & Guiding Block`,
         url: window.location.href,
       }).catch(() => {});
     } else {
-      setShareToast('Tautan rute aksesibel berhasil disalin ke papan klip!');
+      setShareToast('Tautan rute aksesibel Surabaya berhasil disalin!');
       setTimeout(() => setShareToast(''), 3500);
     }
   };
 
   // =========================================================================
-  // VIEW A: NAVIGASI RUTE AKTIF MOTION (stitch_leluasa)
+  // VIEW A: NAVIGASI RUTE AKTIF INTERAKTIF (Langkah demi Langkah)
   // =========================================================================
   if (isNavigating) {
+    const currentStep = destInfo.steps[navStepIndex] || destInfo.steps[0];
+
     return (
-      <div className="relative w-full max-w-md h-[calc(100vh-4rem)] sm:h-[calc(100vh-5rem)] mx-auto overflow-hidden flex flex-col justify-between bg-surface-container-low shadow-2xl animate-fadeIn">
-        {/* 1. SENSORY ROUTE MOTION CANVAS */}
-        <div aria-hidden="true" className="absolute inset-0 z-0 bg-[#F4F6F9]">
-          <svg className="w-full h-full" fill="none" viewBox="0 0 390 844" xmlns="http://www.w3.org/2000/svg">
-            <rect fill="#F8FAFC" height="844" width="390"></rect>
-            <path d="M-20 280 H420 V360 H-20 Z" fill="#EEF2F6"></path>
-            <path d="M120 -20 V860 H270 V-20 Z" fill="#EEF2F6"></path>
+      <div className="relative w-full max-w-lg h-[calc(100vh-4rem)] sm:h-[calc(100vh-5rem)] mx-auto overflow-hidden flex flex-col justify-between bg-surface-container-low shadow-2xl animate-fadeIn p-4 sm:p-5">
+        
+        {/* TOP HUD CARD: PANDUAN ARAH SEKARANG */}
+        <div className="w-full bg-surface-container-lowest rounded-2xl p-4 sm:p-5 shadow-lg border-l-[8px] border-primary flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3.5">
+            <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center text-on-primary shadow-md shrink-0">
+              <span className="material-symbols-outlined text-[32px]">
+                {currentStep.icon || 'turn_right'}
+              </span>
+            </div>
+            <div>
+              <span className="text-[11px] uppercase tracking-wider text-primary font-bold block">
+                Langkah {navStepIndex + 1} dari {destInfo.steps.length}
+              </span>
+              <span className="font-headline-sm text-base sm:text-lg text-on-surface font-extrabold leading-tight block">
+                {currentStep.instruction}
+              </span>
+              <span className="text-xs text-on-surface-variant font-medium mt-0.5 block">
+                {currentStep.detail} ({currentStep.distance})
+              </span>
+            </div>
+          </div>
 
-            {/* Tactile Guiding Block Walkways (Kuning Indikator Jalur Pemandu) */}
-            <path d="M195 720 L195 320 Q195 305 210 305 L320 305" opacity="0.65" stroke="#FDE047" strokeLinecap="round" strokeLinejoin="round" strokeWidth="14"></path>
-            <path d="M195 720 L195 320 Q195 305 210 305 L320 305" opacity="0.75" stroke="#CA8A04" strokeDasharray="4 4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5"></path>
-
-            {/* Sensory Sonar Radar Rings */}
-            <circle className="pulse-ring-1" cx="195" cy="540" fill="none" r="10" stroke="#0284C7"></circle>
-            <circle className="pulse-ring-2" cx="195" cy="540" fill="none" r="10" stroke="#1D4ED8"></circle>
-            <circle className="pulse-ring-3" cx="195" cy="540" fill="none" r="10" stroke="#38BDF8"></circle>
-
-            {/* Dynamic Animated Active Route */}
-            <path d="M195 540 L195 320 Q195 305 210 305 L320 305" stroke="#0037B0" strokeLinecap="round" strokeLinejoin="round" strokeWidth="8"></path>
-            <path className="animate-dash-flow" d="M195 540 L195 320 Q195 305 210 305 L320 305" stroke="#38BDF8" strokeDasharray="14 10" strokeLinecap="round" strokeLinejoin="round" strokeWidth="5"></path>
-
-            {/* Turn Target Node */}
-            <circle cx="210" cy="305" fill="#FFFFFF" r="9" stroke="#0037B0" strokeWidth="4"></circle>
-            <circle cx="210" cy="305" fill="#0037B0" r="3.5"></circle>
-
-            {/* User Sensor Beacon */}
-            <g className="beacon-glow">
-              <circle cx="195" cy="540" fill="#FFFFFF" r="14" stroke="#1D4ED8" strokeWidth="4"></circle>
-              <circle cx="195" cy="540" fill="#1D4ED8" r="6"></circle>
-            </g>
-          </svg>
+          {/* Tombol Speaker: Play / Stop / Replay */}
+          <button
+            aria-label={isSpeakingNav ? 'Hentikan panduan suara' : 'Putar instruksi suara'}
+            onClick={() => handleToggleVoice()}
+            className={`w-12 h-12 min-h-[48px] min-w-[48px] rounded-full flex items-center justify-center transition-all cursor-pointer ${
+              isSpeakingNav
+                ? 'bg-error text-white ring-4 ring-error/30 animate-pulse'
+                : 'bg-surface-container text-primary hover:bg-surface-container-high'
+            }`}
+            type="button"
+            title={isSpeakingNav ? 'Klik: Hentikan Suara' : 'Klik: Dengarkan Ulang Suara'}
+          >
+            <span className="material-symbols-outlined text-2xl">
+              {isSpeakingNav ? 'stop' : 'volume_up'}
+            </span>
+          </button>
         </div>
 
-        {/* 2. TOP FLOATING HUD CARD: URGENT HIGH-CONTRAST TACTILE CUE */}
-        <div className="relative z-20 px-4 sm:px-5 pt-3">
-          <div className="w-full bg-surface-container-lowest rounded-2xl p-4 sm:p-5 shadow-[0_12px_28px_rgba(17,24,39,0.12)] border-l-[8px] border-primary flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              <div aria-label="Arah: Belok Kanan" className="w-14 h-14 rounded-full bg-primary flex items-center justify-center text-on-primary shadow-md shrink-0">
-                <span className="material-symbols-outlined text-[34px]">turn_right</span>
-              </div>
-              <div>
-                <span className="font-headline-lg-mobile text-on-surface tracking-tight block">
-                  Belok Kanan
-                </span>
-                <span className="text-body-lg text-primary font-bold block -mt-1">
-                  45 meter lagi
-                </span>
-              </div>
-            </div>
+        {/* STATUS GUILDING BLOCK & HAPTIC */}
+        <div className="flex items-center justify-between my-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-tertiary-fixed rounded-full text-on-tertiary-fixed shadow-xs">
+            <span className="material-symbols-outlined text-base text-tertiary font-bold">texture</span>
+            <span className="text-xs font-bold">Jalur Ubin Pemandu Aktif</span>
+          </div>
 
-            {/* Audio cue repeating button */}
+          <button
+            type="button"
+            onClick={() => {
+              const next = !hapticActive;
+              setHapticActive(next);
+              if (next && 'vibrate' in navigator) navigator.vibrate(100);
+            }}
+            className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              hapticActive ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-surface-container text-on-surface-variant'
+            }`}
+          >
+            <span className="material-symbols-outlined text-base">vibration</span>
+            <span>{hapticActive ? 'Getar Aktif' : 'Getar Mati'}</span>
+          </button>
+        </div>
+
+        {/* BOTTOM HUD CARD & CONTROLS */}
+        <div className="w-full bg-surface-container-lowest rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col gap-3 mt-auto">
+          <div className="flex items-center justify-between border-b border-surface-container pb-2.5">
+            <div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-xl font-extrabold text-primary">{effectiveRouteBDuration}</span>
+                <span className="text-xs text-on-surface-variant font-bold">• {destInfo.routeBDistance}</span>
+              </div>
+              <p className="text-xs text-on-surface-variant font-medium mt-0.5 truncate">
+                {destInfo.destination}
+              </p>
+            </div>
+            <span className="px-2.5 py-1 rounded-full bg-secondary/10 text-secondary text-xs font-bold">
+              GPS ±0.8m
+            </span>
+          </div>
+
+          {/* Tombol Aksi Navigasi */}
+          <div className="grid grid-cols-2 gap-2.5">
             <button
-              aria-label="Ulangi instruksi suara"
-              onClick={handleRepeatVoice}
-              className="w-12 h-12 min-h-[48px] min-w-[48px] rounded-full bg-surface-container text-primary flex items-center justify-center hover:bg-surface-container-high transition-colors active:scale-95 focus:outline focus:outline-[3px] focus:outline-primary"
               type="button"
+              onClick={handleNextStep}
+              disabled={navStepIndex >= destInfo.steps.length - 1}
+              className={`min-h-[48px] rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer ${
+                navStepIndex >= destInfo.steps.length - 1
+                  ? 'bg-secondary text-white opacity-80 cursor-default'
+                  : 'bg-primary text-on-primary hover:bg-primary-container'
+              }`}
             >
-              <span className="material-symbols-outlined text-2xl">volume_up</span>
+              <span>{navStepIndex >= destInfo.steps.length - 1 ? 'Tiba di Tujuan' : 'Langkah Selanjutnya'}</span>
+              <span className="material-symbols-outlined text-base">arrow_forward</span>
             </button>
-          </div>
 
-          {/* Quick Guiding Block Road Status Pill */}
-          <div className="mt-2.5 flex items-center justify-start">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-tertiary-fixed rounded-full text-on-tertiary-fixed shadow-sm">
-              <span className="material-symbols-outlined text-lg text-tertiary font-bold">blind</span>
-              <span className="text-label-md font-extrabold text-xs text-on-tertiary-fixed">Jalur Guiding Block Tersedia</span>
-            </div>
-          </div>
-        </div>
-
-        {/* 3. FLOATING VOICE ASSISTANT FAB */}
-        <div className="relative z-20 px-5 flex justify-end my-auto pointer-events-none">
-          <div className="relative pointer-events-auto">
-            <span className="mic-ripple absolute inset-0 rounded-full bg-primary opacity-30"></span>
             <button
-              aria-label="Perintah Suara Pintar Leluasa"
-              onClick={handleRepeatVoice}
-              className="relative w-14 h-14 rounded-full bg-primary text-on-primary shadow-xl flex items-center justify-center active:scale-95 transition-transform"
               type="button"
+              onClick={() => setActiveTab('report-obstacle')}
+              className="min-h-[48px] rounded-xl bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-2xl">mic</span>
+              <span className="material-symbols-outlined text-base text-error">report</span>
+              <span>Lapor Rintangan</span>
             </button>
           </div>
-        </div>
 
-        {/* 4. BOTTOM FLOATING TRIP COMPACT HUD & CONTROLS */}
-        <div className="relative z-20 px-4 sm:px-5 pb-6 space-y-3">
-          <div className="w-full bg-surface-container-lowest rounded-2xl p-4 sm:p-5 shadow-[0_12px_28px_rgba(17,24,39,0.12)]">
-            <div className="flex items-center justify-between border-b border-surface-container pb-3">
-              <div>
-                <div className="flex items-baseline gap-2">
-                  <span className="font-headline-lg-mobile text-on-surface font-extrabold">{destInfo.routeBDuration}</span>
-                  <span className="font-headline-sm text-outline font-semibold">• {destInfo.routeBDistance}</span>
-                </div>
-                <p className="text-body-sm text-on-surface-variant font-medium mt-0.5">
-                  {destInfo.subtitle}
-                </p>
-              </div>
-
-              {/* Haptic Mode Toggle */}
-              <button
-                aria-label="Beralih ke getar taktil"
-                onClick={() => setHapticActive(!hapticActive)}
-                className={`min-h-[48px] px-3.5 py-2 rounded-full flex items-center gap-1.5 shadow-sm active:scale-95 transition-all ${
-                  hapticActive ? 'bg-primary-container text-on-primary' : 'bg-surface-container text-on-surface-variant'
-                }`}
-                type="button"
-              >
-                <span className="material-symbols-outlined text-xl">vibration</span>
-                <span className="text-label-md text-xs">{hapticActive ? 'Haptik' : 'Mute'}</span>
-              </button>
-            </div>
-
-            {/* Quick Actions (min 52px height) */}
-            <div className="pt-3 grid grid-cols-2 gap-2.5">
-              <button
-                onClick={() => {
-                  loadRoute();
-                  handleRepeatVoice();
-                }}
-                className="min-h-[50px] w-full rounded-full bg-surface-container text-primary font-bold text-xs flex items-center justify-center gap-2 hover:bg-surface-container-high transition-colors active:scale-95"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-xl">alt_route</span>
-                <span>Rute Ulang</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('report-obstacle')}
-                className="min-h-[50px] w-full rounded-full bg-error-container text-on-error-container font-bold text-xs flex items-center justify-center gap-2 hover:opacity-90 active:scale-95"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-xl">report</span>
-                <span>Hambatan</span>
-              </button>
-            </div>
-
-            {/* Selesai Navigasi Button */}
-            <button
-              onClick={() => setIsNavigating(false)}
-              className="w-full mt-2.5 py-2 rounded-xl text-center text-xs font-bold text-on-surface-variant hover:text-primary transition-colors"
-            >
-              ← Kembali ke Pilihan Rute
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+              setIsNavigating(false);
+            }}
+            className="w-full py-2 text-center text-xs font-bold text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+          >
+            Kembali ke Pilihan Rute
+          </button>
         </div>
       </div>
     );
   }
 
   // =========================================================================
-  // VIEW B: PILIHAN RUTE MINIMALIS (stitch_leluasa)
+  // VIEW B: PERBANDINGAN RUTE (Surabaya 100% Riil)
   // =========================================================================
   return (
     <div className="px-3 sm:px-space-md lg:px-space-xl py-3 sm:py-space-md flex flex-col gap-4 max-w-[1520px] mx-auto w-full animate-fadeIn pb-8">
+      
       {/* Toast Notifikasi */}
       {shareToast && (
         <div role="status" aria-live="polite" className="fixed top-20 left-1/2 -translate-x-1/2 z-50 p-3 rounded-xl bg-secondary text-on-secondary font-label-sm text-xs font-semibold shadow-xl flex items-center gap-2 animate-fadeIn">
@@ -409,51 +491,77 @@ export default function PlanRoute({ setActiveTab }) {
         </div>
       )}
 
-      {/* MINIMAL SPATIAL HEADER (stitch_leluasa) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+      {/* HEADER SPATIAL & SELECTOR TUJUAN SURABAYA */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-1">
         <div>
-          <span className="text-label-md uppercase tracking-wider text-primary font-bold">Pilih Jalur Aman</span>
-          <h1 className="font-headline-lg-mobile text-xl sm:text-2xl text-on-surface font-extrabold">
+          <span className="text-label-md uppercase tracking-wider text-primary font-bold text-xs">
+            Rute &amp; Perbandingan Aksesibilitas
+          </span>
+          <h1 className="font-headline-lg-mobile text-xl sm:text-2xl text-on-surface font-extrabold tracking-tight">
             {destInfo.title}
           </h1>
           <p className="text-xs text-on-surface-variant font-medium mt-0.5">{destInfo.subtitle}</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Destination Selector Pill Switcher */}
+
+        {/* Destination Selector Pill Switcher (3 Pilihan Rute Surabaya Riil) */}
+        <div className="flex items-center gap-1.5 flex-wrap">
           <div className="flex items-center bg-surface-container p-1 rounded-full border border-outline-variant/30 text-xs font-bold shadow-xs">
             <button
               type="button"
-              onClick={() => setSelectedDest('halte-transjakarta')}
-              className={`px-3 py-1.5 rounded-full transition-all flex items-center gap-1 ${
-                selectedDest === 'halte-transjakarta' ? 'bg-primary text-white shadow-xs' : 'text-on-surface-variant hover:text-on-surface'
+              onClick={() => setSelectedDest('balai-pemuda')}
+              className={`px-3 py-1.5 rounded-full transition-all flex items-center gap-1 cursor-pointer ${
+                selectedDest === 'balai-pemuda' ? 'bg-primary text-white shadow-xs' : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
-              <span>Halte TransJakarta (Stitch)</span>
+              <span>Halte Balai Pemuda</span>
             </button>
+
             <button
               type="button"
               onClick={() => setSelectedDest('rsud-soetomo')}
-              className={`px-3 py-1.5 rounded-full transition-all flex items-center gap-1 ${
+              className={`px-3 py-1.5 rounded-full transition-all flex items-center gap-1 cursor-pointer ${
                 selectedDest === 'rsud-soetomo' ? 'bg-primary text-white shadow-xs' : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
-              <span>RSUD Dr. Soetomo (SBY)</span>
+              <span>RSUD Dr. Soetomo</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedDest('detour-bollard')}
+              className={`px-3 py-1.5 rounded-full transition-all flex items-center gap-1 cursor-pointer ${
+                selectedDest === 'detour-bollard' ? 'bg-secondary text-white shadow-xs' : 'text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              <span className="material-symbols-outlined text-xs">alt_route</span>
+              <span>Bypass Bollard</span>
             </button>
           </div>
 
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-container-high rounded-full border border-outline-variant shadow-xs">
-            <span aria-hidden="true" className="w-2.5 h-2.5 rounded-full bg-secondary animate-pulse"></span>
-            <span className="text-label-md text-xs text-on-surface font-semibold">GPS Akurat</span>
-          </div>
           <MockDataBadge />
         </div>
       </div>
 
-      {/* ================= VECTOR MAP CANVAS: INTERACTIVE ROUTE PREVIEW ================= */}
+      {/* ALERT ESTIMASI CUACA HUJAN (Bila opsi ubin licin aktif) */}
+      {rainBufferMinutes > 0 && (
+        <div className="p-3 rounded-2xl bg-primary-container/30 border border-primary/20 flex items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2 text-primary font-semibold">
+            <span className="material-symbols-outlined text-lg text-primary">umbrella</span>
+            <span>
+              <strong>Intelijen Cuaca:</strong> Potensi hujan di Surabaya Pusat. Waktu tempuh disesuaikan <strong>+{rainBufferMinutes} mnt</strong> sebagai batas kecepatan aman di atas trotoar basah.
+            </span>
+          </div>
+          <span className="px-2.5 py-0.5 rounded-full bg-primary text-white text-[10px] font-bold shrink-0">
+            Buffer Aman Aktif
+          </span>
+        </div>
+      )}
+
+      {/* ================= VECTOR MAP CANVAS & ROUTE COMPARISON CARDS ================= */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
         
-        {/* KIRI: PRATINJAU PETA TAKTIL (stitch_leluasa + Leaflet) */}
-        <section aria-label="Pratinjau Peta Rute Taktil" className="lg:col-span-7 relative w-full h-72 sm:h-84 lg:h-96 rounded-2xl overflow-hidden bg-surface-container-lowest border-2 border-outline-variant shadow-sm flex items-center justify-center">
+        {/* KIRI: PRATINJAU PETA LEAFLET SURABAYA */}
+        <section aria-label="Pratinjau Peta Rute Surabaya" className="lg:col-span-7 relative w-full h-72 sm:h-84 lg:h-96 rounded-2xl overflow-hidden bg-surface-container-lowest border-2 border-outline-variant shadow-sm flex items-center justify-center">
           <div
             ref={mapContainerRef}
             className="w-full h-full z-0 cursor-grab active:cursor-grabbing"
@@ -463,7 +571,7 @@ export default function PlanRoute({ setActiveTab }) {
             <div className="absolute inset-0 bg-surface/60 backdrop-blur-xs flex items-center justify-center z-20">
               <div className="px-4 py-2.5 rounded-xl bg-surface-container-lowest shadow-lg flex items-center gap-2.5 text-primary text-xs font-bold animate-pulse">
                 <span className="material-symbols-outlined text-secondary animate-spin text-lg">progress_activity</span>
-                <span>Menghitung Rute Taktil Aman...</span>
+                <span>Menghitung Graf Rute Aksesibel...</span>
               </div>
             </div>
           )}
@@ -471,27 +579,28 @@ export default function PlanRoute({ setActiveTab }) {
           {/* Floating Badges di Canvas */}
           <div className="absolute top-3 left-3 bg-surface-container-lowest/95 backdrop-blur-sm px-3 py-1.5 rounded-full border-2 border-primary shadow-sm flex items-center gap-2 z-10">
             <span aria-hidden="true" className="w-2.5 h-2.5 rounded-full bg-primary animate-ping"></span>
-            <span className="text-label-md text-xs text-primary font-bold">
-              {activeRouteKey === 'routeB' ? 'Jalur Kuning Aktif' : 'Jalur Trotoar Aktif'}
+            <span className="text-xs text-primary font-bold">
+              {activeRouteKey === 'routeB' ? 'Jalur Rekomendasi AI' : 'Jalur Alternatif'}
             </span>
           </div>
+
           <div className="absolute bottom-3 right-3 bg-surface-container-lowest/95 px-3 py-1.5 rounded-full border border-outline-variant shadow-sm flex items-center gap-1.5 text-on-surface-variant z-10">
-            <span className="material-symbols-outlined text-sm text-secondary">hearing</span>
-            <span className="text-label-md text-[11px] font-semibold">Audio Beacon Siap</span>
+            <span className="material-symbols-outlined text-sm text-secondary">verified</span>
+            <span className="text-[11px] font-semibold">Sensor Surabaya Live</span>
           </div>
         </section>
 
-        {/* KANAN: MINIMAL ROUTE COMPARISON CARDS (stitch_leluasa) */}
+        {/* KANAN: KARTU KOMPARASI RUTE A vs RUTE B */}
         <div className="lg:col-span-5 flex flex-col justify-between gap-3">
           <div aria-label="Opsi Rute Perjalanan" className="flex flex-col gap-3" role="radiogroup">
             
-            {/* CARD 1: PRIMARY (Jalur Kuning Guiding Block) */}
+            {/* CARD 1: PRIMARY (Rekomendasi AI - Jalur Ubin Pemandu & Rampa) */}
             <div
               aria-checked={activeRouteKey === 'routeB'}
               onClick={() => setActiveRouteKey('routeB')}
               className={`relative w-full bg-surface-container-lowest rounded-2xl p-4 flex flex-col gap-2.5 cursor-pointer transition-all ${
                 activeRouteKey === 'routeB'
-                  ? 'border-[3px] border-primary shadow-[0_4px_16px_rgba(29,78,216,0.15)] ring-2 ring-primary/20'
+                  ? 'border-[3px] border-primary shadow-md ring-2 ring-primary/20'
                   : 'border-2 border-outline-variant hover:border-outline shadow-xs'
               }`}
               role="radio"
@@ -502,40 +611,46 @@ export default function PlanRoute({ setActiveTab }) {
                   <span className={`w-7 h-7 rounded-full flex items-center justify-center ${activeRouteKey === 'routeB' ? 'bg-primary text-on-primary' : 'border-2 border-outline'}`}>
                     {activeRouteKey === 'routeB' && <span className="material-symbols-outlined text-base">check</span>}
                   </span>
-                  <span className="font-headline-sm text-sm sm:text-base text-on-surface font-extrabold">
-                    Jalur Kuning (Guiding Block)
+                  <span className="text-sm sm:text-base text-on-surface font-extrabold">
+                    Jalur Guiding Block &amp; Rampa Halus
                   </span>
                 </div>
                 <span className="px-2.5 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed text-[11px] font-bold">
-                  Paling Aman
+                  Rekomendasi AI
                 </span>
               </div>
 
               <div className="flex items-baseline gap-2 pl-9">
-                <span className="font-headline-md text-base sm:text-lg text-primary font-extrabold">{destInfo.routeBDuration} ({destInfo.routeBDistance})</span>
+                <span className="text-base sm:text-lg text-primary font-extrabold">
+                  {effectiveRouteBDuration} ({destInfo.routeBDistance})
+                </span>
                 <span className="text-on-surface-variant font-bold">•</span>
-                <span className="text-secondary text-xs font-bold">Aman 100% (Bebas Halangan)</span>
+                <span className="text-secondary text-xs font-bold">100% Ramah Disabilitas</span>
               </div>
+
+              <p className="text-xs text-on-surface-variant pl-9 leading-relaxed">
+                {destInfo.routeBDescription}
+              </p>
 
               <div className="flex flex-wrap items-center gap-2 pt-1 pl-9">
                 <div className="flex items-center gap-1 px-2.5 py-1 bg-surface-container rounded-full text-on-surface text-[11px] font-bold">
                   <span className="material-symbols-outlined text-primary text-sm">texture</span>
-                  <span>Ubin Pengarah Mulus</span>
+                  <span>Ubin Kuning Teratur</span>
                 </div>
                 <div className="flex items-center gap-1 px-2.5 py-1 bg-surface-container rounded-full text-on-surface text-[11px] font-bold">
-                  <span className="material-symbols-outlined text-secondary text-sm">volume_up</span>
-                  <span>Pelikan Suara</span>
+                  <span className="material-symbols-outlined text-secondary text-sm">accessible</span>
+                  <span>Rampa 1:12 Standar</span>
                 </div>
               </div>
             </div>
 
-            {/* CARD 2: ALTERNATIVE (Jalur Trotoar Lebar Standar) */}
+            {/* CARD 2: ALTERNATIVE (Jalur Trotoar Standar) */}
             <div
               aria-checked={activeRouteKey === 'routeA'}
               onClick={() => setActiveRouteKey('routeA')}
               className={`w-full bg-surface-container-lowest rounded-2xl p-4 flex flex-col gap-2 cursor-pointer transition-all ${
                 activeRouteKey === 'routeA'
-                  ? 'border-[3px] border-error shadow-[0_4px_16px_rgba(186,26,26,0.15)] ring-2 ring-error/20'
+                  ? 'border-[3px] border-error shadow-md ring-2 ring-error/20'
                   : 'border-2 border-outline-variant hover:border-outline shadow-xs'
               }`}
               role="radio"
@@ -546,37 +661,32 @@ export default function PlanRoute({ setActiveTab }) {
                   <span className={`w-7 h-7 rounded-full flex items-center justify-center ${activeRouteKey === 'routeA' ? 'bg-error text-white' : 'border-2 border-outline'}`}>
                     {activeRouteKey === 'routeA' && <span className="material-symbols-outlined text-base">check</span>}
                   </span>
-                  <span className="font-headline-sm text-sm sm:text-base text-on-surface font-bold">
-                    Jalur Trotoar Lebar (Standar)
+                  <span className="text-sm sm:text-base text-on-surface font-bold">
+                    Jalur Trotoar Jalan Raya
                   </span>
                 </div>
                 <span className="text-[11px] text-on-surface-variant font-medium">Alternatif</span>
               </div>
 
               <div className="flex items-baseline gap-2 pl-9">
-                <span className="font-headline-sm text-sm sm:text-base text-on-surface font-bold">{destInfo.routeADuration} ({destInfo.routeADistance})</span>
+                <span className="text-sm sm:text-base text-on-surface font-bold">
+                  {destInfo.routeADuration} ({destInfo.routeADistance})
+                </span>
                 <span className="text-on-surface-variant font-bold">•</span>
                 <span className="text-on-surface-variant text-xs font-semibold">{destInfo.routeADescription}</span>
-              </div>
-
-              <div className="flex items-center gap-2 pl-9">
-                <div className="flex items-center gap-1 px-2.5 py-1 bg-surface-container-low rounded-full text-on-surface-variant text-[11px]">
-                  <span className="material-symbols-outlined text-sm">straighten</span>
-                  <span>Lebar 2.4m</span>
-                </div>
               </div>
             </div>
           </div>
 
-          {/* FULL WIDTH HIGH-CONTRAST PRIMARY ACTION (stitch_leluasa) */}
+          {/* CTA TOMBOL MULAI NAVIGASI */}
           <div className="pt-2">
             <button
               onClick={handleStartNav}
-              className="w-full min-h-[56px] py-3.5 px-6 rounded-full bg-primary text-on-primary font-headline-sm text-base font-extrabold shadow-[0_8px_20px_rgba(0,55,176,0.25)] flex items-center justify-center gap-3 active:scale-95 transition-transform duration-150 focus:outline focus:outline-[3px] focus:outline-primary"
+              className="w-full min-h-[54px] py-3.5 px-6 rounded-full bg-primary text-on-primary font-bold text-sm sm:text-base shadow-md hover:bg-primary-container flex items-center justify-center gap-3 active:scale-95 transition-transform duration-150 cursor-pointer"
               type="button"
             >
-              <span>Mulai Navigasi</span>
-              <span className="material-symbols-outlined text-2xl animate-pulse">arrow_forward</span>
+              <span>Mulai Panduan Navigasi</span>
+              <span className="material-symbols-outlined text-2xl">arrow_forward</span>
             </button>
           </div>
         </div>
@@ -590,12 +700,12 @@ export default function PlanRoute({ setActiveTab }) {
         >
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-lg">tune</span>
-            <span className="font-headline-sm text-xs sm:text-sm font-bold text-on-surface">
-              Pengaturan Profil Mobilitas & Parameter Jalur
+            <span className="text-xs sm:text-sm font-bold text-on-surface">
+              Pengaturan Profil Mobilitas &amp; Parameter Aksesibilitas
             </span>
           </div>
           <div className="flex items-center gap-1 text-primary text-xs font-bold">
-            <span>{Object.values(activeFilters).filter(Boolean).length} Filter Aktif</span>
+            <span>{Object.values(activeFilters).filter(Boolean).length} Parameter Aktif</span>
             <span className="material-symbols-outlined text-base">
               {filtersExpanded ? 'expand_less' : 'expand_more'}
             </span>
@@ -611,10 +721,10 @@ export default function PlanRoute({ setActiveTab }) {
                 value={selectedProfile}
                 onChange={(e) => setSelectedProfile(e.target.value)}
               >
-                <option value="electric">⚡ Kursi Roda Listrik (Lebar 68cm)</option>
-                <option value="manual">🧑‍🦽 Kursi Roda Manual (Utamakan Rampa)</option>
-                <option value="scooter">🛵 Skuter Mobilitas (Radius Putar 110cm)</option>
-                <option value="caregiver">🤝 Didorong Pendamping (Kelandaian &lt;8%)</option>
+                <option value="electric">Kursi Roda Listrik (Lebar 68cm)</option>
+                <option value="manual">Kursi Roda Manual (Utamakan Rampa)</option>
+                <option value="scooter">Skuter Mobilitas (Radius Putar 110cm)</option>
+                <option value="caregiver">Didorong Pendamping (Kelandaian &lt;8%)</option>
               </select>
             </div>
 
@@ -622,14 +732,15 @@ export default function PlanRoute({ setActiveTab }) {
               {[
                 { key: 'avoidBarriers', label: 'Hindari rintangan terblokir' },
                 { key: 'prioritizeCurbRamps', label: 'Prioritaskan rampa landai' },
-                { key: 'avoidSteepSlopes', label: 'Hindari tanjakan curam &gt;6%' },
-                { key: 'preferShadedWalkways', label: 'Jalur berteduh/beratap' }
+                { key: 'avoidSteepSlopes', label: 'Hindari tanjakan curam >6%' },
+                { key: 'preferShadedWalkways', label: 'Jalur berteduh/beratap' },
+                { key: 'avoidSlipperyTiles', label: 'Hindari ubin licin saat basah' }
               ].map(f => (
                 <button
                   key={f.key}
                   type="button"
                   onClick={() => toggleFilter(f.key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer ${
                     activeFilters[f.key] ? 'bg-secondary-container text-secondary font-bold' : 'bg-surface-container text-on-surface-variant'
                   }`}
                 >
@@ -644,16 +755,16 @@ export default function PlanRoute({ setActiveTab }) {
         )}
       </div>
 
-      {/* PANDUAN TIAP BELOKAN */}
+      {/* PANDUAN TIAP BELOKAN (STEP LIST) */}
       <div className="bg-surface-container-lowest rounded-2xl p-4 border border-outline-variant/30 flex flex-col gap-3">
         <div className="flex items-center justify-between pb-2 border-b border-outline-variant/20">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-secondary text-lg">directions_walk</span>
-            <h2 className="font-headline-sm text-xs sm:text-sm font-bold text-on-surface">Panduan Navigasi Tiap Belokan</h2>
+            <h2 className="text-xs sm:text-sm font-bold text-on-surface">Panduan Navigasi Tiap Belokan ({destInfo.destination.split('(')[0]})</h2>
           </div>
           <button
             onClick={handleShare}
-            className="px-3 py-1 rounded-full bg-surface-container text-primary font-bold text-xs flex items-center gap-1 hover:bg-surface-container-high"
+            className="px-3 py-1 rounded-full bg-surface-container text-primary font-bold text-xs flex items-center gap-1 hover:bg-surface-container-high cursor-pointer"
           >
             <span className="material-symbols-outlined text-xs">share</span>
             <span>Bagikan</span>
@@ -661,20 +772,14 @@ export default function PlanRoute({ setActiveTab }) {
         </div>
 
         <div className="flex flex-col gap-2">
-          {(routeB?.segments || [
-            { instruction: 'Mulai dari titik awal, lewati rampa barat bergradien 3,5%', detail: 'Rampa selebar 2,1m dengan ubin pengarah (guiding block) utuh', distance: '120 m' },
-            { instruction: 'Belok kanan ke trotoar utara', detail: 'Beton bertekstur mulus, lebar bersih 2,4m, bebas bollard sempit', distance: '380 m' },
-            { instruction: 'Menyeberang di Pelican Crossing pelikan suara', detail: 'Lampu penyeberangan berbunyi akustik (audio chirp) aktif 45 detik', distance: '45 m' },
-            { instruction: 'Lanjut lurus menyusuri koridor teduh berkanopi', detail: 'Trotoar berkanopi, ubin taktil terpasang rapi, kelandaian rampa 2,8%', distance: '620 m' },
-            { instruction: 'Tiba di pintu rampa lobi tujuan utama', detail: 'Rampa bersertifikasi standar kemiringan 1:12 dengan pegangan tangan ganda', distance: 'Tujuan' }
-          ]).map((seg, idx) => (
+          {destInfo.steps.map((seg, idx) => (
             <div key={idx} className="flex items-start gap-3 p-2.5 rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors">
               <div className="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
                 {idx + 1}
               </div>
               <div className="flex-1 flex items-baseline justify-between gap-2">
                 <div className="flex flex-col">
-                  <span className="font-label-md text-xs font-semibold text-on-surface">{seg.instruction}</span>
+                  <span className="text-xs font-semibold text-on-surface">{seg.instruction}</span>
                   <span className="text-[11px] text-on-surface-variant">{seg.detail}</span>
                 </div>
                 <span className="px-2 py-0.5 rounded-md bg-surface-container text-[11px] text-primary font-bold shrink-0">

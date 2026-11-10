@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 export default function Sidebar({
   activeTab,
@@ -7,6 +7,26 @@ export default function Sidebar({
   isMobileOpen,
   onCloseMobile
 }) {
+  // Pasang bridge global secara sinkron agar Header dan komponen lain selalu dapat memicu navigasi
+  if (typeof window !== 'undefined') {
+    window.__setLeluasaTab = setActiveTab;
+    window.__activeLeluasaTab = activeTab;
+  }
+
+  // Dengarkan custom event leluasa:navigate
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.__setLeluasaTab = setActiveTab;
+    }
+    const handleNavEvent = (e) => {
+      if (e.detail?.tab && typeof setActiveTab === 'function') {
+        setActiveTab(e.detail.tab);
+      }
+    };
+    window.addEventListener('leluasa:navigate', handleNavEvent);
+    return () => window.removeEventListener('leluasa:navigate', handleNavEvent);
+  }, [setActiveTab]);
+
   const navItems = [
     { id: 'home', label: 'Beranda (Dashboard)', icon: 'space_dashboard' },
     { id: 'explore-map', label: 'Peta Navigasi', icon: 'map' },
@@ -14,11 +34,12 @@ export default function Sidebar({
     { id: 'report-obstacle', label: 'Buat Laporan', icon: 'notification_important', isAction: true },
     { id: 'reports-impact', label: 'Riwayat & Verifikasi Komunitas', icon: 'history' },
     { id: 'weather-intelligence', label: 'Intelijen Cuaca', icon: 'routine' },
-    { id: 'voice-assistant', label: 'Asisten Suara AI', icon: 'graphic_eq' },
   ];
 
   const handleItemClick = (id) => {
-    setActiveTab(id);
+    if (typeof setActiveTab === 'function') {
+      setActiveTab(id);
+    }
     if (onCloseMobile) onCloseMobile();
   };
 
@@ -31,9 +52,11 @@ export default function Sidebar({
             className="flex items-start gap-space-sm cursor-pointer"
             onClick={() => handleItemClick('home')}
           >
-            <div className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center text-on-secondary shadow-md mt-0.5">
-              <span className="material-symbols-outlined text-2xl font-bold">accessible</span>
-            </div>
+            <img
+              src="/logo.png"
+              alt="Logo Leluasa"
+              className="w-9 h-9 rounded-full object-contain shrink-0 mt-0.5"
+            />
             <div className="flex flex-col">
               <div className="flex items-center gap-space-xs">
                 <span className="font-headline-sm text-headline-sm text-primary tracking-tight font-extrabold">Leluasa</span>
@@ -109,50 +132,12 @@ export default function Sidebar({
           })}
         </nav>
       </div>
-
-      {/* Quick Accessibility & User Profile Card */}
-      <div className="p-space-md m-space-md bg-surface-container-low rounded-xl flex flex-col gap-space-md shadow-xs mb-safe">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-secondary text-lg">tune</span>
-            <span className="font-label-sm text-on-surface font-semibold text-xs">Aksesibilitas Cepat</span>
-          </div>
-          <button
-            onClick={() => {
-              onToggleAccessibility();
-              if (onCloseMobile) onCloseMobile();
-            }}
-            className="min-h-[32px] px-2.5 rounded-lg bg-surface-container-lowest text-secondary font-label-sm text-xs hover:bg-surface-container hover:text-on-surface transition-colors flex items-center gap-1 shadow-[0_1px_3px_rgba(16,42,67,0.04)]"
-            type="button"
-          >
-            <span className="material-symbols-outlined text-xs">contrast</span>
-            <span>Preferensi</span>
-          </button>
-        </div>
-
-        <div className="flex items-center gap-space-sm pt-space-xs border-t border-outline-variant/30">
-          <img
-            alt="Profil Dian Kartika"
-            className="w-8 h-8 rounded-full object-cover shrink-0 ring-2 ring-secondary/30"
-            src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80"
-          />
-          <div className="flex flex-col min-w-0">
-            <span className="font-label-md text-primary font-semibold truncate text-sm">Dian Kartika</span>
-            <span className="font-label-sm text-on-surface-variant truncate text-xs">Pengguna Kursi Roda · Level 3</span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 
   return (
     <>
-      {/* Desktop Persistent Sidebar */}
-      <aside className="hidden lg:flex fixed left-0 top-0 h-full w-80 z-50 flex-col">
-        {sidebarContent}
-      </aside>
-
-      {/* Mobile Drawer (with backdrop) */}
+      {/* Mobile Drawer Only (Desktop Sidebar dinonaktifkan sesuai desain web laptop full-width) */}
       {isMobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex animate-fadeIn">
           <div
