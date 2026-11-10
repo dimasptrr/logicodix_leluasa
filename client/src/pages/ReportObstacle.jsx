@@ -1,6 +1,41 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import L from 'leaflet';
 import { createObstacle } from '../features/dashboard/services/safeApi.js';
+import useGeolocation from '../features/dashboard/hooks/useGeolocation.js';
 import MockDataBadge from '../components/MockDataBadge.jsx';
+
+const MAX_PHOTO_BYTES = 1.5 * 1024 * 1024;
+
+async function compressPhoto(file) {
+  const image = await createImageBitmap(file);
+  let scale = Math.min(1, 1600 / Math.max(image.width, image.height));
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Browser tidak dapat memproses foto.');
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.82 - attempt * 0.04));
+    if (blob && blob.size <= MAX_PHOTO_BYTES) {
+      image.close();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('Foto gagal dibaca.'));
+        reader.readAsDataURL(blob);
+      });
+    }
+    scale *= 0.82;
+  }
+
+  image.close();
+  throw new Error('Ukuran foto masih terlalu besar setelah dikompresi. Pilih foto lain.');
+}
 
 export default function ReportObstacle({ setActiveTab }) {
   // Data formulir pelaporan (1 langkah sederhana)
@@ -8,21 +43,51 @@ export default function ReportObstacle({ setActiveTab }) {
   const [clearanceOption, setClearanceOption] = useState('less_80');
   const [severity, setSeverity] = useState('impassable');
   const [notes, setNotes] = useState('');
-  const [locationText, setLocationText] = useState('Jl. Pemuda No. 45, Genteng, Kota Surabaya');
-  const [coordinates, setCoordinates] = useState({ lat: -7.265412, lng: 112.748231 });
+  const [locationText, setLocationText] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState(null);
   const [uploadedImage, setUploadedImage] = useState(null);
   const [isAnonymous, setIsAnonymous] = useState(false);
 
   // Status proses
-  const [isLocating, setIsLocating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [reportTicketId, setReportTicketId] = useState('');
 
   const fileInputRef = useRef(null);
+  const mapContainerRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const reportMarkerRef = useRef(null);
+  const isManualLocationRef = useRef(false);
+  const centerOnNextGpsFixRef = useRef(true);
+  const {
+    coords: gpsCoords,
+    accuracy: gpsAccuracy,
+    status: gpsStatus,
+    error: gpsError,
+    loading: gpsLoading,
+    refreshLocation
+  } = useGeolocation();
 
-  const defaultPhoto = "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=1200&q=80";
+  const gpsStatusLabel = {
+    idle: 'Belum mencari lokasi',
+    loading: 'Sedang mencari lokasi...',
+    located: 'Lokasi GPS berhasil ditemukan',
+    denied: 'Izin lokasi ditolak',
+    unavailable: 'Lokasi tidak tersedia',
+    timeout: 'Pencarian lokasi timeout',
+    unsupported: 'Browser tidak mendukung GPS',
+    'insecure-context': 'GPS memerlukan HTTPS atau localhost'
+  }[gpsStatus];
+
+  const selectManualLocationRef = useRef(null);
+  selectManualLocationRef.current = (lat, lng) => {
+    isManualLocationRef.current = true;
+    centerOnNextGpsFixRef.current = false;
+    setSelectedLocation({ lat, lng, accuracy: null, source: 'manual' });
+    setLocationText(`Titik manual (${lat.toFixed(6)}, ${lng.toFixed(6)})`);
+    setSubmitError(null);
+  };
 
   const categories = [
     { id: 'Bollard / Pembatas', label: 'Bollard / Pembatas', icon: 'front_hand' },
@@ -32,61 +97,145 @@ export default function ReportObstacle({ setActiveTab }) {
     { id: 'Tangga Tanpa Rampa', label: 'Tangga Tanpa Rampa', icon: 'stairs' },
   ];
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      setUploadedImage(reader.result);
-    };
-    reader.readAsDataURL(file);
+    setSubmitError(null);
+    try {
+      setUploadedImage(await compressPhoto(file));
+    } catch (error) {
+      setUploadedImage(null);
+      setSubmitError(error.message || 'Foto gagal diproses. Silakan pilih foto lain.');
+    }
   };
 
-  // Auto-deteksi lokasi GPS pengguna saat form pelaporan dibuka
-  React.useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords;
-          setCoordinates({ lat: latitude, lng: longitude });
-          setLocationText(`Titik GPS Saya: Surabaya (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`);
-        },
-        () => {
-          // Bila izin GPS belum diberikan, tetap sediakan fallback default lokasi Surabaya
-        },
-        { timeout: 6000 }
-      );
-    }
-  }, []);
+  useEffect(() => {
+    if (submitSuccess || !mapContainerRef.current || mapInstanceRef.current) return;
 
-  const handleDetectGPS = () => {
-    if (!navigator.geolocation) {
-      setSubmitError('Browser tidak mendukung geolokasi.');
+    const map = L.map(mapContainerRef.current, {
+      center: [-7.2575, 112.7521],
+      zoom: 15,
+      zoomControl: true,
+      attributionControl: true
+    });
+
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> kontributor',
+      maxZoom: 19
+    }).addTo(map);
+
+    map.on('click', (event) => {
+      selectManualLocationRef.current?.(event.latlng.lat, event.latlng.lng);
+    });
+    mapInstanceRef.current = map;
+    map.invalidateSize();
+
+    return () => {
+      map.remove();
+      mapInstanceRef.current = null;
+      reportMarkerRef.current = null;
+    };
+  }, [submitSuccess]);
+
+  useEffect(() => {
+    if (gpsCoords && !isManualLocationRef.current) {
+      setSelectedLocation({
+        lat: gpsCoords.lat,
+        lng: gpsCoords.lng,
+        accuracy: gpsCoords.accuracy,
+        source: 'gps'
+      });
+      setLocationText(`Titik GPS (${gpsCoords.lat.toFixed(6)}, ${gpsCoords.lng.toFixed(6)})`);
+      setSubmitError(null);
       return;
     }
 
-    setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        setCoordinates({ lat: latitude, lng: longitude });
-        setLocationText(`Surabaya (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
-        setIsLocating(false);
-      },
-      () => {
-        setIsLocating(false);
-        setSubmitError('Gagal mendeteksi lokasi GPS. Anda dapat mengisi alamat secara manual.');
-      },
-      { timeout: 8000 }
-    );
+    if (!gpsCoords && !isManualLocationRef.current && ['denied', 'unavailable', 'timeout', 'unsupported', 'insecure-context'].includes(gpsStatus)) {
+      setSelectedLocation(null);
+      setLocationText('');
+    }
+  }, [gpsCoords, gpsStatus]);
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (!selectedLocation) {
+      if (reportMarkerRef.current) {
+        map.removeLayer(reportMarkerRef.current);
+        reportMarkerRef.current = null;
+      }
+      return;
+    }
+
+    if (!reportMarkerRef.current) {
+      const reportIcon = L.divIcon({
+        className: 'report-location-marker',
+        html: '<div class="w-8 h-8 rounded-full bg-primary text-white border-2 border-white shadow-lg flex items-center justify-center"><span class="material-symbols-outlined text-base">location_on</span></div>',
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+      });
+
+      reportMarkerRef.current = L.marker([selectedLocation.lat, selectedLocation.lng], {
+        icon: reportIcon,
+        draggable: true,
+        title: 'Pin lokasi laporan, dapat digeser'
+      }).addTo(map);
+      reportMarkerRef.current.on('dragend', (event) => {
+        const point = event.target.getLatLng();
+        selectManualLocationRef.current?.(point.lat, point.lng);
+      });
+    } else {
+      reportMarkerRef.current.setLatLng([selectedLocation.lat, selectedLocation.lng]);
+    }
+
+    if (selectedLocation.source === 'gps' && centerOnNextGpsFixRef.current) {
+      map.setView([selectedLocation.lat, selectedLocation.lng], 17, { animate: true });
+      centerOnNextGpsFixRef.current = false;
+    }
+  }, [selectedLocation, submitSuccess]);
+
+  const handleDetectGPS = () => {
+    isManualLocationRef.current = false;
+    centerOnNextGpsFixRef.current = true;
+    setSelectedLocation(null);
+    setLocationText('');
+    setSubmitError(null);
+    refreshLocation();
+  };
+
+  const handleLocationTextChange = (event) => {
+    isManualLocationRef.current = true;
+    setSelectedLocation(null);
+    setLocationText(event.target.value);
+    setSubmitError(null);
   };
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
 
+    if (!selectedLocation) {
+      setSubmitError('Lokasi belum ditentukan. Gunakan GPS atau pilih titik pada peta dan geser pinnya.');
+      return;
+    }
+
+    if (
+      !Number.isFinite(selectedLocation.lat) ||
+      !Number.isFinite(selectedLocation.lng) ||
+      selectedLocation.lat < -90 || selectedLocation.lat > 90 ||
+      selectedLocation.lng < -180 || selectedLocation.lng > 180
+    ) {
+      setSubmitError('Koordinat lokasi tidak valid. Pilih ulang lokasi melalui GPS atau peta.');
+      return;
+    }
+
     if (!locationText.trim()) {
-      setSubmitError('Harap isi alamat atau lokasi rintangan.');
+      setSubmitError('Lokasi belum memiliki keterangan. Pilih ulang titik melalui GPS atau peta.');
+      return;
+    }
+    if (!uploadedImage) {
+      setSubmitError('Unggah foto rintangan sebelum mengirim laporan.');
       return;
     }
 
@@ -96,11 +245,12 @@ export default function ReportObstacle({ setActiveTab }) {
     try {
       const clearanceVal = clearanceOption === 'less_80' ? 65 : clearanceOption === '80_120' ? 95 : 130;
 
-      // Payload kontrak createObstacle tetap terjaga 100%
-      await createObstacle({
+      const result = await createObstacle({
         title: `${category} dilaporkan di ${locationText.split(',')[0]}`,
+        locationText,
         location: locationText,
-        coordinates: coordinates,
+        coordinates: { lat: selectedLocation.lat, lng: selectedLocation.lng },
+        locationAccuracyM: selectedLocation.source === 'gps' ? selectedLocation.accuracy : null,
         category,
         clearance: clearanceVal,
         clearanceOption,
@@ -108,14 +258,13 @@ export default function ReportObstacle({ setActiveTab }) {
         notes: notes.trim() || 'Rintangan trotoar dilaporkan oleh warga.',
         forwardDpupr: true,
         shareCommunity: true,
-        uploadedImage: uploadedImage || defaultPhoto,
+        uploadedImage,
       });
 
-      const newTicketId = `LEL-2025-SBY-${Math.floor(1000 + Math.random() * 9000)}`;
-      setReportTicketId(newTicketId);
+      setReportTicketId(result.data.id);
       setSubmitSuccess(true);
     } catch (err) {
-      setSubmitError('Gagal mengirimkan laporan. Silakan coba kembali.');
+      setSubmitError(err.message || 'Gagal mengirimkan laporan. Silakan coba kembali.');
     } finally {
       setIsSubmitting(false);
     }
@@ -139,7 +288,7 @@ export default function ReportObstacle({ setActiveTab }) {
 
           <div className="flex flex-col gap-1">
             <span className="px-3 py-1 rounded-full bg-secondary-container text-secondary text-xs font-bold inline-block self-center">
-              Laporan Terbit &amp; Terverifikasi
+              Laporan Terkirim · Menunggu Verifikasi
             </span>
             <h1 className="text-xl sm:text-2xl font-bold text-primary mt-2">
               Laporan Berhasil Terkirim
@@ -202,7 +351,7 @@ export default function ReportObstacle({ setActiveTab }) {
         type="file"
         ref={fileInputRef}
         onChange={handleImageUpload}
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp"
         capture="environment"
         className="hidden"
         aria-hidden="true"
@@ -245,7 +394,7 @@ export default function ReportObstacle({ setActiveTab }) {
             <div className="flex items-center justify-between text-xs font-bold text-primary">
               <span className="flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-base text-secondary" aria-hidden="true">photo_camera</span>
-                <span>Foto Rintangan</span>
+                <span>Foto Rintangan *</span>
               </span>
               {uploadedImage && (
                 <button
@@ -286,24 +435,47 @@ export default function ReportObstacle({ setActiveTab }) {
               <button
                 type="button"
                 onClick={handleDetectGPS}
-                disabled={isLocating}
-                className="text-secondary font-bold hover:underline text-[11px] flex items-center gap-0.5"
+                disabled={gpsLoading}
+                className="text-secondary font-bold hover:underline text-[11px] flex items-center gap-0.5 disabled:opacity-60"
               >
                 <span className="material-symbols-outlined text-xs" aria-hidden="true">my_location</span>
-                <span>{isLocating ? 'Mencari...' : 'GPS Saya'}</span>
+                <span>{gpsStatus === 'loading' ? 'Mencari...' : 'Deteksi Ulang Lokasi'}</span>
               </button>
             </div>
+
+            <div className="flex flex-col gap-1 rounded-xl bg-surface-container-low p-2.5 text-[11px]">
+              <span className="font-bold text-primary">{gpsStatusLabel}</span>
+              {gpsError && <span className="text-error">{gpsError.message}</span>}
+              {gpsCoords && (
+                <span className="text-on-surface-variant">
+                  Akurasi GPS perangkat: ±{Math.round(gpsAccuracy)} m
+                </span>
+              )}
+            </div>
+
+            <div
+              ref={mapContainerRef}
+              aria-label="Peta pemilihan lokasi laporan"
+              className="w-full h-56 sm:h-64 rounded-xl border border-outline-variant/40 overflow-hidden"
+            />
+            <p className="text-[10px] text-on-surface-variant">
+              Geser pin untuk menyesuaikan titik, atau ketuk peta untuk memilih lokasi secara manual.
+            </p>
 
             <input
               type="text"
               value={locationText}
-              onChange={(e) => setLocationText(e.target.value)}
-              placeholder="Nama jalan atau trotoar..."
+              onChange={handleLocationTextChange}
+              placeholder="Keterangan lokasi yang sesuai dengan pin..."
               className="w-full p-2.5 rounded-xl bg-surface-container text-xs text-on-surface font-semibold focus:outline-none focus:ring-2 focus:ring-primary border border-outline-variant/30"
-              required
             />
             <span className="text-[10px] text-on-surface-variant font-mono">
-              Koordinat: {coordinates.lat.toFixed(4)}, {coordinates.lng.toFixed(4)}
+              {selectedLocation ? (
+                <>
+                  Titik {selectedLocation.source === 'gps' ? 'GPS' : 'manual'}: Lat {selectedLocation.lat.toFixed(6)}, Lng {selectedLocation.lng.toFixed(6)}
+                  {selectedLocation.source === 'gps' && ` · Akurasi ±${Math.round(selectedLocation.accuracy)} m`}
+                </>
+              ) : 'Pilih lokasi melalui GPS atau pin pada peta sebelum mengirim laporan.'}
             </span>
           </div>
 

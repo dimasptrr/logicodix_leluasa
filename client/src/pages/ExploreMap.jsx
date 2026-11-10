@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { fetchObstacles, upvoteObstacle, resolveObstacle, dispatchDpupr, fetchRouteComparison } from '../features/dashboard/services/safeApi.js';
+import useGeolocation from '../features/dashboard/hooks/useGeolocation.js';
 import MockDataBadge from '../components/MockDataBadge.jsx';
 
 export default function ExploreMap({ setActiveTab }) {
@@ -13,6 +14,16 @@ export default function ExploreMap({ setActiveTab }) {
   const [actionFeedback, setActionFeedback] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState(null);
+  const {
+    coords,
+    accuracy,
+    timestamp,
+    status: gpsStatus,
+    error: gpsError,
+    loading: gpsLoading,
+    isAccurate,
+    refreshLocation
+  } = useGeolocation();
 
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -20,6 +31,18 @@ export default function ExploreMap({ setActiveTab }) {
   const markersGroupRef = useRef(null);
   const routesGroupRef = useRef(null);
   const userGpsMarkerRef = useRef(null);
+  const centerOnNextLocationRef = useRef(false);
+
+  const gpsStatusLabel = {
+    idle: 'Belum mencari lokasi',
+    loading: 'Sedang mencari lokasi...',
+    located: 'Lokasi GPS ditemukan',
+    denied: 'Izin lokasi ditolak',
+    unavailable: 'Lokasi tidak tersedia',
+    timeout: 'Pencarian lokasi timeout',
+    unsupported: 'Browser tidak mendukung GPS',
+    'insecure-context': 'GPS memerlukan HTTPS atau localhost'
+  }[gpsStatus];
 
   useEffect(() => {
     loadObstacles();
@@ -49,9 +72,8 @@ export default function ExploreMap({ setActiveTab }) {
     if (!mapContainerRef.current) return;
     if (mapInstanceRef.current) return;
 
-    // Titik pusat di Surabaya Pusat (Balai Pemuda / Jl. Pemuda)
     const map = L.map(mapContainerRef.current, {
-      center: [-7.2642, 112.7470],
+      center: [-7.2575, 112.7521],
       zoom: 15,
       zoomControl: false,
       attributionControl: true
@@ -71,15 +93,32 @@ export default function ExploreMap({ setActiveTab }) {
     // Render Koridor Ramah Kursi Roda
     renderCorridors(routesGroupRef.current);
 
-    // Pin GPS awal (Balai Pemuda)
-    updateUserGpsMarker(map, -7.2642, 112.7449, 'Balai Pemuda Surabaya');
-    locateDevice(false);
+    centerOnNextLocationRef.current = true;
 
     return () => {
       map.remove();
       mapInstanceRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (!coords) {
+      if (userGpsMarkerRef.current) {
+        map.removeLayer(userGpsMarkerRef.current);
+        userGpsMarkerRef.current = null;
+      }
+      return;
+    }
+
+    updateUserGpsMarker(map, coords.lat, coords.lng);
+    if (centerOnNextLocationRef.current) {
+      map.setView([coords.lat, coords.lng], 17, { animate: true });
+      centerOnNextLocationRef.current = false;
+    }
+  }, [coords]);
 
   // Update Tile Layer saat mode layer berganti
   useEffect(() => {
@@ -239,7 +278,7 @@ export default function ExploreMap({ setActiveTab }) {
     }
   };
 
-  const updateUserGpsMarker = (map, lat, lng, label = 'Posisi Anda Saat Ini') => {
+  const updateUserGpsMarker = (map, lat, lng) => {
     const userHtml = `
       <div class="relative flex flex-col items-center justify-center cursor-pointer -translate-x-1/2 -translate-y-1/2">
         <div class="w-12 h-12 rounded-full bg-secondary/30 animate-ping absolute"></div>
@@ -248,7 +287,7 @@ export default function ExploreMap({ setActiveTab }) {
         </div>
         <div class="w-2.5 h-3 bg-secondary -mt-1 [clip-path:polygon(50%_100%,0_0,100%_0)] z-20"></div>
         <div class="mt-1 bg-primary text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full shadow-xl whitespace-nowrap z-30 ring-1 ring-white/30">
-          ${label}
+          Posisi Anda
         </div>
       </div>
     `;
@@ -271,40 +310,9 @@ export default function ExploreMap({ setActiveTab }) {
     }
   };
 
-  const locateDevice = (centerMap = true) => {
-    if (!navigator.geolocation) {
-      setActionFeedback('Geolokasi tidak didukung oleh browser Anda.');
-      setTimeout(() => setActionFeedback(''), 3000);
-      return;
-    }
-
-    if (centerMap) {
-      setActionFeedback('Mendeteksi koordinat GPS perangkat Anda...');
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude, accuracy } = position.coords;
-        if (mapInstanceRef.current) {
-          updateUserGpsMarker(mapInstanceRef.current, latitude, longitude, 'Posisi Anda');
-
-          if (centerMap) {
-            mapInstanceRef.current.setView([latitude, longitude], 17, { animate: true });
-          }
-        }
-        setActionFeedback(`Lokasi Terkunci: ${latitude.toFixed(4)}, ${longitude.toFixed(4)} (±${Math.round(accuracy)}m)`);
-        setTimeout(() => setActionFeedback(''), 4500);
-      },
-      (error) => {
-        console.warn('Geolocation error:', error.message);
-        if (centerMap) {
-          setActionFeedback('Izin lokasi belum diberikan. Membuka pusat peta Surabaya.');
-          mapInstanceRef.current?.setView([-7.2625, 112.7441], 16, { animate: true });
-          setTimeout(() => setActionFeedback(''), 4000);
-        }
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 }
-    );
+  const handleLocateMe = () => {
+    centerOnNextLocationRef.current = true;
+    refreshLocation();
   };
 
   const handleAudioWayfinding = () => {
@@ -459,6 +467,19 @@ export default function ExploreMap({ setActiveTab }) {
         </div>
       </div>
 
+      <div className="absolute top-[118px] sm:top-[92px] left-2 sm:left-4 z-20 max-w-[calc(100%-5rem)] rounded-xl border border-outline-variant/30 bg-surface-container-lowest/95 px-3 py-2 text-[10px] sm:text-xs text-on-surface shadow-md pointer-events-none">
+        <div className="font-bold text-primary">{gpsStatusLabel}</div>
+        {coords ? (
+          <div className="mt-0.5 text-on-surface-variant">
+            Lat {coords.lat.toFixed(6)} · Lng {coords.lng.toFixed(6)} · Akurasi ±{Math.round(accuracy)} m
+            {!isAccurate && <span className="block text-warning">Akurasi rendah; posisi dapat kurang tepat.</span>}
+            {timestamp && <span className="block">Diperbarui {new Date(timestamp).toLocaleTimeString()}</span>}
+          </div>
+        ) : gpsError ? (
+          <div className="mt-0.5 text-on-surface-variant">{gpsError.message}</div>
+        ) : null}
+      </div>
+
       {/* FLOATING ACTION BUTTONS KANAN (Sesuai Mockup UI 1: Speaker, Locate, + Lapor) */}
       <div className="absolute right-3 sm:right-6 top-36 sm:top-28 z-20 flex flex-col items-center gap-2.5 pointer-events-auto">
         {/* Tombol Audio Wayfinding */}
@@ -475,10 +496,11 @@ export default function ExploreMap({ setActiveTab }) {
         {/* Tombol Pusatkan GPS */}
         <button
           type="button"
-          onClick={() => locateDevice(true)}
+          onClick={handleLocateMe}
+          disabled={gpsLoading}
           aria-label="Pusatkan posisi saya"
-          className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-surface-container-lowest text-primary shadow-[0_4px_16px_rgba(16,42,67,0.15)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all border border-outline-variant/30"
-          title="Lokasi GPS Saya"
+          className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-surface-container-lowest text-primary shadow-[0_4px_16px_rgba(16,42,67,0.15)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all border border-outline-variant/30 disabled:opacity-60"
+          title="Deteksi ulang dan pusatkan ke lokasi GPS saya"
         >
           <span className="material-symbols-outlined text-xl sm:text-2xl text-secondary">my_location</span>
         </button>

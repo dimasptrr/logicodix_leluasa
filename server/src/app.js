@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { config } from './config/env.js';
 import routingRoutes from './modules/routing/routingRoutes.js';
+import obstacleRoutes from './modules/obstacles/obstacleRoutes.js';
 
 const app = express();
 
@@ -10,7 +11,7 @@ app.use(cors({
   origin: '*', // Memungkinkan akses dari frontend local Vite (:3000 & :5173)
   credentials: true
 }));
-app.use(express.json());
+app.use(express.json({ limit: '2.2mb' }));
 
 // Logging sederhana request
 app.use((req, res, next) => {
@@ -30,6 +31,7 @@ app.get('/api/health', (req, res) => {
 
 // Modul Routing (Kaka)
 app.use('/api/routes', routingRoutes);
+app.use('/api/obstacles', obstacleRoutes);
 
 // Endpoint Mock Sementara untuk modul lain (Erlinda & Dimas) agar frontend tidak 404
 app.get('/api/obstacles', (req, res) => {

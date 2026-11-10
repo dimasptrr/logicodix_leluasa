@@ -1,23 +1,4 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { config } from '../../config/env.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Helper membaca fallback JSON yang telah dites oleh Kaka
-function loadFallbackJson(filename) {
-  try {
-    const rootPath = path.resolve(__dirname, '../../../../', filename);
-    if (fs.existsSync(rootPath)) {
-      return JSON.parse(fs.readFileSync(rootPath, 'utf8'));
-    }
-  } catch (err) {
-    console.warn(`[Routing] Gagal membaca fallback file ${filename}:`, err.message);
-  }
-  return null;
-}
 
 /**
  * Membuat polygon bounding box di sekitar titik rintangan
@@ -78,57 +59,41 @@ export async function queryOpenRouteService(coordinates, profile = 'wheelchair',
     requestBody.options = options;
   }
 
-  // Jika tidak ada API key, gunakan langsung fallback hasil tes
   if (!apiKey) {
-    console.warn('[Routing] ORS_API_KEY tidak ditemukan di .env, menggunakan fallback data lokal.');
-    return getFallbackRoute(profile, options);
+    throw Object.assign(new Error('ORS_API_KEY belum dikonfigurasi di backend.'), { status: 503 });
   }
 
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Authorization': apiKey,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json, application/geo+json'
-      },
-      body: JSON.stringify(requestBody),
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
+    let response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': apiKey,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json, application/geo+json'
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       const errText = await response.text();
-      console.warn(`[Routing] ORS API mengembalikan status ${response.status}: ${errText}. Memakai fallback data.`);
-      return getFallbackRoute(profile, options);
+      throw Object.assign(new Error(`OpenRouteService mengembalikan status ${response.status}: ${errText}`), { status: 502 });
     }
 
     const data = await response.json();
     return data;
   } catch (error) {
-    console.warn(`[Routing] Gagal terhubung ke OpenRouteService (${error.message}). Menggunakan fallback data.`);
-    return getFallbackRoute(profile, options);
+    console.warn(`[Routing] Gagal mendapatkan rute OpenRouteService: ${error.message}`);
+    throw error;
   }
-}
-
-/**
- * Menyediakan data rute fallback yang sudah berhasil ditarik oleh Kaka
- */
-function getFallbackRoute(profile, options) {
-  if (profile === 'foot-walking') {
-    return loadFallbackJson('foot.json');
-  }
-  if (profile === 'wheelchair') {
-    if (options && options.avoid_polygons) {
-      return loadFallbackJson('wheelchair-avoid.json');
-    }
-    return loadFallbackJson('wheelchair.json');
-  }
-  return loadFallbackJson('wheelchair-avoid.json') || loadFallbackJson('foot.json');
 }
 
 /**

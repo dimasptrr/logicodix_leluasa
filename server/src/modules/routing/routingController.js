@@ -17,6 +17,22 @@ const ACTIVE_OBSTACLES = [
   }
 ];
 
+function parseQueryCoordinate(value, minimum, maximum) {
+  if (typeof value !== 'string' || value.trim() === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= minimum && parsed <= maximum ? parsed : null;
+}
+
+function parseOrsPoint(value) {
+  if (!Array.isArray(value) || value.length !== 2) return null;
+  const [longitude, latitude] = value.map(Number);
+  if (
+    !Number.isFinite(longitude) || longitude < -180 || longitude > 180 ||
+    !Number.isFinite(latitude) || latitude < -90 || latitude > 90
+  ) return null;
+  return [longitude, latitude];
+}
+
 /**
  * Controller untuk membandingkan Rute Standar vs Rute AI Leluasa
  * GET /api/routes/compare
@@ -25,11 +41,20 @@ export async function compareRoutes(req, res) {
   try {
     const {
       profile = 'electric',
-      originLat = -7.2655,
-      originLng = 112.7456,
-      destLat = -7.2625,
-      destLng = 112.7390
+      originName = 'Titik awal',
+      destinationName = 'Tujuan'
     } = req.query;
+    const originLat = parseQueryCoordinate(req.query.originLat, -90, 90);
+    const originLng = parseQueryCoordinate(req.query.originLng, -180, 180);
+    const destLat = parseQueryCoordinate(req.query.destLat, -90, 90);
+    const destLng = parseQueryCoordinate(req.query.destLng, -180, 180);
+
+    if ([originLat, originLng, destLat, destLng].some(value => value === null)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'originLat, originLng, destLat, dan destLng wajib berupa koordinat valid.'
+      });
+    }
 
     const start = [parseFloat(originLng), parseFloat(originLat)];
     const end = [parseFloat(destLng), parseFloat(destLat)];
@@ -90,13 +115,13 @@ export async function compareRoutes(req, res) {
       status: 'success',
       data: {
         origin: {
-          name: 'Balai Pemuda',
+          name: originName,
           lat: parseFloat(originLat),
           lng: parseFloat(originLng),
           coordinates: [parseFloat(originLat), parseFloat(originLng)]
         },
         destination: {
-          name: 'RSUD Dr. Soetomo',
+          name: destinationName,
           lat: parseFloat(destLat),
           lng: parseFloat(destLng),
           coordinates: [parseFloat(destLat), parseFloat(destLng)]
@@ -111,7 +136,7 @@ export async function compareRoutes(req, res) {
     });
   } catch (error) {
     console.error('[RoutingController] Error compareRoutes:', error);
-    return res.status(500).json({
+    return res.status(error.status || 500).json({
       status: 'error',
       message: 'Gagal memproses perbandingan rute',
       details: error.message
@@ -127,14 +152,16 @@ export async function planRoute(req, res) {
   try {
     const { origin, destination, profile = 'wheelchair', avoidObstacles = true } = req.body;
 
-    if (!origin || !destination) {
+    const parsedOrigin = parseOrsPoint(origin);
+    const parsedDestination = parseOrsPoint(destination);
+    if (!parsedOrigin || !parsedDestination) {
       return res.status(400).json({
         status: 'error',
-        message: 'Origin dan destination wajib disertakan [lng, lat]'
+        message: 'Origin dan destination wajib berupa pasangan [longitude, latitude] yang valid.'
       });
     }
 
-    const coordinates = [origin, destination];
+    const coordinates = [parsedOrigin, parsedDestination];
     let options = null;
 
     if (avoidObstacles && ACTIVE_OBSTACLES.length > 0) {
@@ -166,7 +193,7 @@ export async function planRoute(req, res) {
     });
   } catch (error) {
     console.error('[RoutingController] Error planRoute:', error);
-    return res.status(500).json({
+    return res.status(error.status || 500).json({
       status: 'error',
       message: 'Gagal merencanakan rute',
       details: error.message

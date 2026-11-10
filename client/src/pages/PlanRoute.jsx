@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
-import { fetchRouteComparison } from '../features/dashboard/services/safeApi.js';
+import { fetchRouteComparison } from '../services/api.js';
+import useGeolocation from '../features/dashboard/hooks/useGeolocation.js';
 import MockDataBadge from '../components/MockDataBadge.jsx';
 
 export default function PlanRoute({ setActiveTab }) {
@@ -23,13 +24,29 @@ export default function PlanRoute({ setActiveTab }) {
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [isLoadingRoute, setIsLoadingRoute] = useState(true);
   const [routeError, setRouteError] = useState(null);
+  const [routeIntent, setRouteIntent] = useState(null);
+  const [routeIntentReady, setRouteIntentReady] = useState(false);
+  const [manualOrigin, setManualOrigin] = useState(null);
+  const { coords, accuracy, timestamp, status: gpsStatus, error: gpsError, loading: gpsLoading, refreshLocation, startTracking, stopTracking, isTracking } = useGeolocation();
+  const [offRouteDistance, setOffRouteDistance] = useState(null);
+  const [isOffRoute, setIsOffRoute] = useState(false);
+  const [navError, setNavError] = useState(null);
+  const [isRecalculatingRoute, setIsRecalculatingRoute] = useState(false);
 
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const routeLayersRef = useRef(null);
+  const gpsMarkerRef = useRef(null);
+  const gpsAccuracyCircleRef = useRef(null);
 
   // Periksa apakah ada target rute yang dikirim dari Asisten Suara atau Peta Pengalihan Bollard
   useEffect(() => {
+    if (window.__leluasaRouteIntent) {
+      setRouteIntent(window.__leluasaRouteIntent);
+      window.__leluasaRouteIntent = null;
+    }
+    setRouteIntentReady(true);
+
     if (typeof window !== 'undefined' && window.__leluasaTargetRoute) {
       setSelectedDest(window.__leluasaTargetRoute);
       window.__leluasaTargetRoute = null;
@@ -114,7 +131,28 @@ export default function PlanRoute({ setActiveTab }) {
     }
   };
 
-  const destInfo = destinations[selectedDest] || destinations['balai-pemuda'];
+  const presetDestInfo = destinations[selectedDest] || destinations['balai-pemuda'];
+  const destInfo = routeIntent?.destination
+    ? {
+      ...presetDestInfo,
+      title: `Tujuan: ${routeIntent.destination.name}`,
+      destination: routeIntent.destination.name,
+      endCoord: [routeIntent.destination.lat, routeIntent.destination.lng],
+      origin: routeIntent.origin?.name || 'Lokasi GPS'
+    }
+    : presetDestInfo;
+  const activeOrigin = manualOrigin || routeIntent?.origin || (coords ? {
+    lat: coords.lat,
+    lng: coords.lng,
+    accuracy: coords.accuracy,
+    name: 'Lokasi GPS',
+    source: 'gps'
+  } : null);
+  const activeDestination = routeIntent?.destination || {
+    lat: destInfo.endCoord[0],
+    lng: destInfo.endCoord[1],
+    name: destInfo.destination
+  };
 
   // Buffer Waktu Cuaca: Jika opsi Hindari Ubin Licin aktif, tambahkan estimasi buffer kehati-hatian
   const rainBufferMinutes = activeFilters.avoidSlipperyTiles ? 2 : 0;
@@ -122,23 +160,43 @@ export default function PlanRoute({ setActiveTab }) {
     ? `${destInfo.baseMinutes + rainBufferMinutes} mnt`
     : destInfo.routeBDuration;
 
-  const loadRoute = () => {
+  const hasValidPoint = (point) => point &&
+    Number.isFinite(Number(point.lat)) && Number(point.lat) >= -90 && Number(point.lat) <= 90 &&
+    Number.isFinite(Number(point.lng)) && Number(point.lng) >= -180 && Number(point.lng) <= 180;
+
+  const loadRoute = async () => {
+    if (!routeIntentReady) return;
+    if (!hasValidPoint(activeOrigin) || !hasValidPoint(activeDestination)) {
+      setRouteData(null);
+      setIsLoadingRoute(false);
+      setRouteError(gpsError?.message || 'Titik awal GPS belum tersedia. Deteksi ulang atau pilih titik awal manual.');
+      return;
+    }
+
     setIsLoadingRoute(true);
     setRouteError(null);
-    fetchRouteComparison({ profile: selectedProfile })
-      .then(res => {
-        setRouteData(res.data);
-        setIsLoadingRoute(false);
-      })
-      .catch(() => {
-        setRouteError('Gagal menghitung perbandingan rute. Klik Coba Lagi.');
-        setIsLoadingRoute(false);
+    try {
+      const response = await fetchRouteComparison({
+        profile: selectedProfile,
+        originLat: activeOrigin.lat,
+        originLng: activeOrigin.lng,
+        destLat: activeDestination.lat,
+        destLng: activeDestination.lng,
+        originName: activeOrigin.name,
+        destinationName: activeDestination.name
       });
+      setRouteData(response.data);
+    } catch (error) {
+      setRouteData(null);
+      setRouteError(error.message || 'Gagal menghitung rute. Periksa koneksi atau layanan routing.');
+    } finally {
+      setIsLoadingRoute(false);
+    }
   };
 
   useEffect(() => {
     loadRoute();
-  }, [selectedProfile, selectedDest]);
+  }, [selectedProfile, selectedDest, activeOrigin?.lat, activeOrigin?.lng, activeDestination.lat, activeDestination.lng, routeIntentReady]);
 
   // Inisialisasi Peta Leaflet
   useEffect(() => {
@@ -146,7 +204,7 @@ export default function PlanRoute({ setActiveTab }) {
     if (mapInstanceRef.current) return;
 
     const map = L.map(mapContainerRef.current, {
-      center: [-7.2655, 112.7515],
+      center: activeOrigin ? [activeOrigin.lat, activeOrigin.lng] : [-7.2575, 112.7521],
       zoom: 15,
       zoomControl: false,
       attributionControl: true
@@ -246,7 +304,10 @@ export default function PlanRoute({ setActiveTab }) {
       iconSize: [0, 0],
       iconAnchor: [0, 0]
     });
-    L.marker(destInfo.startCoord, { icon: startIcon }).addTo(layerGroup);
+    if (activeOrigin) {
+      L.marker([activeOrigin.lat, activeOrigin.lng], { icon: startIcon }).addTo(layerGroup);
+      allPoints.push([activeOrigin.lat, activeOrigin.lng]);
+    }
 
     const endIcon = L.divIcon({
       className: 'route-end-marker',
@@ -263,13 +324,56 @@ export default function PlanRoute({ setActiveTab }) {
       iconSize: [0, 0],
       iconAnchor: [0, 0]
     });
-    L.marker(destInfo.endCoord, { icon: endIcon }).addTo(layerGroup);
+    L.marker([activeDestination.lat, activeDestination.lng], { icon: endIcon }).addTo(layerGroup);
+    allPoints.push([activeDestination.lat, activeDestination.lng]);
 
     if (allPoints.length > 0) {
       const bounds = L.latLngBounds(allPoints);
       mapInstanceRef.current.fitBounds(bounds, { padding: [45, 45], maxZoom: 17 });
     }
-  }, [routeData, activeRouteKey, isNavigating, selectedDest, effectiveRouteBDuration]);
+  }, [routeData, activeRouteKey, isNavigating, selectedDest, effectiveRouteBDuration, activeOrigin?.lat, activeOrigin?.lng, activeDestination.lat, activeDestination.lng]);
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !coords) {
+      if (mapInstanceRef.current && gpsMarkerRef.current) {
+        mapInstanceRef.current.removeLayer(gpsMarkerRef.current);
+        gpsMarkerRef.current = null;
+      }
+      if (mapInstanceRef.current && gpsAccuracyCircleRef.current) {
+        mapInstanceRef.current.removeLayer(gpsAccuracyCircleRef.current);
+        gpsAccuracyCircleRef.current = null;
+      }
+      return;
+    }
+
+    const userIcon = L.divIcon({
+      className: 'route-user-gps-marker',
+      html: '<div class="w-8 h-8 rounded-full bg-secondary text-white border-2 border-white shadow-lg flex items-center justify-center"><span class="material-symbols-outlined text-base">my_location</span></div>',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16]
+    });
+    if (gpsMarkerRef.current) {
+      gpsMarkerRef.current.setLatLng([coords.lat, coords.lng]);
+      gpsMarkerRef.current.setIcon(userIcon);
+    } else {
+      gpsMarkerRef.current = L.marker([coords.lat, coords.lng], { icon: userIcon, zIndexOffset: 2000 })
+        .bindTooltip('Posisi GPS Anda')
+        .addTo(map);
+    }
+
+    if (gpsAccuracyCircleRef.current) {
+      gpsAccuracyCircleRef.current.setLatLng([coords.lat, coords.lng]);
+      gpsAccuracyCircleRef.current.setRadius(accuracy);
+    } else {
+      gpsAccuracyCircleRef.current = L.circle([coords.lat, coords.lng], {
+        radius: accuracy,
+        color: '#006e2d',
+        weight: 1,
+        fillOpacity: 0.08
+      }).addTo(map);
+    }
+  }, [coords, accuracy, isNavigating]);
 
   const toggleFilter = (key) => {
     setActiveFilters(prev => ({ ...prev, [key]: !prev[key] }));

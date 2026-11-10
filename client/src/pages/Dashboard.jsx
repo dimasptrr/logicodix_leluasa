@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
+import useGeolocation from '../features/dashboard/hooks/useGeolocation.js';
 import MockDataBadge from '../components/MockDataBadge.jsx';
 
 // Data Lokasi Surabaya Populer untuk Pencarian & Multi-Stop
@@ -76,37 +77,41 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
   // State Kontrol Rute HUD
   const [selectedRouteKey, setSelectedRouteKey] = useState('ubin'); // 'ubin' | 'ramp'
   const [hapticEnabled, setHapticEnabled] = useState(true);
-  const [isSimulating, setIsSimulating] = useState(false);
-  const [simulationStep, setSimulationStep] = useState(0);
   const [audioFeedback, setAudioFeedback] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [mapZoom, setMapZoom] = useState(1);
   const [mapRotation, setMapRotation] = useState(0);
   const [isAudioMuted, setIsAudioMuted] = useState(false);
-  const [userLocationName, setUserLocationName] = useState('Surabaya Pusat');
-  const [userCoords, setUserCoords] = useState({ lat: -7.2655, lng: 112.7515 });
+  const {
+    coords,
+    accuracy,
+    timestamp,
+    status: gpsStatus,
+    error: gpsError,
+    loading: gpsLoading,
+    refreshLocation
+  } = useGeolocation();
+  const userCoords = coords ? { lat: coords.lat, lng: coords.lng } : null;
+  const userLocationName = coords
+    ? `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`
+    : gpsError?.message || 'Lokasi pengguna belum tersedia';
+  const gpsStatusLabel = {
+    idle: 'Belum mencari lokasi',
+    loading: 'Sedang mencari lokasi...',
+    located: 'Lokasi GPS ditemukan',
+    denied: 'Izin lokasi ditolak',
+    unavailable: 'Lokasi tidak tersedia',
+    timeout: 'Pencarian lokasi timeout',
+    unsupported: 'Browser tidak mendukung GPS',
+    'insecure-context': 'GPS memerlukan HTTPS atau localhost'
+  }[gpsStatus];
 
   // Refs Peta Leaflet Utama
   const leafletMapRef = useRef(null);
   const leafletInstanceRef = useRef(null);
   const markersLayerRef = useRef(null);
-
-  // Auto-deteksi lokasi GPS riil pengguna browser
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords;
-          setUserCoords({ lat: latitude, lng: longitude });
-          setUserLocationName(`Surabaya (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
-        },
-        () => {
-          setUserLocationName('Surabaya Pusat');
-        },
-        { timeout: 7000 }
-      );
-    }
-  }, []);
+  const originMarkerRef = useRef(null);
+  const centerMapOnNextFixRef = useRef(false);
 
   // Inisialisasi Peta Leaflet Utama saat belum memilih tujuan
   useEffect(() => {
@@ -121,7 +126,7 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
     if (!leafletMapRef.current || leafletInstanceRef.current) return;
 
     const map = L.map(leafletMapRef.current, {
-      center: [userCoords.lat, userCoords.lng],
+      center: userCoords ? [userCoords.lat, userCoords.lng] : [-7.2575, 112.7521],
       zoom: 15,
       zoomControl: false,
       attributionControl: true
@@ -134,12 +139,15 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
 
     markersLayerRef.current = L.layerGroup().addTo(map);
     leafletInstanceRef.current = map;
+    centerMapOnNextFixRef.current = true;
 
     return () => {
       map.remove();
       leafletInstanceRef.current = null;
+      markersLayerRef.current = null;
+      originMarkerRef.current = null;
     };
-  }, [hasSelectedDestination, userCoords]);
+  }, [hasSelectedDestination]);
 
   // Pasang Pin Lokasi di Peta Leaflet
   useEffect(() => {
@@ -148,25 +156,7 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
     const layer = markersLayerRef.current;
     layer.clearLayers();
 
-    // 1. Pin Titik Awal (Default GPS atau Titik Kustom)
-    const originLat = customOrigin ? customOrigin.lat : userCoords.lat;
-    const originLng = customOrigin ? customOrigin.lng : userCoords.lng;
-    const originTitle = customOrigin ? `Titik Awal: ${customOrigin.name}` : 'Lokasi Anda Saat Ini (GPS)';
-
-    const userMarkerHtml = `
-      <div class="relative flex items-center justify-center -translate-x-1/2 -translate-y-1/2 cursor-pointer">
-        <div class="absolute w-10 h-10 bg-primary/30 rounded-full animate-ping"></div>
-        <div class="w-8 h-8 rounded-full bg-primary border-3 border-white shadow-xl flex items-center justify-center text-white font-bold">
-          <span class="material-symbols-outlined text-[16px]">navigation</span>
-        </div>
-      </div>
-    `;
-    const userIcon = L.divIcon({ className: 'user-pin', html: userMarkerHtml, iconSize: [0, 0] });
-    L.marker([originLat, originLng], { icon: userIcon })
-      .bindTooltip(originTitle, { permanent: false, direction: 'top' })
-      .addTo(layer);
-
-    // 2. Pin Destinasi Surabaya
+    // Pin destinasi Surabaya
     SURABAYA_DESTINATIONS.forEach((dest) => {
       const isSelected = stop1?.id === dest.id || stop2?.id === dest.id;
       const destMarkerHtml = `
@@ -188,7 +178,44 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
         handleSelectLocation(dest);
       });
     });
-  }, [hasSelectedDestination, userCoords, stop1, stop2, customOrigin]);
+  }, [hasSelectedDestination, stop1, stop2]);
+
+  useEffect(() => {
+    const map = leafletInstanceRef.current;
+    if (!map || hasSelectedDestination) return;
+
+    const origin = customOrigin || userCoords;
+    if (!origin) {
+      if (originMarkerRef.current) {
+        map.removeLayer(originMarkerRef.current);
+        originMarkerRef.current = null;
+      }
+      return;
+    }
+
+    const originIcon = L.divIcon({
+      className: 'dashboard-origin-marker',
+      html: '<div class="w-8 h-8 rounded-full bg-primary text-white border-2 border-white shadow-xl flex items-center justify-center"><span class="material-symbols-outlined text-base">navigation</span></div>',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16]
+    });
+    const label = customOrigin ? `Titik Awal: ${customOrigin.name}` : 'Lokasi Anda (GPS)';
+
+    if (originMarkerRef.current) {
+      originMarkerRef.current.setLatLng([origin.lat, origin.lng]);
+      originMarkerRef.current.setIcon(originIcon);
+      originMarkerRef.current.unbindTooltip().bindTooltip(label);
+    } else {
+      originMarkerRef.current = L.marker([origin.lat, origin.lng], { icon: originIcon, zIndexOffset: 1500 })
+        .bindTooltip(label)
+        .addTo(map);
+    }
+
+    if (!customOrigin && centerMapOnNextFixRef.current) {
+      map.setView([origin.lat, origin.lng], 16, { animate: true });
+      centerMapOnNextFixRef.current = false;
+    }
+  }, [coords, customOrigin, hasSelectedDestination]);
 
   const handleSelectLocation = (dest) => {
     if (searchTarget === 'origin') {
@@ -210,7 +237,9 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
 
   const originDisplay = customOrigin
     ? customOrigin.name
-    : `Lokasi Saya Saat Ini (GPS: ${userLocationName})`;
+    : coords
+    ? `Lokasi Saya (${userLocationName})`
+    : gpsStatusLabel;
 
   const originLabel = customOrigin ? customOrigin.name : 'Lokasi Saya';
 
@@ -232,11 +261,37 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
 
   const handleApplyRoute = () => {
     if (!stop1) return;
-    setHasSelectedDestination(true);
+    if (!customOrigin && !coords) {
+      setAudioFeedback(gpsError?.message || 'Lokasi GPS belum tersedia. Coba deteksi ulang atau pilih titik awal manual.');
+      return;
+    }
+    handleOpenPlanRoute();
 
     if ('vibrate' in navigator && hapticEnabled) {
       navigator.vibrate([80, 40, 80]);
     }
+  };
+
+  const handleOpenPlanRoute = () => {
+    if (!stop1) return;
+    window.__leluasaRouteIntent = {
+      origin: customOrigin
+        ? { lat: customOrigin.lat, lng: customOrigin.lng, name: customOrigin.name, source: 'manual' }
+        : coords
+        ? { lat: coords.lat, lng: coords.lng, accuracy: coords.accuracy, name: 'Lokasi GPS', source: 'gps' }
+        : null,
+      destination: { lat: stop1.lat, lng: stop1.lng, name: stop1.name }
+    };
+    setActiveTab('plan-route');
+  };
+
+  const handleLocateMe = () => {
+    if (userCoords) {
+      leafletInstanceRef.current?.setView([userCoords.lat, userCoords.lng], 16, { animate: true });
+      return;
+    }
+    centerMapOnNextFixRef.current = true;
+    refreshLocation();
   };
 
   const handleResetDestination = () => {
@@ -296,29 +351,6 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
 
     window.speechSynthesis.speak(utterance);
     setIsSpeaking(true);
-  };
-
-  const handleStartSimulation = () => {
-    setIsSimulating(true);
-    setSimulationStep(1);
-
-    if (!isSpeaking) {
-      handleToggleAudio();
-    }
-
-    const interval = setInterval(() => {
-      setSimulationStep((prev) => {
-        if ('vibrate' in navigator && hapticEnabled) {
-          navigator.vibrate([70, 30, 70]);
-        }
-        if (prev >= 4) {
-          clearInterval(interval);
-          setIsSimulating(false);
-          return 0;
-        }
-        return prev + 1;
-      });
-    }, 2800);
   };
 
   const filteredDestinations = SURABAYA_DESTINATIONS.filter(d =>
@@ -556,10 +588,11 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
                 <button
                   type="button"
                   onClick={handleApplyRoute}
-                  className="w-full mt-1 min-h-[46px] rounded-xl bg-primary text-on-primary font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md hover:bg-primary-container active:scale-98 transition-all cursor-pointer"
+                  disabled={!customOrigin && !coords}
+                  className="w-full mt-1 min-h-[46px] rounded-xl bg-primary text-on-primary font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md hover:bg-primary-container active:scale-98 transition-all cursor-pointer disabled:opacity-60"
                 >
                   <span className="material-symbols-outlined text-lg">directions</span>
-                  <span>Lihat Rute Navigasi Taktil ({estimatedTime})</span>
+                  <span>Lihat Rute GPS ({estimatedTime})</span>
                 </button>
               )}
 
@@ -604,7 +637,7 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h2 className="text-base sm:text-lg font-headline-sm text-on-surface font-extrabold leading-tight">
-                      {simulationStep > 0 ? `Langkah ${simulationStep}: Lanjutkan 20m` : 'Belok Kanan 45m'}
+                      Menuju {stop1?.name || 'tujuan pilihan'}
                     </h2>
                     <p className="text-xs sm:text-sm text-on-surface-variant font-medium mt-1 truncate">
                       {currentRouteSubtitle}
@@ -694,7 +727,7 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
 
                   <span className="text-xs font-bold text-secondary flex items-center gap-1.5 px-2.5 py-1 bg-secondary/10 rounded-full">
                     <span className="w-2 h-2 rounded-full bg-secondary inline-block animate-breathing-green" aria-hidden="true"></span>
-                    <span className="truncate max-w-[130px]">{userLocationName}</span>
+                    <span className="truncate max-w-[130px]">{gpsStatusLabel}</span>
                   </span>
                 </div>
               </div>
@@ -768,15 +801,13 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
                 <div className="pointer-events-auto flex items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => {
-                      if (leafletInstanceRef.current) {
-                        leafletInstanceRef.current.setView([userCoords.lat, userCoords.lng], 16);
-                      }
-                    }}
-                    className="h-9 px-3 bg-surface-container-lowest/95 backdrop-blur-md text-primary font-bold text-xs rounded-full border border-outline-variant shadow-md flex items-center gap-1 hover:bg-surface-container transition-all cursor-pointer"
+                    onClick={handleLocateMe}
+                    disabled={gpsLoading}
+                    className="h-9 px-3 bg-surface-container-lowest/95 backdrop-blur-md text-primary font-bold text-xs rounded-full border border-outline-variant shadow-md flex items-center gap-1 hover:bg-surface-container transition-all cursor-pointer disabled:opacity-60"
+                    title={userCoords ? 'Pusatkan peta pada lokasi GPS terbaru' : 'Deteksi GPS dan pusatkan peta'}
                   >
                     <span className="material-symbols-outlined text-base">my_location</span>
-                    <span className="hidden sm:inline">Posisi Saya</span>
+                    <span className="hidden sm:inline">Lokasi Saya</span>
                   </button>
                 </div>
               </div>
@@ -787,7 +818,7 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
               {/* Info Bottom Floating Bar Peta Awal */}
               <div className="p-3 bg-surface-container-lowest/95 backdrop-blur-md border-t border-outline-variant z-20 flex flex-wrap items-center justify-between gap-2 text-xs">
                 <span className="font-semibold text-on-surface">
-                  Pilih titik tujuan di panel kiri atau klik langsung pin lokasi di peta Surabaya.
+                  {gpsStatusLabel}{coords ? ` · Akurasi GPS ±${Math.round(accuracy)} m` : ''}
                 </span>
                 {stop1 && (
                   <button
@@ -820,7 +851,9 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
                       {currentRouteTitle}
                     </span>
                     <span className="text-[10px] sm:text-[11px] text-on-surface-variant block font-medium">
-                      Akurasi GPS ± 0.8 meter · {userLocationName} (LiDAR Aktif)
+                      {coords
+                        ? `${gpsStatusLabel} · Akurasi GPS ±${Math.round(accuracy)} m · ${userLocationName}`
+                        : gpsError?.message || gpsStatusLabel}
                     </span>
                   </div>
                 </div>
@@ -846,14 +879,14 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
 
                   <button
                     type="button"
-                    onClick={handleStartSimulation}
-                    aria-label={isSimulating ? 'Simulasi berjalan' : 'Mulai simulasi rute'}
+                    onClick={handleOpenPlanRoute}
+                    aria-label="Buka navigasi GPS untuk rute ini"
                     className="h-10 sm:h-11 px-3.5 sm:px-4 bg-primary text-on-primary font-bold text-xs sm:text-sm rounded-full shadow-md hover:bg-primary-container transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-lg" aria-hidden="true">
-                      {isSimulating ? 'sync' : 'play_arrow'}
+                      navigation
                     </span>
-                    <span>{isSimulating ? 'Simulasi...' : 'Simulasi Rute'}</span>
+                    <span>Navigasi GPS</span>
                   </button>
                 </div>
               </div>

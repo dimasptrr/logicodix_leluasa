@@ -84,44 +84,7 @@ export async function fetchObstacleById(id) {
 }
 
 export async function createObstacle(obstacleData) {
-  try {
-    const res = await realApi.createObstacle(obstacleData);
-    return res;
-  } catch (err) {
-    activateFallback();
-    const newId = `SUB-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newObstacle = {
-      id: newId,
-      title: obstacleData.title || obstacleData.notes || 'Rintangan Baru',
-      location: obstacleData.location || 'Surabaya',
-      coordinates: obstacleData.coordinates || { lat: -7.26042, lng: 112.73831 },
-      category: obstacleData.category || 'Lainnya',
-      severity: obstacleData.severity || 'impassable',
-      status: 'active',
-      clearance: obstacleData.clearance || 65,
-      clearanceLabel: obstacleData.clearance ? `${obstacleData.clearance} cm` : '0 cm Terblokir',
-      reporter: 'Anda (Sesi Ini)',
-      reportedTime: 'Baru saja',
-      upvotes: 1,
-      confirmedCount: 1,
-      dpuprForwarded: Boolean(obstacleData.dpuprForward),
-      notes: obstacleData.notes || '',
-      photoUrl: obstacleData.photoUrl,
-      aiTelemetry: {
-        confidence: 91,
-        detectedBarrier: obstacleData.category || 'Rintangan Trotoar'
-      }
-    };
-
-    inMemoryObstacles = [newObstacle, ...inMemoryObstacles];
-
-    return {
-      success: true,
-      isMock: true,
-      message: 'Obstacle report registered successfully (offline demo mode)',
-      data: newObstacle
-    };
-  }
+  return realApi.createObstacle(obstacleData);
 }
 
 export async function upvoteObstacle(id) {
