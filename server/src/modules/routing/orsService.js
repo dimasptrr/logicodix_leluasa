@@ -138,7 +138,9 @@ export function formatRouteForLeluasa(geoJson, meta = {}) {
       instruction: s.instruction,
       distanceMeters: s.distance,
       durationSeconds: s.duration,
-      name: s.name
+      name: s.name,
+      type: s.type,
+      wayPoints: s.way_points
     }))
   };
 }

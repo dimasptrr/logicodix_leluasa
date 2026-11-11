@@ -14,8 +14,8 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   orsApiKey: process.env.ORS_API_KEY || '',
   aiServiceUrl: process.env.AI_SERVICE_URL || 'http://localhost:8000',
-  supabaseUrl: process.env.SUPABASE_URL || '',
-  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  supabaseUrl: process.env.SUPABASE_URL ? process.env.SUPABASE_URL.trim().replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '') : '',
+  supabaseServiceRoleKey: (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim(),
   jwtSecret: process.env.JWT_SECRET || 'leluasa_hackathon_secret',
   corsOrigin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['http://localhost:3000', 'http://localhost:5173']
 };

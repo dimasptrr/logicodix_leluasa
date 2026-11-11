@@ -1,8 +1,122 @@
 import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
-import { fetchRouteComparison } from '../services/api.js';
+import { fetchRouteComparison } from '../features/dashboard/services/safeApi.js';
 import useGeolocation from '../features/dashboard/hooks/useGeolocation.js';
 import MockDataBadge from '../components/MockDataBadge.jsx';
+
+// Hitung koordinat presisi titik langkah aktif di sepanjang garis rute
+function getStepCoordinate(stepIndex, totalSteps, coordinates, origin, destination, currentStep) {
+  if (Array.isArray(coordinates) && coordinates.length > 0) {
+    if (stepIndex <= 0) return coordinates[0];
+    if (stepIndex >= totalSteps - 1) return coordinates[coordinates.length - 1];
+
+    // Jika step memiliki indeks wayPoint eksak dari OpenRouteService, gunakan titik belokan presisi tersebut
+    if (currentStep?.wayPointIndex !== null && currentStep?.wayPointIndex !== undefined) {
+      const idx = currentStep.wayPointIndex;
+      if (idx >= 0 && idx < coordinates.length) {
+        return coordinates[idx];
+      }
+    }
+
+    const ratio = stepIndex / (totalSteps - 1);
+    const targetIdx = Math.min(
+      coordinates.length - 1,
+      Math.max(0, Math.round(ratio * (coordinates.length - 1)))
+    );
+    return coordinates[targetIdx];
+  }
+
+  if (origin && destination) {
+    const factor = totalSteps > 1 ? stepIndex / (totalSteps - 1) : 0;
+    return [
+      origin.lat + (destination.lat - origin.lat) * factor,
+      origin.lng + (destination.lng - origin.lng) * factor
+    ];
+  }
+
+  return null;
+}
+
+// Memformat manuver langkah & ikon agar 100% presisi dan sinkron dengan instruksi navigasi
+function formatStepManeuver(st, idx, arr, destName) {
+  const isLast = idx === arr.length - 1;
+  const rawInst = st.instruction || '';
+  const lower = rawInst.toLowerCase();
+
+  let icon = 'straight';
+  let instruction = rawInst;
+
+  // 1. Periksa kode tipe manuver OpenRouteService bila tersedia
+  if (st.type !== undefined && st.type !== null) {
+    switch (Number(st.type)) {
+      case 0: icon = 'turn_left'; break;
+      case 1: icon = 'turn_right'; break;
+      case 2: icon = 'turn_sharp_left'; break;
+      case 3: icon = 'turn_sharp_right'; break;
+      case 4: icon = 'turn_slight_left'; break;
+      case 5: icon = 'turn_slight_right'; break;
+      case 6: icon = 'straight'; break;
+      case 7:
+      case 8: icon = 'roundabout_right'; break;
+      case 9: icon = 'u_turn_left'; break;
+      case 10: icon = 'check_circle'; break;
+      case 11: icon = 'straight'; break;
+      case 12: icon = 'turn_slight_left'; break;
+      case 13: icon = 'turn_slight_right'; break;
+      default: break;
+    }
+  }
+
+  // 2. Pemeriksaan kata kunci komprehensif (Bahasa Indonesia & Bahasa Inggris)
+  if (isLast || lower.includes('tiba') || lower.includes('sampai') || lower.includes('arrive') || lower.includes('destination')) {
+    icon = 'check_circle';
+  } else if (lower.includes('sharp right') || lower.includes('tajam kanan')) {
+    icon = 'turn_sharp_right';
+  } else if (lower.includes('sharp left') || lower.includes('tajam kiri')) {
+    icon = 'turn_sharp_left';
+  } else if (lower.includes('slight right') || lower.includes('serong kanan') || lower.includes('keep right')) {
+    icon = 'turn_slight_right';
+  } else if (lower.includes('slight left') || lower.includes('serong kiri') || lower.includes('keep left')) {
+    icon = 'turn_slight_left';
+  } else if (lower.includes('turn right') || lower.includes('belok kanan') || lower.includes('ke kanan') || lower.includes('kanan') || lower.includes('right')) {
+    icon = 'turn_right';
+  } else if (lower.includes('turn left') || lower.includes('belok kiri') || lower.includes('ke kiri') || lower.includes('kiri') || lower.includes('left')) {
+    icon = 'turn_left';
+  } else if (lower.includes('u-turn') || lower.includes('putar balik')) {
+    icon = 'u_turn_left';
+  } else if (lower.includes('cross') || lower.includes('seberang') || lower.includes('pelican')) {
+    icon = 'directions_walk';
+  } else if (lower.includes('ramp') || lower.includes('rampa')) {
+    icon = 'ramp_right';
+  } else if (lower.includes('straight') || lower.includes('lurus') || lower.includes('head') || lower.includes('depart') || lower.includes('continue')) {
+    icon = 'straight';
+  }
+
+  // 3. Terjemahkan teks instruksi ke Bahasa Indonesia yang ramah & natural
+  if (isLast) {
+    instruction = `Tiba di ${destName || 'tujuan'}`;
+  } else if (lower.startsWith('turn right')) {
+    instruction = rawInst.replace(/^turn right onto\s+/i, 'Belok kanan ke ').replace(/^turn right/i, 'Belok kanan');
+  } else if (lower.startsWith('turn left')) {
+    instruction = rawInst.replace(/^turn left onto\s+/i, 'Belok kiri ke ').replace(/^turn left/i, 'Belok kiri');
+  } else if (lower.startsWith('turn sharp right')) {
+    instruction = rawInst.replace(/^turn sharp right onto\s+/i, 'Belok tajam ke kanan ke ').replace(/^turn sharp right/i, 'Belok tajam ke kanan');
+  } else if (lower.startsWith('turn sharp left')) {
+    instruction = rawInst.replace(/^turn sharp left onto\s+/i, 'Belok tajam ke kiri ke ').replace(/^turn sharp left/i, 'Belok tajam ke kiri');
+  } else if (lower.startsWith('turn slight right') || lower.startsWith('keep right')) {
+    instruction = rawInst.replace(/^(?:turn slight right|keep right) onto\s+/i, 'Serong kanan ke ').replace(/^(?:turn slight right|keep right)/i, 'Serong kanan');
+  } else if (lower.startsWith('turn slight left') || lower.startsWith('keep left')) {
+    instruction = rawInst.replace(/^(?:turn slight left|keep left) onto\s+/i, 'Serong kiri ke ').replace(/^(?:turn slight left|keep left)/i, 'Serong kiri');
+  } else if (lower.startsWith('head') || lower.startsWith('depart')) {
+    instruction = rawInst.replace(/^head\s+\w+\s+(?:on|onto)\s+/i, 'Mulai perjalanan di ').replace(/^depart\s+/i, 'Mulai dari ');
+  } else if (lower.startsWith('continue')) {
+    instruction = rawInst.replace(/^continue onto\s+/i, 'Lanjut di ').replace(/^continue/i, 'Lanjut lurus');
+  } else if (lower.startsWith('arrive')) {
+    instruction = `Tiba di ${destName || 'tujuan'}`;
+  }
+
+  return { icon, instruction };
+}
 
 export default function PlanRoute({ setActiveTab }) {
   const [routeData, setRouteData] = useState(null);
@@ -38,11 +152,34 @@ export default function PlanRoute({ setActiveTab }) {
   const routeLayersRef = useRef(null);
   const gpsMarkerRef = useRef(null);
   const gpsAccuracyCircleRef = useRef(null);
+  const stepMarkerRef = useRef(null);
+
+  const shouldAutoPlayVoiceRef = useRef(false);
+  const hasAutoPlayedVoiceRef = useRef(false);
 
   // Periksa apakah ada target rute yang dikirim dari Asisten Suara atau Peta Pengalihan Bollard
   useEffect(() => {
     if (window.__leluasaRouteIntent) {
-      setRouteIntent(window.__leluasaRouteIntent);
+      const intent = window.__leluasaRouteIntent;
+      setRouteIntent(intent);
+      if (intent.autoPlayVoice) {
+        shouldAutoPlayVoiceRef.current = true;
+        hasAutoPlayedVoiceRef.current = false;
+      } else {
+        shouldAutoPlayVoiceRef.current = false;
+        hasAutoPlayedVoiceRef.current = true;
+      }
+      const destName = (intent.destination?.name || '').toLowerCase();
+      const destId = (intent.destination?.id || '').toLowerCase();
+      if (destName.includes('soetomo') || destName.includes('rsud') || destId === 'rsud-soetomo') {
+        setSelectedDest('rsud-soetomo');
+      } else if (destName.includes('bollard') || destId === 'detour-bollard') {
+        setSelectedDest('detour-bollard');
+      } else if (destName.includes('pemuda') || destId === 'balai-pemuda' || destId === 'halte-pemuda') {
+        setSelectedDest('balai-pemuda');
+      } else {
+        setSelectedDest('custom');
+      }
       window.__leluasaRouteIntent = null;
     }
     setRouteIntentReady(true);
@@ -87,21 +224,21 @@ export default function PlanRoute({ setActiveTab }) {
     },
     'rsud-soetomo': {
       title: 'Tujuan: RSUD Dr. Soetomo Surabaya',
-      subtitle: 'Balai Pemuda ke Gedung Rawat Jalan RSUD Soetomo',
-      origin: 'Balai Pemuda, Jl. Gubernur Suryo',
+      subtitle: 'Balai Kota Surabaya ke Gedung Rawat Jalan RSUD Soetomo',
+      origin: 'Balai Kota Surabaya, Jl. Walikota Mustajab',
       destination: 'RSUD Dr. Soetomo (Jl. Mayjen Prof. Dr. Moestopo)',
-      baseMinutes: 22,
-      routeBDuration: '22 mnt',
+      baseMinutes: 20,
+      routeBDuration: '20 mnt',
       routeBDistance: '1,6 km',
       routeBDescription: 'Rampa landai kontinu 4.5° via Jl. Kusuma Bangsa dengan pelintasan berbunyi',
       routeADuration: '18 mnt',
       routeADistance: '1,4 km',
       routeADescription: 'Jalur terpendek (tanpa kanopi peneduh, rampa agak curam)',
-      turnInstruction: 'Belok Kanan dalam 120m ke trotoar utara Jl. Pemuda arah RSUD Soetomo',
-      startCoord: [-7.2642, 112.7449],
+      turnInstruction: 'Lurus ke arah timur Jl. Walikota Mustajab lalu Jl. Kusuma Bangsa menuju RSUD Soetomo',
+      startCoord: [-7.2628, 112.7530],
       endCoord: [-7.2678, 112.7582],
       steps: [
-        { instruction: 'Mulai dari Balai Pemuda arah Jl. Gubernur Suryo', detail: 'Gunakan ubin pemandu di trotoar sisi timur', distance: '120 m', icon: 'turn_right' },
+        { instruction: 'Mulai dari Balai Kota Surabaya arah Jl. Walikota Mustajab', detail: 'Gunakan ubin pemandu di trotoar sisi selatan', distance: '120 m', icon: 'turn_right' },
         { instruction: 'Lurus menyusuri koridor Jl. Kusuma Bangsa', detail: 'Trotoar berkanopi peneduh, lebar bersih 2.2m', distance: '650 m', icon: 'straight' },
         { instruction: 'Lewati rampa akses penyeberangan Stasiun Gubeng', detail: 'Kelandaian aman 4.5°, pegangan tangan ganda', distance: '380 m', icon: 'ramp_right' },
         { instruction: 'Tiba di Lobi Rawat Jalan RSUD Dr. Soetomo', detail: 'Pintu otomatis lebar 1.8m ramah kursi roda', distance: '450 m', icon: 'check_circle' }
@@ -131,28 +268,87 @@ export default function PlanRoute({ setActiveTab }) {
     }
   };
 
+  const isCustomDest = selectedDest === 'custom' || Boolean(routeIntent?.destination && !['balai-pemuda', 'rsud-soetomo', 'detour-bollard'].includes(selectedDest));
   const presetDestInfo = destinations[selectedDest] || destinations['balai-pemuda'];
-  const destInfo = routeIntent?.destination
+
+  const activeOrigin = isCustomDest
+    ? (manualOrigin || routeIntent?.origin || (coords ? {
+        lat: coords.lat,
+        lng: coords.lng,
+        accuracy: coords.accuracy,
+        name: 'Lokasi GPS',
+        source: 'gps'
+      } : {
+        lat: presetDestInfo.startCoord[0],
+        lng: presetDestInfo.startCoord[1],
+        name: presetDestInfo.origin,
+        source: 'preset'
+      }))
+    : {
+        lat: presetDestInfo.startCoord[0],
+        lng: presetDestInfo.startCoord[1],
+        name: presetDestInfo.origin,
+        source: 'preset'
+      };
+
+  const destInfo = (isCustomDest && routeIntent?.destination)
     ? {
       ...presetDestInfo,
       title: `Tujuan: ${routeIntent.destination.name}`,
+      subtitle: `${activeOrigin?.name || 'Lokasi Saya'} ke ${routeIntent.destination.name}`,
+      origin: activeOrigin?.name || 'Lokasi Saya',
       destination: routeIntent.destination.name,
+      startCoord: [activeOrigin.lat, activeOrigin.lng],
       endCoord: [routeIntent.destination.lat, routeIntent.destination.lng],
-      origin: routeIntent.origin?.name || 'Lokasi GPS'
+      baseMinutes: routeData?.routeB?.durationSeconds ? Math.max(1, Math.round(routeData.routeB.durationSeconds / 60)) : 10,
+      routeBDuration: routeData?.routeB?.duration || '10 mnt',
+      routeBDistance: routeData?.routeB?.distance || '800m',
+      routeBDescription: 'Jalur aksesibilitas ramah kursi roda dihitung oleh OpenRouteService AI',
+      routeADuration: routeData?.routeA?.duration || '12 mnt',
+      routeADistance: routeData?.routeA?.distance || '850m',
+      routeADescription: 'Jalur pejalan kaki standar umum',
+      turnInstruction: `Arahkan navigasi menuju ${routeIntent.destination.name}`,
+      steps: [
+        { instruction: `Mulai perjalanan dari ${activeOrigin?.name || 'lokasi awal'}`, detail: 'Ikuti trotoar pemandu terdekat', distance: '100 m', icon: 'straight' },
+        { instruction: `Menuju ${routeIntent.destination.name}`, detail: 'Trotoar aksesibel', distance: '500 m', icon: 'turn_right' },
+        { instruction: `Tiba di ${routeIntent.destination.name}`, detail: 'Tujuan tercapai', distance: '50 m', icon: 'check_circle' }
+      ]
     }
     : presetDestInfo;
-  const activeOrigin = manualOrigin || routeIntent?.origin || (coords ? {
-    lat: coords.lat,
-    lng: coords.lng,
-    accuracy: coords.accuracy,
-    name: 'Lokasi GPS',
-    source: 'gps'
-  } : null);
-  const activeDestination = routeIntent?.destination || {
+
+  const activeDestination = (isCustomDest && routeIntent?.destination) ? {
+    lat: routeIntent.destination.lat,
+    lng: routeIntent.destination.lng,
+    name: routeIntent.destination.name
+  } : {
     lat: destInfo.endCoord[0],
     lng: destInfo.endCoord[1],
     name: destInfo.destination
   };
+
+  const effectiveSteps = (routeData?.[activeRouteKey]?.steps?.length > 0)
+    ? routeData[activeRouteKey].steps.map((st, idx, arr) => {
+        const { icon, instruction } = formatStepManeuver(st, idx, arr, destInfo.destination);
+        return {
+          instruction: instruction || (idx === arr.length - 1 ? `Tiba di ${destInfo.destination}` : 'Lurus menyusuri trotoar'),
+          detail: st.name ? `Melalui ${st.name} (${Math.round(st.distanceMeters || 0)} m)` : `Jarak segmen: ${Math.round(st.distanceMeters || 0)} m`,
+          distance: `${Math.round(st.distanceMeters || 0)} m`,
+          icon,
+          wayPointIndex: (Array.isArray(st.wayPoints) && st.wayPoints.length > 0)
+            ? Number(st.wayPoints[0])
+            : (typeof st.wayPoints === 'string' && st.wayPoints.trim().length > 0)
+            ? Number(st.wayPoints.trim().split(/\s+/)[0])
+            : null
+        };
+      })
+    : destInfo.steps.map((s, idx, arr) => {
+        const { icon, instruction } = formatStepManeuver(s, idx, arr, destInfo.destination);
+        return {
+          ...s,
+          icon: s.icon || icon,
+          instruction: s.instruction || instruction
+        };
+      });
 
   // Buffer Waktu Cuaca: Jika opsi Hindari Ubin Licin aktif, tambahkan estimasi buffer kehati-hatian
   const rainBufferMinutes = activeFilters.avoidSlipperyTiles ? 2 : 0;
@@ -198,6 +394,41 @@ export default function PlanRoute({ setActiveTab }) {
     loadRoute();
   }, [selectedProfile, selectedDest, activeOrigin?.lat, activeOrigin?.lng, activeDestination.lat, activeDestination.lng, routeIntentReady]);
 
+  // Auto-play panduan suara turn-by-turn navigasi saat dipicu oleh Asisten AI (Ramah Tuna Netra)
+  useEffect(() => {
+    if (shouldAutoPlayVoiceRef.current && !hasAutoPlayedVoiceRef.current && !isLoadingRoute) {
+      hasAutoPlayedVoiceRef.current = true;
+      setIsNavigating(true);
+      setNavStepIndex(0);
+
+      if ('vibrate' in navigator && hapticActive) {
+        navigator.vibrate([120, 60, 120]);
+      }
+
+      const timer = setTimeout(() => {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const firstStep = effectiveSteps[0] || {
+            instruction: `Mulai perjalanan menuju ${destInfo.destination}`,
+            detail: 'Ikuti ubin pemandu trotoar terdekat',
+            distance: destInfo.routeBDistance || '100 m'
+          };
+          const speechText = `Panduan Navigasi Leluasa aktif. Tujuan Anda: ${destInfo.destination}. Langkah pertama: ${firstStep.instruction}. ${firstStep.detail}. Jarak ${firstStep.distance}.`;
+          const utterance = new SpeechSynthesisUtterance(speechText);
+          utterance.lang = 'id-ID';
+          utterance.rate = 1.0;
+          utterance.onstart = () => setIsSpeakingNav(true);
+          utterance.onend = () => setIsSpeakingNav(false);
+          utterance.onerror = () => setIsSpeakingNav(false);
+          window.speechSynthesis.speak(utterance);
+          setIsSpeakingNav(true);
+        }
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [isLoadingRoute, effectiveSteps, destInfo.destination, hapticActive]);
+
   // Inisialisasi Peta Leaflet
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -218,30 +449,59 @@ export default function PlanRoute({ setActiveTab }) {
     routeLayersRef.current = L.layerGroup().addTo(map);
     mapInstanceRef.current = map;
 
+    // Pastikan ukuran peta disinkronkan setelah render DOM selesai
+    const timer = setTimeout(() => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+      }
+    }, 150);
+
     return () => {
-      map.remove();
+      clearTimeout(timer);
+      try {
+        if (stepMarkerRef.current) {
+          stepMarkerRef.current.remove();
+          stepMarkerRef.current = null;
+        }
+        map.remove();
+      } catch (e) {
+        // Safe catch if DOM container unmounted
+      }
       mapInstanceRef.current = null;
+      routeLayersRef.current = null;
     };
   }, [isNavigating]);
 
   // Update rendering garis rute Leaflet
   useEffect(() => {
-    if (!mapInstanceRef.current || !routeLayersRef.current || !routeData) return;
+    if (!mapInstanceRef.current || !routeLayersRef.current) return;
 
     const layerGroup = routeLayersRef.current;
     layerGroup.clearLayers();
 
-    const routeA = routeData.routeA;
-    const routeB = routeData.routeB;
+    const routeA = routeData?.routeA;
+    const routeB = routeData?.routeB;
 
-    if (!routeA?.coordinates?.length && !routeB?.coordinates?.length) return;
+    let coordsA = routeA?.coordinates;
+    let coordsB = routeB?.coordinates;
+
+    // Fallback jika API belum mengembalikan koordinat:
+    if (!coordsB?.length && activeOrigin && activeDestination) {
+      coordsB = [
+        [activeOrigin.lat, activeOrigin.lng],
+        selectedDest === 'rsud-soetomo' ? [-7.2655, 112.7515] : [-7.2648, 112.7480],
+        [activeDestination.lat, activeDestination.lng]
+      ];
+    }
+
+    if (!coordsA?.length && !coordsB?.length) return;
 
     const allPoints = [];
 
     // 1. Render Rute A (Alternatif)
-    if (routeA?.coordinates?.length) {
+    if (coordsA?.length) {
       const isSelected = activeRouteKey === 'routeA';
-      const polylineA = L.polyline(routeA.coordinates, {
+      const polylineA = L.polyline(coordsA, {
         color: '#ba1a1a',
         weight: isSelected ? 8 : 4,
         opacity: isSelected ? 0.95 : 0.45,
@@ -254,15 +514,15 @@ export default function PlanRoute({ setActiveTab }) {
       polylineA.on('click', () => setActiveRouteKey('routeA'));
 
       if (isSelected) {
-        routeA.coordinates.forEach(pt => allPoints.push(pt));
+        coordsA.forEach(pt => allPoints.push(pt));
       }
     }
 
     // 2. Render Rute B (Rekomendasi AI Leluasa - Jalur Guiding Block)
-    if (routeB?.coordinates?.length) {
+    if (coordsB?.length) {
       const isSelected = activeRouteKey === 'routeB';
 
-      const polylineBBase = L.polyline(routeB.coordinates, {
+      const polylineBBase = L.polyline(coordsB, {
         color: '#0037B0',
         weight: isSelected ? 9 : 5,
         opacity: isSelected ? 0.95 : 0.5,
@@ -271,7 +531,7 @@ export default function PlanRoute({ setActiveTab }) {
       }).addTo(layerGroup);
 
       // Garis Kuning Taktil Guiding Block
-      L.polyline(routeB.coordinates, {
+      L.polyline(coordsB, {
         color: '#FFE083',
         weight: isSelected ? 3.5 : 2,
         opacity: 1.0,
@@ -284,7 +544,7 @@ export default function PlanRoute({ setActiveTab }) {
       polylineBBase.on('click', () => setActiveRouteKey('routeB'));
 
       if (isSelected || allPoints.length === 0) {
-        routeB.coordinates.forEach(pt => allPoints.push(pt));
+        coordsB.forEach(pt => allPoints.push(pt));
       }
     }
 
@@ -329,7 +589,10 @@ export default function PlanRoute({ setActiveTab }) {
 
     if (allPoints.length > 0) {
       const bounds = L.latLngBounds(allPoints);
-      mapInstanceRef.current.fitBounds(bounds, { padding: [45, 45], maxZoom: 17 });
+      mapInstanceRef.current.fitBounds(bounds, {
+        padding: isNavigating ? [130, 35] : [45, 45],
+        maxZoom: 17
+      });
     }
   }, [routeData, activeRouteKey, isNavigating, selectedDest, effectiveRouteBDuration, activeOrigin?.lat, activeOrigin?.lng, activeDestination.lat, activeDestination.lng]);
 
@@ -403,7 +666,7 @@ export default function PlanRoute({ setActiveTab }) {
     }
 
     window.speechSynthesis.cancel();
-    const currentStep = destInfo.steps[navStepIndex] || destInfo.steps[0];
+    const currentStep = effectiveSteps[navStepIndex] || effectiveSteps[0];
     const text = `Panduan Navigasi Leluasa: ${currentStep.instruction}. ${currentStep.detail}. Jarak ${currentStep.distance}.`;
 
     const utterance = new SpeechSynthesisUtterance(text);
@@ -417,7 +680,7 @@ export default function PlanRoute({ setActiveTab }) {
   };
 
   const handleNextStep = () => {
-    if (navStepIndex < destInfo.steps.length - 1) {
+    if (navStepIndex < effectiveSteps.length - 1) {
       const nextIndex = navStepIndex + 1;
       setNavStepIndex(nextIndex);
 
@@ -428,7 +691,7 @@ export default function PlanRoute({ setActiveTab }) {
       // Bacakan instruksi langkah berikutnya
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
-        const nextStep = destInfo.steps[nextIndex];
+        const nextStep = effectiveSteps[nextIndex];
         const utterance = new SpeechSynthesisUtterance(`${nextStep.instruction}. ${nextStep.detail}.`);
         utterance.lang = 'id-ID';
         utterance.onstart = () => setIsSpeakingNav(true);
@@ -438,6 +701,116 @@ export default function PlanRoute({ setActiveTab }) {
       }
     }
   };
+
+  const handlePrevStep = () => {
+    if (navStepIndex > 0) {
+      const prevIndex = navStepIndex - 1;
+      setNavStepIndex(prevIndex);
+
+      if ('vibrate' in navigator && hapticActive) {
+        navigator.vibrate([60]);
+      }
+
+      // Bacakan instruksi langkah sebelumnya
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const prevStep = effectiveSteps[prevIndex];
+        const utterance = new SpeechSynthesisUtterance(`Kembali ke: ${prevStep.instruction}. ${prevStep.detail}.`);
+        utterance.lang = 'id-ID';
+        utterance.onstart = () => setIsSpeakingNav(true);
+        utterance.onend = () => setIsSpeakingNav(false);
+        utterance.onerror = () => setIsSpeakingNav(false);
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+  };
+
+  // Update Penanda Panah Petunjuk Langkah Aktif (Dynamic Turn Arrow Marker)
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (!isNavigating) {
+      if (stepMarkerRef.current) {
+        map.removeLayer(stepMarkerRef.current);
+        stepMarkerRef.current = null;
+      }
+      return;
+    }
+
+    const currentStep = effectiveSteps[navStepIndex] || effectiveSteps[0];
+    const coordsB = routeData?.routeB?.coordinates;
+    const stepCoord = getStepCoordinate(
+      navStepIndex,
+      effectiveSteps.length,
+      coordsB,
+      activeOrigin,
+      activeDestination,
+      currentStep
+    );
+
+    if (!stepCoord) return;
+
+    // Pastikan icon panah marker SAMA PERSIS dengan ikon & belokan di HUD atas
+    const iconName = currentStep.icon || 'straight';
+    const isFinish = navStepIndex >= effectiveSteps.length - 1 || iconName === 'check_circle';
+
+    // Label balon deskriptif sesuai aksi manuver belokan
+    const maneuverLabel = isFinish
+      ? 'Titik Tujuan'
+      : iconName === 'turn_right' ? `Belok Kanan (${currentStep.distance || 'Belokan'})`
+      : iconName === 'turn_left' ? `Belok Kiri (${currentStep.distance || 'Belokan'})`
+      : iconName === 'turn_slight_right' ? `Serong Kanan (${currentStep.distance || 'Belokan'})`
+      : iconName === 'turn_slight_left' ? `Serong Kiri (${currentStep.distance || 'Belokan'})`
+      : iconName === 'turn_sharp_right' ? `Tajam Kanan (${currentStep.distance || 'Belokan'})`
+      : iconName === 'turn_sharp_left' ? `Tajam Kiri (${currentStep.distance || 'Belokan'})`
+      : `Langkah ${navStepIndex + 1} (${currentStep.distance || 'Lurus'})`;
+
+    const arrowHtml = `
+      <div class="flex flex-col items-center -translate-x-1/2 -translate-y-full cursor-pointer transition-all duration-500 ease-out">
+        <!-- Label Balon Langkah -->
+        <div class="px-2.5 py-1 rounded-full ${isFinish ? 'bg-secondary' : 'bg-amber-500'} text-white font-extrabold text-[10px] sm:text-[11px] shadow-2xl whitespace-nowrap mb-1 flex items-center gap-1.5 border-2 border-white ring-2 ring-black/10">
+          <span class="w-2 h-2 rounded-full bg-white animate-ping inline-block"></span>
+          <span>${maneuverLabel}</span>
+        </div>
+        <!-- Lingkaran Panah Berdenyut (Pulse Ring) -->
+        <div class="relative flex items-center justify-center">
+          <div class="absolute -inset-2.5 rounded-full ${isFinish ? 'bg-secondary/40' : 'bg-amber-400/40'} animate-ping"></div>
+          <div class="w-11 h-11 rounded-full ${isFinish ? 'bg-secondary' : 'bg-amber-500'} text-white flex items-center justify-center shadow-2xl ring-4 ring-white border-2 ${isFinish ? 'border-secondary' : 'border-amber-600'} font-black">
+            <span class="material-symbols-outlined text-2xl font-bold">
+              ${isFinish ? 'flag' : iconName}
+            </span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const stepArrowIcon = L.divIcon({
+      className: 'step-turn-arrow-marker',
+      html: arrowHtml,
+      iconSize: [0, 0],
+      iconAnchor: [0, 0]
+    });
+
+    if (stepMarkerRef.current) {
+      stepMarkerRef.current.setLatLng(stepCoord);
+      stepMarkerRef.current.setIcon(stepArrowIcon);
+    } else {
+      stepMarkerRef.current = L.marker(stepCoord, {
+        icon: stepArrowIcon,
+        zIndexOffset: 3500
+      }).addTo(map);
+    }
+
+    stepMarkerRef.current.unbindTooltip();
+    stepMarkerRef.current.bindTooltip(
+      `<strong>Langkah ${navStepIndex + 1}:</strong> ${currentStep.instruction}`,
+      { direction: 'top', offset: [0, -45], permanent: false }
+    );
+
+    // Geser kamera peta secara halus (smooth pan) memusatkan ke titik panah langkah ini
+    map.panTo(stepCoord, { animate: true, duration: 0.6 });
+  }, [isNavigating, navStepIndex, effectiveSteps, routeData, activeOrigin?.lat, activeOrigin?.lng, activeDestination?.lat, activeDestination?.lng]);
 
   const handleShare = () => {
     if (navigator.share) {
@@ -456,13 +829,19 @@ export default function PlanRoute({ setActiveTab }) {
   // VIEW A: NAVIGASI RUTE AKTIF INTERAKTIF (Langkah demi Langkah)
   // =========================================================================
   if (isNavigating) {
-    const currentStep = destInfo.steps[navStepIndex] || destInfo.steps[0];
+    const currentStep = effectiveSteps[navStepIndex] || effectiveSteps[0];
 
     return (
-      <div className="relative w-full max-w-lg h-[calc(100vh-4rem)] sm:h-[calc(100vh-5rem)] mx-auto overflow-hidden flex flex-col justify-between bg-surface-container-low shadow-2xl animate-fadeIn p-4 sm:p-5">
+      <div className="relative w-full max-w-xl h-[calc(100vh-4rem)] sm:h-[calc(100vh-5rem)] mx-auto overflow-hidden flex flex-col justify-between bg-surface-container-low shadow-2xl rounded-3xl animate-fadeIn p-4 sm:p-5">
         
+        {/* PETA LEAFLET LATAR BELAKANG NAVIGASI AKTIF SURABAYA */}
+        <div
+          ref={mapContainerRef}
+          className="absolute inset-0 w-full h-full z-0 cursor-grab active:cursor-grabbing"
+        />
+
         {/* TOP HUD CARD: PANDUAN ARAH SEKARANG */}
-        <div className="w-full bg-surface-container-lowest rounded-2xl p-4 sm:p-5 shadow-lg border-l-[8px] border-primary flex items-center justify-between gap-3">
+        <div className="relative z-10 w-full bg-surface-container-lowest/95 backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-xl border-l-[8px] border-primary flex items-center justify-between gap-3 border border-outline-variant/20">
           <div className="flex items-center gap-3.5">
             <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center text-on-primary shadow-md shrink-0">
               <span className="material-symbols-outlined text-[32px]">
@@ -471,7 +850,7 @@ export default function PlanRoute({ setActiveTab }) {
             </div>
             <div>
               <span className="text-[11px] uppercase tracking-wider text-primary font-bold block">
-                Langkah {navStepIndex + 1} dari {destInfo.steps.length}
+                Langkah {navStepIndex + 1} dari {effectiveSteps.length}
               </span>
               <span className="font-headline-sm text-base sm:text-lg text-on-surface font-extrabold leading-tight block">
                 {currentStep.instruction}
@@ -500,69 +879,109 @@ export default function PlanRoute({ setActiveTab }) {
           </button>
         </div>
 
-        {/* STATUS GUILDING BLOCK & HAPTIC */}
-        <div className="flex items-center justify-between my-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-tertiary-fixed rounded-full text-on-tertiary-fixed shadow-xs">
+        {/* STATUS GUIDING BLOCK & HAPTIC + TOMBOL PUSATKAN */}
+        <div className="relative z-10 flex items-center justify-between my-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-tertiary-fixed/95 backdrop-blur-md rounded-full text-on-tertiary-fixed shadow-md border border-amber-300">
             <span className="material-symbols-outlined text-base text-tertiary font-bold">texture</span>
             <span className="text-xs font-bold">Jalur Ubin Pemandu Aktif</span>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              const next = !hapticActive;
-              setHapticActive(next);
-              if (next && 'vibrate' in navigator) navigator.vibrate(100);
-            }}
-            className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-              hapticActive ? 'bg-primary/10 text-primary border border-primary/30' : 'bg-surface-container text-on-surface-variant'
-            }`}
-          >
-            <span className="material-symbols-outlined text-base">vibration</span>
-            <span>{hapticActive ? 'Getar Aktif' : 'Getar Mati'}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (mapInstanceRef.current) {
+                  const currentStep = effectiveSteps[navStepIndex] || effectiveSteps[0];
+                  const coordsB = routeData?.routeB?.coordinates;
+                  const stepCoord = getStepCoordinate(navStepIndex, effectiveSteps.length, coordsB, activeOrigin, activeDestination, currentStep);
+                  if (stepCoord) {
+                    mapInstanceRef.current.setView(stepCoord, 17, { animate: true });
+                  } else if (coords) {
+                    mapInstanceRef.current.setView([coords.lat, coords.lng], 17, { animate: true });
+                  } else if (activeOrigin) {
+                    mapInstanceRef.current.setView([activeOrigin.lat, activeOrigin.lng], 16, { animate: true });
+                  }
+                }
+              }}
+              title="Pusatkan Peta ke Titik Belokan Ini"
+              className="w-8 h-8 rounded-full bg-surface-container-lowest/90 backdrop-blur-md shadow-md flex items-center justify-center text-primary border border-outline-variant/30 hover:bg-surface-container cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-base">my_location</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                const next = !hapticActive;
+                setHapticActive(next);
+                if (next && 'vibrate' in navigator) navigator.vibrate(100);
+              }}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-md backdrop-blur-md transition-all cursor-pointer ${
+                hapticActive ? 'bg-primary/90 text-white' : 'bg-surface-container-lowest/90 text-on-surface-variant border border-outline-variant/30'
+              }`}
+            >
+              <span className="material-symbols-outlined text-base">vibration</span>
+              <span>{hapticActive ? 'Getar Aktif' : 'Getar Mati'}</span>
+            </button>
+          </div>
         </div>
 
         {/* BOTTOM HUD CARD & CONTROLS */}
-        <div className="w-full bg-surface-container-lowest rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col gap-3 mt-auto">
+        <div className="relative z-10 w-full bg-surface-container-lowest/95 backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-xl border border-outline-variant/20 flex flex-col gap-3 mt-auto">
           <div className="flex items-center justify-between border-b border-surface-container pb-2.5">
             <div>
               <div className="flex items-baseline gap-2">
                 <span className="text-xl font-extrabold text-primary">{effectiveRouteBDuration}</span>
                 <span className="text-xs text-on-surface-variant font-bold">• {destInfo.routeBDistance}</span>
               </div>
-              <p className="text-xs text-on-surface-variant font-medium mt-0.5 truncate">
+              <p className="text-xs text-on-surface-variant font-medium mt-0.5 truncate max-w-[280px]">
                 {destInfo.destination}
               </p>
             </div>
-            <span className="px-2.5 py-1 rounded-full bg-secondary/10 text-secondary text-xs font-bold">
-              GPS ±0.8m
+            <span className="px-2.5 py-1 rounded-full bg-secondary/15 text-secondary text-xs font-bold border border-secondary/30 flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
+              <span>GPS ±0.8m</span>
             </span>
           </div>
 
-          {/* Tombol Aksi Navigasi */}
-          <div className="grid grid-cols-2 gap-2.5">
+          {/* Tombol Aksi Navigasi (Langkah Selanjutnya & Langkah Sebelumnya) */}
+          <div className="flex items-center gap-2">
+            {navStepIndex > 0 && (
+              <button
+                type="button"
+                onClick={handlePrevStep}
+                className="h-12 px-3 sm:px-4 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs sm:text-sm flex items-center justify-center gap-1 cursor-pointer shrink-0 transition-all border border-outline-variant/30 active:scale-95"
+                title="Kembali ke langkah sebelumnya"
+              >
+                <span className="material-symbols-outlined text-base">arrow_back</span>
+                <span>Sebelumnya</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={handleNextStep}
-              disabled={navStepIndex >= destInfo.steps.length - 1}
-              className={`min-h-[48px] rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer ${
-                navStepIndex >= destInfo.steps.length - 1
-                  ? 'bg-secondary text-white opacity-80 cursor-default'
-                  : 'bg-primary text-on-primary hover:bg-primary-container'
+              disabled={navStepIndex >= effectiveSteps.length - 1}
+              className={`flex-1 h-12 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer ${
+                navStepIndex >= effectiveSteps.length - 1
+                  ? 'bg-secondary text-white opacity-85 cursor-default'
+                  : 'bg-primary text-on-primary hover:bg-primary-container active:scale-95'
               }`}
             >
-              <span>{navStepIndex >= destInfo.steps.length - 1 ? 'Tiba di Tujuan' : 'Langkah Selanjutnya'}</span>
-              <span className="material-symbols-outlined text-base">arrow_forward</span>
+              <span>{navStepIndex >= effectiveSteps.length - 1 ? '🎉 Tiba di Tujuan' : 'Langkah Selanjutnya'}</span>
+              <span className="material-symbols-outlined text-base">
+                {navStepIndex >= effectiveSteps.length - 1 ? 'check' : 'arrow_forward'}
+              </span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('report-obstacle')}
-              className="min-h-[48px] rounded-xl bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 cursor-pointer"
+              className="h-12 px-3.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 cursor-pointer shrink-0 transition-all border border-outline-variant/30 active:scale-95"
+              title="Laporkan rintangan atau trotoar rusak"
             >
               <span className="material-symbols-outlined text-base text-error">report</span>
-              <span>Lapor Rintangan</span>
+              <span className="hidden sm:inline">Lapor Rintangan</span>
             </button>
           </div>
 
@@ -612,7 +1031,11 @@ export default function PlanRoute({ setActiveTab }) {
           <div className="flex items-center bg-surface-container p-1 rounded-full border border-outline-variant/30 text-xs font-bold shadow-xs">
             <button
               type="button"
-              onClick={() => setSelectedDest('balai-pemuda')}
+              onClick={() => {
+                setSelectedDest('balai-pemuda');
+                setRouteIntent(null);
+                setNavStepIndex(0);
+              }}
               className={`px-3 py-1.5 rounded-full transition-all flex items-center gap-1 cursor-pointer ${
                 selectedDest === 'balai-pemuda' ? 'bg-primary text-white shadow-xs' : 'text-on-surface-variant hover:text-on-surface'
               }`}
@@ -622,7 +1045,11 @@ export default function PlanRoute({ setActiveTab }) {
 
             <button
               type="button"
-              onClick={() => setSelectedDest('rsud-soetomo')}
+              onClick={() => {
+                setSelectedDest('rsud-soetomo');
+                setRouteIntent(null);
+                setNavStepIndex(0);
+              }}
               className={`px-3 py-1.5 rounded-full transition-all flex items-center gap-1 cursor-pointer ${
                 selectedDest === 'rsud-soetomo' ? 'bg-primary text-white shadow-xs' : 'text-on-surface-variant hover:text-on-surface'
               }`}
@@ -632,7 +1059,11 @@ export default function PlanRoute({ setActiveTab }) {
 
             <button
               type="button"
-              onClick={() => setSelectedDest('detour-bollard')}
+              onClick={() => {
+                setSelectedDest('detour-bollard');
+                setRouteIntent(null);
+                setNavStepIndex(0);
+              }}
               className={`px-3 py-1.5 rounded-full transition-all flex items-center gap-1 cursor-pointer ${
                 selectedDest === 'detour-bollard' ? 'bg-secondary text-white shadow-xs' : 'text-on-surface-variant hover:text-on-surface'
               }`}
@@ -640,9 +1071,44 @@ export default function PlanRoute({ setActiveTab }) {
               <span className="material-symbols-outlined text-xs">alt_route</span>
               <span>Bypass Bollard</span>
             </button>
+
+            {routeIntent?.destination && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedDest('custom');
+                  setNavStepIndex(0);
+                }}
+                className={`px-3 py-1.5 rounded-full transition-all flex items-center gap-1 cursor-pointer ${
+                  selectedDest === 'custom' ? 'bg-secondary text-white shadow-xs' : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+                title={routeIntent.destination.name}
+              >
+                <span className="material-symbols-outlined text-xs">my_location</span>
+                <span className="truncate max-w-[120px]">📍 {routeIntent.destination.name}</span>
+              </button>
+            )}
           </div>
 
-          <MockDataBadge />
+          {/* Tombol Pintas Buat Rute Riil dari Lokasi GPS User */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('home')}
+            className="px-3.5 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer shrink-0"
+            title="Cari dan buat rute baru dari lokasi GPS Anda di Beranda"
+          >
+            <span className="material-symbols-outlined text-sm">add_location_alt</span>
+            <span>+ Buat Rute dari Lokasi Saya</span>
+          </button>
+
+          {isCustomDest ? (
+            <span className="px-2.5 py-1 rounded-full bg-secondary/15 text-secondary border border-secondary/30 text-xs font-bold flex items-center gap-1 shrink-0">
+              <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
+              <span>GPS Riil Aktif</span>
+            </span>
+          ) : (
+            <MockDataBadge />
+          )}
         </div>
       </div>
 

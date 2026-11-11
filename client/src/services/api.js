@@ -90,3 +90,21 @@ export async function fetchPlaces(search = '') {
   if (!res.ok) throw new Error('Failed to fetch places');
   return res.json();
 }
+
+export async function geocodeSearch(query, lat = null, lng = null) {
+  const params = new URLSearchParams({ q: query });
+  if (lat !== null && lng !== null) {
+    params.append('lat', lat);
+    params.append('lng', lng);
+  }
+  const res = await fetch(`${API_BASE}/routes/geocode?${params.toString()}`);
+  if (!res.ok) throw new Error('Failed to search locations');
+  return res.json();
+}
+
+export async function reverseGeocode(lat, lng) {
+  const params = new URLSearchParams({ lat, lng });
+  const res = await fetch(`${API_BASE}/routes/reverse-geocode?${params.toString()}`);
+  if (!res.ok) throw new Error('Failed to reverse geocode');
+  return res.json();
+}

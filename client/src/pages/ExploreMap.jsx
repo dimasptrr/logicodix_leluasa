@@ -4,6 +4,36 @@ import { fetchObstacles, upvoteObstacle, resolveObstacle, dispatchDpupr, fetchRo
 import useGeolocation from '../features/dashboard/hooks/useGeolocation.js';
 import MockDataBadge from '../components/MockDataBadge.jsx';
 
+// Format waktu relatif berbasis WIB (Jakarta / Surabaya GMT+7)
+function formatReportTimeWIB(dateString) {
+  if (!dateString) return 'Baru saja';
+  if (typeof dateString === 'string' && (dateString.includes('lalu') || dateString.includes('menit') || dateString.includes('jam'))) {
+    return dateString;
+  }
+
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return 'Baru saja';
+
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.max(0, Math.floor(diffMs / 1000));
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHour / 24);
+
+  const timeWIB = date.toLocaleTimeString('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Jakarta'
+  }) + ' WIB';
+
+  if (diffMin < 1) return `Baru saja (${timeWIB})`;
+  if (diffMin < 60) return `${diffMin} menit lalu (${timeWIB})`;
+  if (diffHour < 24) return `${diffHour} jam lalu (${timeWIB})`;
+  if (diffDay === 1) return `Kemarin (${timeWIB})`;
+  return `${diffDay} hari lalu (${timeWIB})`;
+}
+
 export default function ExploreMap({ setActiveTab }) {
   const [obstacles, setObstacles] = useState([]);
   const [selectedObstacle, setSelectedObstacle] = useState(null);
@@ -53,9 +83,25 @@ export default function ExploreMap({ setActiveTab }) {
     setErrorMessage(null);
     try {
       const res = await fetchObstacles({ severity: activeFilter });
-      setObstacles(res.data);
-      if (res.data.length > 0 && !selectedObstacle) {
-        setSelectedObstacle(res.data[0]);
+      const dataList = res.data || [];
+      setObstacles(dataList);
+
+      const target = typeof window !== 'undefined' ? window.__leluasaTargetObstacle : null;
+      if (target) {
+        window.__leluasaTargetObstacle = null;
+        const found = dataList.find(o => String(o.id) === String(target.id)) || dataList[0];
+        if (found) {
+          setSelectedObstacle(found);
+          setDrawerOpen(true);
+          const tLat = Number(target.lat ?? found.lat ?? found.latitude ?? found.coordinates?.lat);
+          const tLng = Number(target.lng ?? found.lng ?? found.longitude ?? found.coordinates?.lng);
+          if (Number.isFinite(tLat) && Number.isFinite(tLng) && mapInstanceRef.current) {
+            mapInstanceRef.current.setView([tLat, tLng], 17, { animate: true });
+            centerOnNextLocationRef.current = false;
+          }
+        }
+      } else if (dataList.length > 0 && !selectedObstacle) {
+        setSelectedObstacle(dataList[0]);
         if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
           setDrawerOpen(true);
         }
@@ -140,8 +186,9 @@ export default function ExploreMap({ setActiveTab }) {
     markersGroupRef.current.clearLayers();
 
     obstacles.forEach((obs) => {
-      const lat = obs.coordinates?.lat || -7.2655;
-      const lng = obs.coordinates?.lng || 112.7482;
+      const lat = Number(obs.lat ?? obs.latitude ?? obs.coordinates?.lat);
+      const lng = Number(obs.lng ?? obs.longitude ?? obs.coordinates?.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
       const isImpassable = obs.severity === 'impassable';
       const isDifficult = obs.severity === 'difficult';
@@ -150,11 +197,12 @@ export default function ExploreMap({ setActiveTab }) {
       const iconBg = isImpassable ? 'bg-error' : isDifficult ? 'bg-warning' : 'bg-secondary';
       const iconText = isDifficult ? 'text-on-warning' : 'text-white';
       const iconSymbol = isImpassable ? 'block' : isDifficult ? 'build' : 'accessible';
+      const displayTitle = obs.title || obs.name || 'Rintangan Trotoar';
 
       const labelBadge = isImpassable
-        ? `<div class="bg-error text-white font-bold text-[10px] px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1 mb-1 whitespace-nowrap"><span class="material-symbols-outlined text-[12px]">cancel</span><span>${obs.title || 'Tangga 4 Trap'}</span></div>`
+        ? `<div class="bg-error text-white font-bold text-[10px] px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1 mb-1 whitespace-nowrap"><span class="material-symbols-outlined text-[12px]">cancel</span><span>${displayTitle}</span></div>`
         : isDifficult
-        ? `<div class="bg-warning text-on-warning font-bold text-[10px] px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1 mb-1 whitespace-nowrap"><span class="material-symbols-outlined text-[12px]">warning</span><span>Sulit (${obs.title || 'Ubin Rusak'})</span></div>`
+        ? `<div class="bg-warning text-on-warning font-bold text-[10px] px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1 mb-1 whitespace-nowrap"><span class="material-symbols-outlined text-[12px]">warning</span><span>Sulit (${displayTitle})</span></div>`
         : `<div class="bg-secondary text-white font-bold text-[10px] px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1 mb-1 whitespace-nowrap"><span class="material-symbols-outlined text-[12px]">check_circle</span><span>Bisa dilewati</span></div>`;
 
       const html = `
@@ -670,16 +718,37 @@ export default function ExploreMap({ setActiveTab }) {
 
           {/* Isi Konten Detail (Mockup UI 2) */}
           <div className="p-4 sm:p-5 flex flex-col gap-4 flex-1">
+            {/* Foto Rintangan Lapangan (dari Supabase Storage jika ada) */}
+            {(selectedObstacle.image_url || selectedObstacle.photo_url) && (
+              <div className="w-full h-44 rounded-2xl overflow-hidden border border-outline-variant/30 shadow-xs relative bg-surface-container">
+                <img
+                  src={selectedObstacle.image_url || selectedObstacle.photo_url}
+                  alt={selectedObstacle.title || selectedObstacle.name || 'Foto Rintangan Lapangan'}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute bottom-2 left-2 px-2.5 py-0.5 rounded-full bg-black/60 text-white text-[10px] font-bold backdrop-blur-xs flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs">verified</span>
+                  <span>Foto Terverifikasi Lapangan</span>
+                </div>
+              </div>
+            )}
+
             {/* Judul & Lokasi */}
             <div className="flex flex-col gap-1">
               <h2 className="font-headline-sm text-lg sm:text-xl font-bold text-primary tracking-tight">
-                {selectedObstacle.title || 'Bollard di trotoar'}
+                {selectedObstacle.title || selectedObstacle.name || 'Bollard di trotoar'}
               </h2>
-              <div className="flex items-center gap-1.5 text-on-surface-variant text-xs">
+              <div className="flex items-center gap-1.5 text-on-surface-variant text-xs flex-wrap">
                 <span className="material-symbols-outlined text-secondary text-sm">pin_drop</span>
-                <span>{selectedObstacle.location || 'Jl. Pemuda No. 45, Surabaya'}</span>
+                <span>
+                  {selectedObstacle.location || selectedObstacle.location_text || (
+                    selectedObstacle.lat != null ? `Titik GPS (${Number(selectedObstacle.lat).toFixed(6)}, ${Number(selectedObstacle.lng).toFixed(6)})` : 'Lokasi Terlapor'
+                  )}
+                </span>
                 <span>•</span>
-                <span>{selectedObstacle.reportedTime || 'Dilaporkan 3 hari lalu'}</span>
+                <span className="font-semibold text-primary">
+                  {formatReportTimeWIB(selectedObstacle.reported_at || selectedObstacle.created_at || selectedObstacle.reportedTime)}
+                </span>
               </div>
             </div>
 

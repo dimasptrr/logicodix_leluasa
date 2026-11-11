@@ -3,9 +3,11 @@ node_modules/
 .pnp
 .pnp.js
 
-# Production builds
+# Production builds & bundler caches
 dist/
+dist-ssr/
 build/
+.vite/
 
 # Python & AI weights / checkpoints
 __pycache__/
@@ -16,6 +18,8 @@ __pycache__/
 env/
 venv/
 .venv/
+.pytest_cache/
+.ipynb_checkpoints/
 *.pt
 *.pth
 *.onnx
@@ -26,6 +30,7 @@ venv/
 .env
 .env.local
 .env.*.local
+!*.example
 
 # Logs
 npm-debug.log*
@@ -33,9 +38,11 @@ yarn-debug.log*
 yarn-error.log*
 *.log
 
-# Editor & OS files
+# Editor, OS & Temporary files
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
+*.tmp
+*.backup
 

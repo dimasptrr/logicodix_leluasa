@@ -244,3 +244,31 @@ export async function fetchPlaces(search = '') {
   }
 }
 
+export async function geocodeSearch(query, lat = null, lng = null) {
+  try {
+    const res = await realApi.geocodeSearch(query, lat, lng);
+    return res;
+  } catch (err) {
+    console.warn('Geocode API fallback:', err.message);
+    return { status: 'success', data: [] };
+  }
+}
+
+export async function reverseGeocode(lat, lng) {
+  try {
+    const res = await realApi.reverseGeocode(lat, lng);
+    return res;
+  } catch (err) {
+    console.warn('Reverse geocode fallback:', err.message);
+    return {
+      status: 'success',
+      data: {
+        name: `Titik Pilihan Peta (${lat.toFixed(5)}, ${lng.toFixed(5)})`,
+        address: `Koordinat: ${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+        lat,
+        lng
+      }
+    };
+  }
+}
+

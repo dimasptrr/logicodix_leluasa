@@ -1,11 +1,70 @@
 import React, { useState, useEffect, useRef } from 'react';
+import useGeolocation from '../features/dashboard/hooks/useGeolocation.js';
+import { geocodeSearch } from '../features/dashboard/services/safeApi.js';
+
+// Ekstraksi tujuan rute dari kalimat percakapan bahasa Indonesia
+function extractDestinationQuery(rawText) {
+  if (!rawText) return null;
+  const text = rawText.trim();
+
+  // Pola 1: "dari ... ke <tujuan> (rutenya|rute)?"
+  const fromToMatch = text.match(/dari\s+.*?\s+ke\s+([^,.\n?]+?)(?:\s+(?:rutenya|rute|jalurnya|dong|ya|sekarang|tolong))?[\s.?!]*$/i);
+  if (fromToMatch && fromToMatch[1]) {
+    return cleanDestString(fromToMatch[1]);
+  }
+
+  // Pola 2: "ke / menuju / arah <tujuan> (rutenya|rute)?"
+  const toMatch = text.match(/(?:ke|menuju|arah)\s+([^,.\n?]+?)(?:\s+(?:rutenya|rute|jalurnya|dong|ya|sekarang|tolong))?[\s.?!]*$/i);
+  if (toMatch && toMatch[1]) {
+    return cleanDestString(toMatch[1]);
+  }
+
+  // Pola 3: "rute / jalan / jalur <tujuan>"
+  const routePrefixMatch = text.match(/^(?:rute|jalur|jalan|navigasi|cari rute|tampilkan rute)\s+(?:ke\s+|menuju\s+)?([^,.\n?]+?)(?:\s+(?:rutenya|rute|jalurnya|dong|ya|sekarang|tolong))?[\s.?!]*$/i);
+  if (routePrefixMatch && routePrefixMatch[1]) {
+    return cleanDestString(routePrefixMatch[1]);
+  }
+
+  return null;
+}
+
+function cleanDestString(str) {
+  if (!str) return '';
+  let s = str.trim();
+  // Hilangkan sisa frase "lokasi saya..." jika ada
+  s = s.replace(/^(?:lokasi\s+saya\s+(?:saat\s+ini\s+)?ke\s+)/i, '');
+  // Ubah variasi alun2 menjadi alun-alun
+  s = s.replace(/\balun\s*2\b/gi, 'alun-alun');
+  s = s.replace(/\brs\b/gi, 'RSUD');
+  return s.trim();
+}
 
 export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) {
+  const { coords } = useGeolocation();
   const [inputText, setInputText] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [speakingIndex, setSpeakingIndex] = useState(null);
   const [micError, setMicError] = useState('');
+  const [isSearchingRoute, setIsSearchingRoute] = useState(false);
   const messagesEndRef = useRef(null);
+
+  // Mode Navigasi: 'voice' (Tunjukkan Rute & Putar Suara / Ramah Tuna Netra) vs 'silent' (Hanya Tunjukkan Rute)
+  const [navVoiceMode, setNavVoiceMode] = useState(() => {
+    try {
+      return localStorage.getItem('leluasa_voice_nav_mode') || 'voice';
+    } catch (e) {
+      return 'voice';
+    }
+  });
+
+  const handleSelectNavMode = (mode) => {
+    setNavVoiceMode(mode);
+    try {
+      localStorage.setItem('leluasa_voice_nav_mode', mode);
+    } catch (e) {
+      // ignore
+    }
+  };
 
   // Riwayat percakapan Chatbot Asisten AI
   const [messages, setMessages] = useState([
@@ -27,8 +86,8 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
         badge: '100% Ramah Roda',
         subtitle: 'Jl. Pemuda ke Halte Balai Pemuda • 8 mnt (420m)',
         tags: ['Trotoar Rata', 'Ubin Kuning Teratur', 'Elevator Aksesibel'],
-        targetTab: 'home',
-        targetRouteKey: 'halte-pemuda'
+        targetTab: 'plan-route',
+        targetRouteKey: 'balai-pemuda'
       }
     }
   ]);
@@ -169,7 +228,7 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
   };
 
   // Eksekusi Pertanyaan Pengguna
-  const handleSendMessage = (userQuery) => {
+  const handleSendMessage = async (userQuery) => {
     const query = (userQuery || inputText).trim();
     if (!query) return;
 
@@ -180,30 +239,43 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
     let reply = '';
     let targetTab = null;
     let cardData = null;
+    let routeIntent = null;
 
+    // 1. Ekstraksi tujuan otomatis menggunakan regex bahasa Indonesia
+    const extractedDest = extractDestinationQuery(query);
+
+    // 2. Deteksi apakah rute menuju preset Surabaya atau lokasi kustom di luar Surabaya
     if (lower.includes('soetomo') || lower.includes('rsud')) {
-      reply = 'Menyiapkan rute aksesibel ke RSUD Dr. Soetomo pada Dashboard Navigasi: trotoar ubin pemandu via Jl. Kusuma Bangsa bebas dari rintangan proyek galian.';
-      targetTab = 'home';
-      if (typeof window !== 'undefined') window.__leluasaDashboardDestination = 'rsud-soetomo';
+      targetTab = 'plan-route';
+      routeIntent = {
+        destination: { id: 'rsud-soetomo', name: 'RSUD Dr. Soetomo Surabaya', lat: -7.2678, lng: 112.7582 },
+        autoPlayVoice: navVoiceMode === 'voice'
+      };
+      reply = `Menyiapkan rute aksesibel ke RSUD Dr. Soetomo: trotoar ubin pemandu via Jl. Kusuma Bangsa bebas dari rintangan proyek galian.${navVoiceMode === 'voice' ? ' Panduan suara turn-by-turn akan langsung aktif.' : ' Membuka peta rute navigasi visual...'}`;
       cardData = {
         title: 'Jalur Akses RSUD Dr. Soetomo',
-        badge: 'Rampa Landai 4.5°',
+        badge: navVoiceMode === 'voice' ? '🔊 Panduan Suara Aktif' : 'Rampa Landai 4.5°',
         subtitle: 'Jl. Kusuma Bangsa • 10 mnt (650m)',
         tags: ['Ubin Pemandu Utuh', 'Bebas Hambatan', 'Lift Aksesibel'],
-        targetTab: 'home',
-        targetRouteKey: 'rsud-soetomo'
+        targetTab: 'plan-route',
+        targetRouteKey: 'rsud-soetomo',
+        routeIntent
       };
-    } else if (lower.includes('pemuda') || lower.includes('halte') || lower.includes('balai')) {
-      reply = 'Menyiapkan rute Halte Balai Pemuda pada Dashboard Navigasi: belok kanan 45m dari Jl. Pemuda. Ubin pemandu teratur tanpa lubang trotoar.';
-      targetTab = 'home';
-      if (typeof window !== 'undefined') window.__leluasaDashboardDestination = 'halte-pemuda';
+    } else if (lower.includes('pemuda') || lower.includes('halte') || (lower.includes('balai') && !lower.includes('kota'))) {
+      targetTab = 'plan-route';
+      routeIntent = {
+        destination: { id: 'balai-pemuda', name: 'Halte Integrasi Balai Pemuda', lat: -7.2655, lng: 112.7515 },
+        autoPlayVoice: navVoiceMode === 'voice'
+      };
+      reply = `Menyiapkan rute Halte Balai Pemuda: belok kanan 45m dari Jl. Pemuda dengan ubin pemandu teratur.${navVoiceMode === 'voice' ? ' Panduan suara turn-by-turn akan langsung aktif.' : ' Membuka peta rute navigasi visual...'}`;
       cardData = {
         title: 'Rute Halte Balai Pemuda',
-        badge: '100% Ramah Roda',
+        badge: navVoiceMode === 'voice' ? '🔊 Panduan Suara Aktif' : '100% Ramah Roda',
         subtitle: 'Jl. Pemuda Surabaya • 8 mnt (420m)',
         tags: ['Jalur Kuning', 'Elevator 10m', 'Trotoar Rata'],
-        targetTab: 'home',
-        targetRouteKey: 'halte-pemuda'
+        targetTab: 'plan-route',
+        targetRouteKey: 'balai-pemuda',
+        routeIntent
       };
     } else if (lower.includes('kuliner') || lower.includes('makan') || lower.includes('sentra')) {
       reply = 'Menyiapkan rute Sentra Kuliner Pemuda pada Dashboard: trotoar lebar 2.4m bebas parkir liar dengan akses rampa landai.';
@@ -218,30 +290,90 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
         targetRouteKey: 'sentra-kuliner'
       };
     } else if (lower.includes('bollard') || lower.includes('halangan')) {
-      reply = 'Mengaktifkan rute pengalihan menghindari bollard rapat di Jl. Pemuda via rampa halus gedung drop-off.';
-      targetTab = 'home';
-      if (typeof window !== 'undefined') window.__leluasaDashboardDestination = 'balai-kota';
+      targetTab = 'plan-route';
+      routeIntent = {
+        destination: { id: 'detour-bollard', name: 'Pengalihan Halangan Bollard Sempit', lat: -7.2628, lng: 112.7530 },
+        autoPlayVoice: navVoiceMode === 'voice'
+      };
+      reply = `Mengaktifkan rute pengalihan menghindari bollard rapat di Jl. Pemuda via rampa halus gedung drop-off.${navVoiceMode === 'voice' ? ' Memulai panduan suara turn-by-turn...' : ' Membuka peta navigasi...'}`;
       cardData = {
         title: 'Pengalihan Rute Bollard Sempit',
         badge: 'Bypass Aman',
         subtitle: 'Jl. Pemuda No. 34 ke Balai Kota • 6 mnt (380m)',
         tags: ['Rampa Halus 120cm', 'Bypass Tiang', 'Kursi Roda Aman'],
-        targetTab: 'home',
-        targetRouteKey: 'balai-kota'
+        targetTab: 'plan-route',
+        targetRouteKey: 'detour-bollard',
+        routeIntent
+      };
+    } else if (extractedDest) {
+      // 3. PENCARIAN RUTE KE LOKASI DINAMIS (Misal: "alun2 probolinggo", "kopi kenangan probolinggo", dll)
+      setIsSearchingRoute(true);
+      let resolvedPlace = null;
+
+      try {
+        const geoRes = await geocodeSearch(extractedDest, coords?.lat, coords?.lng);
+        if (geoRes && Array.isArray(geoRes.data) && geoRes.data.length > 0) {
+          resolvedPlace = geoRes.data[0];
+        }
+      } catch (err) {
+        console.warn('Geocoding gagal:', err);
+      } finally {
+        setIsSearchingRoute(false);
+      }
+
+      const destLat = resolvedPlace ? resolvedPlace.lat : (coords?.lat ? coords.lat + 0.005 : -7.7545);
+      const destLng = resolvedPlace ? resolvedPlace.lng : (coords?.lng ? coords.lng + 0.005 : 113.2159);
+      const destDisplayName = resolvedPlace?.name || extractedDest;
+
+      routeIntent = {
+        origin: coords ? {
+          lat: coords.lat,
+          lng: coords.lng,
+          name: 'Lokasi GPS Saya',
+          source: 'gps'
+        } : null,
+        destination: {
+          lat: destLat,
+          lng: destLng,
+          name: destDisplayName,
+          id: `custom-${Date.now()}`
+        },
+        autoPlayVoice: navVoiceMode === 'voice'
+      };
+
+      targetTab = 'plan-route';
+      reply = `Menyiapkan rute aksesibel menuju ${destDisplayName}.${navVoiceMode === 'voice' ? ' Mengarahkan ke peta dan memutar panduan suara langkah demi langkah...' : ' Mengarahkan langsung ke peta rute navigasi...'}`;
+
+      cardData = {
+        title: `Rute ke ${destDisplayName}`,
+        badge: navVoiceMode === 'voice' ? '🔊 Panduan Suara Aktif' : '🗺️ Peta Visual',
+        subtitle: `${coords ? 'Dari Lokasi GPS Anda' : 'Dari Titik Awal'} menuju ${destDisplayName}`,
+        tags: [
+          'Rute Ramah Disabilitas',
+          'Deteksi Cerdas AI',
+          navVoiceMode === 'voice' ? 'Turn-by-turn Suara' : 'Peta Interaktif'
+        ],
+        targetTab: 'plan-route',
+        routeIntent
       };
     } else if (lower.includes('lapor') || lower.includes('rusak') || lower.includes('hambatan') || lower.includes('kabel') || lower.includes('foto')) {
       reply = 'Membuka formulir pelaporan rintangan. Silakan unggah foto hambatan agar dapat diverifikasi oleh komunitas dan DPUPR Surabaya.';
       targetTab = 'report-obstacle';
     } else if (lower.includes('cuaca') || lower.includes('hujan') || lower.includes('licin') || lower.includes('panas')) {
-      reply = 'Cuaca Surabaya saat ini terpantau 31 derajat Celsius, berawan. Permukaan ubin trotoar kering dan memiliki daya cengkeram aman untuk kursi roda dan tongkat netra.';
+      reply = 'Cuaca saat ini terpantau 31 derajat Celsius, berawan. Permukaan trotoar kering dan memiliki daya cengkeram aman untuk kursi roda dan tongkat netra.';
       targetTab = 'weather-intelligence';
     } else if (lower.includes('peta') || lower.includes('surabaya') || lower.includes('eksplorasi')) {
       reply = 'Membuka Peta Navigasi Surabaya dengan visualisasi seluruh jaringan trotoar, halte Trans Semanggi, dan titik rintangan aktif.';
       targetTab = 'explore-map';
     } else {
-      reply = `Informasi navigasi untuk "${query}": jalur trotoar terdekat dalam status aktif dan aman dilintasi pejalan kaki serta pengguna kursi roda.`;
+      reply = `Informasi navigasi untuk "${query}": ubin pemandu terdekat dalam kondisi aktif dan aman dilintasi pejalan kaki maupun pengguna kursi roda.`;
       targetTab = 'home';
       if (typeof window !== 'undefined') window.__leluasaDashboardDestination = 'halte-pemuda';
+    }
+
+    // Pasang target route intent secara global untuk ditangkap oleh halaman tujuan
+    if (routeIntent && typeof window !== 'undefined') {
+      window.__leluasaRouteIntent = routeIntent;
     }
 
     const nextMessages = [
@@ -255,16 +387,18 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
     const newAiIndex = nextMessages.length - 1;
     handleToggleVoicePlayback(reply, newAiIndex);
 
-    // Jika perintah mengarahkan ke tab tertentu, buka setelah 3.5 detik
+    // Jika perintah mengarahkan ke tab tertentu, buka otomatis setelah 3 detik
     if (targetTab && onNavigateTab) {
       setTimeout(() => {
-        if (cardData?.targetRouteKey && typeof window !== 'undefined') {
+        if (cardData?.routeIntent && typeof window !== 'undefined') {
+          window.__leluasaRouteIntent = cardData.routeIntent;
+        } else if (cardData?.targetRouteKey && typeof window !== 'undefined') {
           window.__leluasaDashboardDestination = cardData.targetRouteKey;
           window.dispatchEvent(new CustomEvent('leluasa:dashboard-route', { detail: { destId: cardData.targetRouteKey } }));
         }
         onNavigateTab(targetTab);
         onClose();
-      }, 3500);
+      }, 3000);
     }
   };
 
@@ -375,21 +509,23 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
                             </div>
                           </div>
                           
-                          {/* Tombol Buka Rute: Mengarahkan ke Dashboard Utama dengan navigasi langkah */}
+                          {/* Tombol Buka Rute: Mengarahkan ke Rute / Dashboard dengan navigasi langkah */}
                           <button
                             type="button"
                             onClick={() => {
                               stopSpeaking();
-                              if (m.card.targetRouteKey && typeof window !== 'undefined') {
+                              if (m.card.routeIntent && typeof window !== 'undefined') {
+                                window.__leluasaRouteIntent = m.card.routeIntent;
+                              } else if (m.card.targetRouteKey && typeof window !== 'undefined') {
                                 window.__leluasaDashboardDestination = m.card.targetRouteKey;
                                 window.dispatchEvent(new CustomEvent('leluasa:dashboard-route', { detail: { destId: m.card.targetRouteKey } }));
                               }
-                              if (onNavigateTab) onNavigateTab('home');
+                              if (onNavigateTab) onNavigateTab(m.card.targetTab || 'plan-route');
                               onClose();
                             }}
                             className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-container text-on-primary text-xs font-bold shadow-xs active:scale-95 cursor-pointer whitespace-nowrap flex items-center justify-center gap-1.5"
                           >
-                            <span>Buka di Dashboard</span>
+                            <span>{m.card.routeIntent?.autoPlayVoice ? 'Mulai Panduan Suara' : 'Buka Peta Rute'}</span>
                             <span className="material-symbols-outlined text-base">arrow_forward</span>
                           </button>
                         </div>
@@ -445,6 +581,49 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
               {prompt}
             </button>
           ))}
+        </div>
+
+        {/* PILIHAN MODE AKSI NAVIGASI DI ATAS KOLOM INPUT (RAMAH TUNA NETRA & VISUAL) */}
+        <div className="px-5 py-2.5 bg-surface-container-low/70 border-t border-outline-variant/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-on-surface-variant">
+            <span className="material-symbols-outlined text-base text-primary">assistant_navigation</span>
+            <span>Opsi Saat Rute Ditemukan:</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-surface-container rounded-full p-1 border border-outline-variant/40" role="group" aria-label="Mode navigasi rute">
+            <button
+              type="button"
+              onClick={() => handleSelectNavMode('silent')}
+              aria-pressed={navVoiceMode === 'silent'}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                navVoiceMode === 'silent'
+                  ? 'bg-primary text-white shadow-sm ring-1 ring-primary'
+                  : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'
+              }`}
+              title="Hanya menampilkan peta rute secara visual tanpa memutar suara panduan"
+            >
+              <span className="material-symbols-outlined text-sm">map</span>
+              <span>Hanya Tunjukkan Rute</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSelectNavMode('voice')}
+              aria-pressed={navVoiceMode === 'voice'}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                navVoiceMode === 'voice'
+                  ? 'bg-secondary text-white shadow-sm ring-1 ring-secondary'
+                  : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'
+              }`}
+              title="Tunjukkan rute dan otomatis bunyikan panduan suara turn-by-turn langkah demi langkah (sangat ramah tuna netra)"
+            >
+              <span className="material-symbols-outlined text-sm">record_voice_over</span>
+              <span>Tunjukkan Rute &amp; Putar Suara</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${navVoiceMode === 'voice' ? 'bg-white/25 text-white' : 'bg-secondary/15 text-secondary'}`}>
+                Tuna Netra
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* INPUT BAR (TEKS + MIKROFON + KIRIM) */}

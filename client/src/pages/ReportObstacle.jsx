@@ -324,8 +324,17 @@ export default function ReportObstacle({ setActiveTab }) {
           <div className="flex flex-col sm:flex-row gap-2.5 w-full pt-2">
             <button
               type="button"
-              onClick={() => setActiveTab('explore-map')}
-              className="flex-1 min-h-[46px] rounded-xl bg-primary text-on-primary font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-md hover:bg-primary-container transition-all"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.__leluasaTargetObstacle = {
+                    id: reportTicketId,
+                    lat: selectedLocation?.lat,
+                    lng: selectedLocation?.lng
+                  };
+                }
+                setActiveTab('explore-map');
+              }}
+              className="flex-1 min-h-[46px] rounded-xl bg-primary text-on-primary font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-md hover:bg-primary-container transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-lg" aria-hidden="true">map</span>
               <span>Lihat di Peta Navigasi</span>

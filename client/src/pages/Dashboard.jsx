@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import useGeolocation from '../features/dashboard/hooks/useGeolocation.js';
 import MockDataBadge from '../components/MockDataBadge.jsx';
+import { geocodeSearch, reverseGeocode } from '../features/dashboard/services/safeApi.js';
 
 // Data Lokasi Surabaya Populer untuk Pencarian & Multi-Stop
 const SURABAYA_DESTINATIONS = [
@@ -73,15 +74,6 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchTarget, setSearchTarget] = useState('stop1'); // 'origin' | 'stop1' | 'stop2'
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-
-  // State Kontrol Rute HUD
-  const [selectedRouteKey, setSelectedRouteKey] = useState('ubin'); // 'ubin' | 'ramp'
-  const [hapticEnabled, setHapticEnabled] = useState(true);
-  const [audioFeedback, setAudioFeedback] = useState('');
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [mapZoom, setMapZoom] = useState(1);
-  const [mapRotation, setMapRotation] = useState(0);
-  const [isAudioMuted, setIsAudioMuted] = useState(false);
   const {
     coords,
     accuracy,
@@ -105,6 +97,48 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
     unsupported: 'Browser tidak mendukung GPS',
     'insecure-context': 'GPS memerlukan HTTPS atau localhost'
   }[gpsStatus];
+
+  const [liveSearchResults, setLiveSearchResults] = useState([]);
+  const [isSearchingGeocode, setIsSearchingGeocode] = useState(false);
+  const searchTargetRef = useRef(searchTarget);
+
+  useEffect(() => {
+    searchTargetRef.current = searchTarget;
+  }, [searchTarget]);
+
+  // Live Geocoding Search: Cari tempat bebas di manapun di Indonesia saat user mengetik
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed || trimmed.length < 2) {
+      setLiveSearchResults([]);
+      setIsSearchingGeocode(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingGeocode(true);
+      try {
+        const res = await geocodeSearch(trimmed, userCoords?.lat, userCoords?.lng);
+        setLiveSearchResults(res.data || []);
+      } catch (err) {
+        console.warn('Live geocode search failed:', err);
+        setLiveSearchResults([]);
+      } finally {
+        setIsSearchingGeocode(false);
+      }
+    }, 320);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, userCoords?.lat, userCoords?.lng]);
+
+  // State Kontrol Rute HUD
+  const [selectedRouteKey, setSelectedRouteKey] = useState('ubin'); // 'ubin' | 'ramp'
+  const [hapticEnabled, setHapticEnabled] = useState(true);
+  const [audioFeedback, setAudioFeedback] = useState('');
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [mapZoom, setMapZoom] = useState(1);
+  const [mapRotation, setMapRotation] = useState(0);
+  const [isAudioMuted, setIsAudioMuted] = useState(false);
 
   // Refs Peta Leaflet Utama
   const leafletMapRef = useRef(null);
@@ -133,9 +167,46 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
     });
 
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> Surabaya',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       maxZoom: 19
     }).addTo(map);
+
+    // Tangkap klik langsung di peta untuk memilih tujuan atau titik awal
+    map.on('click', async (e) => {
+      const lat = e.latlng.lat;
+      const lng = e.latlng.lng;
+      setAudioFeedback('Menentukan lokasi dari titik peta...');
+      try {
+        const res = await reverseGeocode(lat, lng);
+        const name = res.data?.name || `Titik Peta (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+        const address = res.data?.address || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        const loc = {
+          id: `map-${Date.now()}`,
+          name,
+          address,
+          lat,
+          lng,
+          accessibility: 'Titik Dipilih Langsung di Peta',
+          time: 'Menyesuaikan',
+          distance: 'Menyesuaikan'
+        };
+        handleSelectLocation(loc);
+        setAudioFeedback(`Lokasi dipilih: ${name}`);
+        setTimeout(() => setAudioFeedback(''), 2500);
+      } catch (err) {
+        const loc = {
+          id: `map-${Date.now()}`,
+          name: `Titik Peta (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
+          address: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+          lat,
+          lng,
+          accessibility: 'Titik Dipilih Langsung di Peta',
+          time: 'Menyesuaikan',
+          distance: 'Menyesuaikan'
+        };
+        handleSelectLocation(loc);
+      }
+    });
 
     markersLayerRef.current = L.layerGroup().addTo(map);
     leafletInstanceRef.current = map;
@@ -178,6 +249,38 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
         handleSelectLocation(dest);
       });
     });
+
+    // Pin untuk Stop 1 jika merupakan lokasi kustom / hasil pencarian / klik peta
+    if (stop1 && !SURABAYA_DESTINATIONS.some(d => d.id === stop1.id)) {
+      const stop1MarkerHtml = `
+        <div class="flex flex-col items-center -translate-x-1/2 -translate-y-full cursor-pointer hover:scale-110 transition-transform">
+          <div class="px-2.5 py-0.5 rounded-full bg-secondary text-white font-bold text-[10px] shadow-lg whitespace-nowrap mb-1">
+            ${stop1.name}
+          </div>
+          <div class="w-8 h-8 rounded-full bg-secondary text-white flex items-center justify-center shadow-md ring-2 ring-white">
+            <span class="material-symbols-outlined text-base">flag</span>
+          </div>
+        </div>
+      `;
+      const icon = L.divIcon({ className: 'custom-stop1-pin', html: stop1MarkerHtml, iconSize: [0, 0] });
+      L.marker([stop1.lat, stop1.lng], { icon }).addTo(layer);
+    }
+
+    // Pin untuk Stop 2 jika kustom
+    if (stop2 && !SURABAYA_DESTINATIONS.some(d => d.id === stop2.id)) {
+      const stop2MarkerHtml = `
+        <div class="flex flex-col items-center -translate-x-1/2 -translate-y-full cursor-pointer hover:scale-110 transition-transform">
+          <div class="px-2.5 py-0.5 rounded-full bg-amber-500 text-white font-bold text-[10px] shadow-lg whitespace-nowrap mb-1">
+            ${stop2.name}
+          </div>
+          <div class="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-md ring-2 ring-white">
+            <span class="material-symbols-outlined text-base">flag</span>
+          </div>
+        </div>
+      `;
+      const icon = L.divIcon({ className: 'custom-stop2-pin', html: stop2MarkerHtml, iconSize: [0, 0] });
+      L.marker([stop2.lat, stop2.lng], { icon }).addTo(layer);
+    }
   }, [hasSelectedDestination, stop1, stop2]);
 
   useEffect(() => {
@@ -218,13 +321,14 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
   }, [coords, customOrigin, hasSelectedDestination]);
 
   const handleSelectLocation = (dest) => {
-    if (searchTarget === 'origin') {
+    const currentTarget = searchTargetRef.current || searchTarget;
+    if (currentTarget === 'origin') {
       setCustomOrigin(dest);
       setIsEditingOrigin(false);
       setSearchQuery('');
       setIsSearchFocused(false);
       setSearchTarget('stop1');
-    } else if (searchTarget === 'stop2' || (stop1 && isAddingStop2 && !stop2)) {
+    } else if (currentTarget === 'stop2' || (stop1 && isAddingStop2 && !stop2)) {
       setStop2(dest);
       setSearchQuery('');
       setIsSearchFocused(false);
@@ -232,6 +336,10 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
       setStop1(dest);
       setSearchQuery('');
       setIsSearchFocused(false);
+    }
+
+    if (leafletInstanceRef.current && dest.lat && dest.lng) {
+      leafletInstanceRef.current.panTo([dest.lat, dest.lng]);
     }
   };
 
@@ -272,6 +380,29 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
     }
   };
 
+  // Handler untuk event rute eksternal (dari Asisten Suara AI)
+  useEffect(() => {
+    const applyDest = (destId) => {
+      const found = SURABAYA_DESTINATIONS.find(d => d.id === destId);
+      if (found) {
+        handleSelectLocation(found);
+      }
+    };
+
+    if (window.__leluasaDashboardDestination) {
+      applyDest(window.__leluasaDashboardDestination);
+      window.__leluasaDashboardDestination = null;
+    }
+
+    const handler = (e) => {
+      if (e.detail?.destId) {
+        applyDest(e.detail.destId);
+      }
+    };
+    window.addEventListener('leluasa:dashboard-route', handler);
+    return () => window.removeEventListener('leluasa:dashboard-route', handler);
+  }, []);
+
   const handleOpenPlanRoute = () => {
     if (!stop1) return;
     window.__leluasaRouteIntent = {
@@ -280,7 +411,7 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
         : coords
         ? { lat: coords.lat, lng: coords.lng, accuracy: coords.accuracy, name: 'Lokasi GPS', source: 'gps' }
         : null,
-      destination: { lat: stop1.lat, lng: stop1.lng, name: stop1.name }
+      destination: { lat: stop1.lat, lng: stop1.lng, name: stop1.name, id: stop1.id }
     };
     setActiveTab('plan-route');
   };
@@ -443,10 +574,17 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
                     <input
                       type="text"
                       autoFocus
-                      placeholder="Ketik lokasi awal di Surabaya..."
+                      placeholder="Ketik lokasi awal atau klik peta..."
                       value={searchTarget === 'origin' ? searchQuery : ''}
                       onFocus={() => { setSearchTarget('origin'); setIsSearchFocused(true); }}
                       onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (filteredDestinations.length > 0) handleSelectLocation(filteredDestinations[0]);
+                          else if (liveSearchResults.length > 0) handleSelectLocation(liveSearchResults[0]);
+                        }
+                      }}
                       className="w-full bg-transparent font-medium text-on-surface placeholder:text-outline focus:outline-none mt-0.5"
                     />
                   ) : (
@@ -488,10 +626,17 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
                   ) : (
                     <input
                       type="text"
-                      placeholder="Ketik atau klik pin di peta..."
+                      placeholder="Ketik lokasi bebas atau klik peta..."
                       value={searchTarget === 'stop1' ? searchQuery : ''}
                       onFocus={() => { setSearchTarget('stop1'); setIsSearchFocused(true); }}
                       onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (filteredDestinations.length > 0) handleSelectLocation(filteredDestinations[0]);
+                          else if (liveSearchResults.length > 0) handleSelectLocation(liveSearchResults[0]);
+                        }
+                      }}
                       className="w-full bg-transparent font-medium text-on-surface placeholder:text-outline focus:outline-none"
                     />
                   )}
@@ -519,10 +664,17 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
                     ) : (
                       <input
                         type="text"
-                        placeholder="Contoh: Sentra Kuliner Pemuda..."
+                        placeholder="Ketik lokasi atau klik peta..."
                         value={searchTarget === 'stop2' ? searchQuery : ''}
                         onFocus={() => { setSearchTarget('stop2'); setIsSearchFocused(true); }}
                         onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (filteredDestinations.length > 0) handleSelectLocation(filteredDestinations[0]);
+                            else if (liveSearchResults.length > 0) handleSelectLocation(liveSearchResults[0]);
+                          }
+                        }}
                         className="w-full bg-transparent font-medium text-on-surface placeholder:text-outline focus:outline-none"
                       />
                     )}
@@ -547,24 +699,90 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
                 </button>
               )}
 
-              {/* Hasil Pencarian Dropdown Cepat */}
+              {/* Hasil Pencarian Dropdown Cepat & Live Geocoding */}
               {isSearchFocused && searchQuery && (
-                <div className="p-2 rounded-xl bg-surface-container-lowest border border-outline-variant shadow-lg max-h-48 overflow-y-auto space-y-1">
-                  <span className="text-[10px] font-bold text-on-surface-variant uppercase px-2 block">Pilih Lokasi Surabaya:</span>
-                  {filteredDestinations.map(item => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => handleSelectLocation(item)}
-                      className="w-full p-2 text-left rounded-lg hover:bg-surface-container flex items-center justify-between text-xs cursor-pointer"
-                    >
-                      <div>
-                        <span className="font-bold text-primary block">{item.name}</span>
-                        <span className="text-[10px] text-on-surface-variant block">{item.address}</span>
-                      </div>
-                      <span className="text-[10px] font-bold text-secondary">{item.distance}</span>
-                    </button>
-                  ))}
+                <div className="p-2 rounded-xl bg-surface-container-lowest border border-outline-variant shadow-xl max-h-60 overflow-y-auto space-y-1 z-30">
+                  {/* Status Loading Geocoding */}
+                  {isSearchingGeocode && (
+                    <div className="flex items-center gap-2 p-2 text-xs text-primary font-semibold">
+                      <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                      <span>Mencari lokasi di peta se-Indonesia...</span>
+                    </div>
+                  )}
+
+                  {/* Preset Landmark Surabaya */}
+                  {filteredDestinations.length > 0 && (
+                    <>
+                      <span className="text-[10px] font-bold text-on-surface-variant uppercase px-2 block">Landmark Surabaya:</span>
+                      {filteredDestinations.map(item => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => handleSelectLocation(item)}
+                          className="w-full p-2 text-left rounded-lg hover:bg-surface-container flex items-center justify-between text-xs cursor-pointer"
+                        >
+                          <div>
+                            <span className="font-bold text-primary block">{item.name}</span>
+                            <span className="text-[10px] text-on-surface-variant block">{item.address}</span>
+                          </div>
+                          <span className="text-[10px] font-bold text-secondary">{item.distance}</span>
+                        </button>
+                      ))}
+                    </>
+                  )}
+
+                  {/* Hasil Live Geocoding (Bisa dari Probolinggo, Jakarta, dsb) */}
+                  {liveSearchResults.length > 0 && (
+                    <>
+                      <span className="text-[10px] font-bold text-secondary uppercase px-2 pt-1 block">Hasil Pencarian Se-Indonesia:</span>
+                      {liveSearchResults.map(item => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => handleSelectLocation(item)}
+                          className="w-full p-2 text-left rounded-lg hover:bg-surface-container flex items-start gap-2 text-xs cursor-pointer border-b border-outline-variant/15 last:border-0"
+                        >
+                          <span className="material-symbols-outlined text-secondary text-base mt-0.5 shrink-0">location_on</span>
+                          <div className="min-w-0 flex-1">
+                            <span className="font-bold text-on-surface block truncate">{item.name}</span>
+                            <span className="text-[10px] text-on-surface-variant block truncate">{item.address}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </>
+                  )}
+
+                  {/* Jika Tidak Menemukan atau Ingin Menggunakan Nama Pencarian Bebas */}
+                  {!isSearchingGeocode && (
+                    <div className="pt-1 border-t border-outline-variant/20 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const base = userCoords || { lat: -7.7511, lng: 113.215 };
+                          handleSelectLocation({
+                            id: `query-${Date.now()}`,
+                            name: searchQuery,
+                            address: `Area sekitar ${base.lat.toFixed(4)}, ${base.lng.toFixed(4)}`,
+                            lat: base.lat + 0.003,
+                            lng: base.lng + 0.003,
+                            accessibility: 'Titik Kustom Pencarian',
+                            time: '10 Menit',
+                            distance: '800 m'
+                          });
+                        }}
+                        className="w-full p-2 text-left rounded-lg bg-primary/5 hover:bg-primary/10 border border-primary/20 flex items-center gap-2 text-xs text-primary font-bold cursor-pointer transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-base">near_me</span>
+                        <div className="min-w-0 flex-1">
+                          <span className="block truncate">Gunakan "{searchQuery}" sebagai Tujuan</span>
+                          <span className="text-[10px] text-on-surface-variant font-normal block">Tetapkan titik rute otomatis di area sekitar</span>
+                        </div>
+                      </button>
+                      <p className="text-[10px] text-on-surface-variant text-center mt-1.5 px-2">
+                        💡 Anda juga dapat <strong>klik langsung titik mana pun di peta</strong> sebelah kanan.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -794,8 +1012,8 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
               <div className="absolute top-3 left-3 right-3 sm:top-4 sm:left-4 sm:right-4 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
                 <div className="pointer-events-auto bg-surface-container-lowest/95 backdrop-blur-md px-3.5 py-2 rounded-full border border-outline-variant shadow-md flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-secondary inline-block animate-ping"></span>
-                  <span className="text-xs font-extrabold text-on-surface">Peta Navigasi Surabaya</span>
-                  <span className="text-[10px] text-on-surface-variant">• Klik lokasi untuk memilih rute</span>
+                  <span className="text-xs font-extrabold text-on-surface">Peta Aksesibilitas Leluasa</span>
+                  <span className="text-[10px] text-on-surface-variant">• Klik titik mana pun di peta untuk memilih rute</span>
                 </div>
 
                 <div className="pointer-events-auto flex items-center gap-1.5">

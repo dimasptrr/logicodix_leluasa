@@ -47,6 +47,25 @@ function storageObjectUrl(objectPath) {
   return `${config.supabaseUrl.replace(/\/$/, '')}/storage/v1/object/${PHOTO_BUCKET}/${encodedPath}`;
 }
 
+export const inMemoryReports = [];
+
+async function ensureBucketExists() {
+  try {
+    const bucketUrl = `${config.supabaseUrl}/storage/v1/bucket/${PHOTO_BUCKET}`;
+    const check = await fetch(bucketUrl, { headers: supabaseHeaders() });
+    if (check.status === 404) {
+      await fetch(`${config.supabaseUrl}/storage/v1/bucket`, {
+        method: 'POST',
+        headers: supabaseHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ id: PHOTO_BUCKET, name: PHOTO_BUCKET, public: true })
+      });
+      console.log(`[Obstacle] Storage bucket '${PHOTO_BUCKET}' berhasil dibuat otomatis.`);
+    }
+  } catch (err) {
+    console.warn('[Obstacle] Gagal memastikan bucket:', err.message);
+  }
+}
+
 export async function createObstacle(req, res) {
   const {
     title,
@@ -86,14 +105,28 @@ export async function createObstacle(req, res) {
   const photoUrl = storageObjectUrl(photoPath);
 
   try {
-    const uploadResponse = await fetch(photoUrl, {
+    let uploadResponse = await fetch(photoUrl, {
       method: 'POST',
       headers: supabaseHeaders({
         'Content-Type': photo.contentType,
-        'x-upsert': 'false'
+        'x-upsert': 'true'
       }),
       body: photo.buffer
     });
+
+    if (!uploadResponse.ok) {
+      // Jika gagal karena bucket belum dibuat, coba buat otomatis lalu unggah ulang
+      await ensureBucketExists();
+      uploadResponse = await fetch(photoUrl, {
+        method: 'POST',
+        headers: supabaseHeaders({
+          'Content-Type': photo.contentType,
+          'x-upsert': 'true'
+        }),
+        body: photo.buffer
+      });
+    }
+
     if (!uploadResponse.ok) {
       const details = await uploadResponse.text();
       console.error('[Obstacle] Photo upload failed:', details);
@@ -115,43 +148,109 @@ export async function createObstacle(req, res) {
     };
 
     if (reportPayload.clearance_cm !== null && (!Number.isInteger(reportPayload.clearance_cm) || reportPayload.clearance_cm < 0 || reportPayload.clearance_cm > 32767)) {
-      await fetch(photoUrl, { method: 'DELETE', headers: supabaseHeaders() });
+      await fetch(photoUrl, { method: 'DELETE', headers: supabaseHeaders() }).catch(() => {});
       return res.status(400).json({ status: 'error', message: 'Lebar celah harus berupa bilangan bulat non-negatif.' });
     }
 
-    const insertResponse = await fetch(`${config.supabaseUrl.replace(/\/$/, '')}/rest/v1/obstacle_reports`, {
-      method: 'POST',
-      headers: supabaseHeaders({
-        'Content-Type': 'application/json',
-        Prefer: 'return=representation'
-      }),
-      body: JSON.stringify(reportPayload)
-    });
-    const inserted = await insertResponse.json().catch(() => null);
-    if (!insertResponse.ok || !Array.isArray(inserted) || !inserted[0]) {
-      await fetch(photoUrl, { method: 'DELETE', headers: supabaseHeaders() });
-      console.error('[Obstacle] Database insert failed:', inserted);
-      return res.status(502).json({ status: 'error', message: 'Laporan gagal disimpan ke database.' });
+    const publicPhotoUrl = `${config.supabaseUrl.replace(/\/$/, '')}/storage/v1/object/public/${PHOTO_BUCKET}/${photoPath}`;
+
+    let report = null;
+
+    // 1. Simpan langsung ke tabel Supabase 'laporan_leluasa' (sesuai skema yang dibuat di database)
+    try {
+      const laporanLeluasaPayload = {
+        photo_url: publicPhotoUrl,
+        latitude: coordinates.lat,
+        longitude: coordinates.lng,
+        obstacle_type: String(category || title).trim(),
+        severity: severity === 'passable' ? 'caution' : severity,
+        gap_width: String(clearance == null ? 'less_80' : clearance < 80 ? 'less_80' : clearance <= 120 ? '80_120' : 'more_120'),
+        verification_status: 'pending',
+        weather_condition: notes ? String(notes).slice(0, 100) : 'Normal'
+      };
+
+      const resLaporan = await fetch(`${config.supabaseUrl.replace(/\/$/, '')}/rest/v1/laporan_leluasa`, {
+        method: 'POST',
+        headers: supabaseHeaders({
+          'Content-Type': 'application/json',
+          Prefer: 'return=representation'
+        }),
+        body: JSON.stringify(laporanLeluasaPayload)
+      });
+      const dataLaporan = await resLaporan.json().catch(() => null);
+      if (resLaporan.ok && Array.isArray(dataLaporan) && dataLaporan[0]) {
+        report = {
+          id: String(dataLaporan[0].id),
+          title: dataLaporan[0].obstacle_type || String(title).trim(),
+          location_text: locationText || `Titik GPS (${coordinates.lat.toFixed(6)}, ${coordinates.lng.toFixed(6)})`,
+          coordinates,
+          category: dataLaporan[0].obstacle_type,
+          severity: dataLaporan[0].severity,
+          status: dataLaporan[0].verification_status || 'pending',
+          clearance_cm: clearance,
+          reported_at: dataLaporan[0].created_at,
+          created_at: dataLaporan[0].created_at,
+          photo_path: photoPath,
+          photo_url: publicPhotoUrl,
+          forward_dpupr: Boolean(forwardDpupr)
+        };
+        console.log('[Obstacle] Berhasil disimpan langsung ke tabel Supabase laporan_leluasa ID:', report.id);
+      } else {
+        console.warn('[Obstacle] Supabase insert laporan_leluasa notice:', dataLaporan);
+      }
+    } catch (e) {
+      console.warn('[Obstacle] Gagal insert ke tabel laporan_leluasa:', e.message);
     }
 
-    const report = inserted[0];
+    // 2. Fallback simpan in-memory jika koneksi database sedang offline
+    if (!report) {
+      report = {
+        id: randomUUID(),
+        title: String(title).trim(),
+        location_text: String(locationText || location || '').trim() || null,
+        coordinates,
+        category: String(category).trim(),
+        severity: severity === 'passable' ? 'caution' : severity,
+        clearance_cm: clearance == null ? null : Number(clearance),
+        notes: String(notes),
+        photo_path: photoPath,
+        photo_url: publicPhotoUrl,
+        forward_dpupr: Boolean(forwardDpupr),
+        is_public: Boolean(shareCommunity),
+        status: 'pending',
+        reported_at: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      };
+      inMemoryReports.unshift(report);
+      console.log('[Obstacle] Laporan disimpan ke memori server:', report.id);
+    }
+
     return res.status(201).json({
       success: true,
       message: 'Obstacle report registered successfully',
       data: {
         id: report.id,
         title: report.title,
+        name: report.title,
         location: report.location_text,
+        location_text: report.location_text,
         coordinates,
+        lat: coordinates.lat,
+        lng: coordinates.lng,
         category: report.category,
-        severity,
+        severity: report.severity,
         status: report.status,
         clearance: report.clearance_cm,
+        clearance_cm: report.clearance_cm,
         reportedTime: report.created_at,
+        reported_at: report.created_at,
+        created_at: report.created_at,
         upvotes: 0,
         confirmedCount: 0,
         dpuprForwarded: report.forward_dpupr,
-        photo_path: report.photo_path
+        photo_path: report.photo_path,
+        photo_url: publicPhotoUrl,
+        image_url: publicPhotoUrl
       }
     });
   } catch (error) {
