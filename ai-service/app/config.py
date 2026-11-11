@@ -21,7 +21,16 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 
 # Default weights location
 DEFAULT_YOLO_PATH = str(BASE_DIR / "app" / "models" / "weights" / "yolov8n.pt")
-YOLO_MODEL_PATH = os.getenv("YOLO_MODEL_PATH", DEFAULT_YOLO_PATH)
+raw_yolo_path = os.getenv("YOLO_MODEL_PATH")
+if raw_yolo_path:
+    if os.path.exists(raw_yolo_path):
+        YOLO_MODEL_PATH = raw_yolo_path
+    elif (BASE_DIR / raw_yolo_path).exists():
+        YOLO_MODEL_PATH = str(BASE_DIR / raw_yolo_path)
+    else:
+        YOLO_MODEL_PATH = raw_yolo_path
+else:
+    YOLO_MODEL_PATH = DEFAULT_YOLO_PATH
 CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", 0.30))
 IOU_THRESHOLD = float(os.getenv("IOU_THRESHOLD", 0.45))
 

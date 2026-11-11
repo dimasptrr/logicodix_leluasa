@@ -10,7 +10,12 @@ from typing import List, Dict, Any, Tuple
 from PIL import Image
 import numpy as np
 
-from ultralytics import YOLO
+try:
+    from ultralytics import YOLO
+    ULTRALYTICS_AVAILABLE = True
+except ImportError:
+    YOLO = None
+    ULTRALYTICS_AVAILABLE = False
 from app.config import YOLO_MODEL_PATH, CONFIDENCE_THRESHOLD, IOU_THRESHOLD
 from app.schemas.vision import BoundingBox, DetectedObstacle
 
@@ -37,6 +42,10 @@ class YOLODetectorService:
         self._load_model()
 
     def _load_model(self):
+        if not ULTRALYTICS_AVAILABLE:
+            print("[YOLODetector] Info: Paket 'ultralytics' belum terpasang. Mode fallback aktif.")
+            self.model = None
+            return
         try:
             if os.path.exists(self.model_path):
                 self.model = YOLO(self.model_path)
