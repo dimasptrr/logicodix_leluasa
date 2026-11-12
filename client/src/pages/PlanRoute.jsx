@@ -120,7 +120,7 @@ function formatStepManeuver(st, idx, arr, destName) {
 
 export default function PlanRoute({ setActiveTab }) {
   const [routeData, setRouteData] = useState(null);
-  const [selectedDest, setSelectedDest] = useState('balai-pemuda'); // 'balai-pemuda' | 'rsud-soetomo' | 'detour-bollard'
+  const [selectedDest, setSelectedDest] = useState(null);
   const [selectedProfile, setSelectedProfile] = useState('electric');
   const [activeRouteKey, setActiveRouteKey] = useState('routeB'); // 'routeB' (Rekomendasi AI) | 'routeA' (Alternatif)
   const [activeFilters, setActiveFilters] = useState({
@@ -136,7 +136,7 @@ export default function PlanRoute({ setActiveTab }) {
   const [isSpeakingNav, setIsSpeakingNav] = useState(false);
   const [hapticActive, setHapticActive] = useState(true);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
-  const [isLoadingRoute, setIsLoadingRoute] = useState(true);
+  const [isLoadingRoute, setIsLoadingRoute] = useState(false);
   const [routeError, setRouteError] = useState(null);
   const [routeIntent, setRouteIntent] = useState(null);
   const [routeIntentReady, setRouteIntentReady] = useState(false);
@@ -157,7 +157,7 @@ export default function PlanRoute({ setActiveTab }) {
   const shouldAutoPlayVoiceRef = useRef(false);
   const hasAutoPlayedVoiceRef = useRef(false);
 
-  // Periksa apakah ada target rute yang dikirim dari Asisten Suara atau Peta Pengalihan Bollard
+  // Periksa apakah ada target rute yang dikirim dari Asisten Suara atau Dashboard
   useEffect(() => {
     if (window.__leluasaRouteIntent) {
       const intent = window.__leluasaRouteIntent;
@@ -171,14 +171,10 @@ export default function PlanRoute({ setActiveTab }) {
       }
       const destName = (intent.destination?.name || '').toLowerCase();
       const destId = (intent.destination?.id || '').toLowerCase();
-      if (destName.includes('soetomo') || destName.includes('rsud') || destId === 'rsud-soetomo') {
-        setSelectedDest('rsud-soetomo');
-      } else if (destName.includes('bollard') || destId === 'detour-bollard') {
-        setSelectedDest('detour-bollard');
-      } else if (destName.includes('pemuda') || destId === 'balai-pemuda' || destId === 'halte-pemuda') {
-        setSelectedDest('balai-pemuda');
+      if (destName.includes('grand city') || destId === 'balaikota-grandcity') {
+        setSelectedDest('balaikota-grandcity');
       } else {
-        setSelectedDest('custom');
+        setSelectedDest(intent.destination?.id || 'custom');
       }
       window.__leluasaRouteIntent = null;
     }
@@ -200,76 +196,33 @@ export default function PlanRoute({ setActiveTab }) {
 
   // Data Rute Surabaya 100% Riil
   const destinations = {
-    'balai-pemuda': {
-      title: 'Tujuan: Halte Integrasi Balai Pemuda Surabaya',
-      subtitle: 'Jl. Pemuda No. 45 ke Halte Trans Semanggi',
-      origin: 'Jl. Pemuda No. 45, Surabaya',
-      destination: 'Halte Integrasi Balai Pemuda',
-      baseMinutes: 8,
-      routeBDuration: '8 mnt',
-      routeBDistance: '420m',
-      routeBDescription: 'Jalur ubin pemandu kontinu kuning bertekstur, elevasi 0°, rampa 1:12',
-      routeADuration: '11 mnt',
-      routeADistance: '590m',
-      routeADescription: 'Jalur trotoar lebar jalan utama, rampa standar',
-      turnInstruction: 'Belok Kanan 45 meter lagi ke Halte Integrasi Balai Pemuda',
-      startCoord: [-7.2642, 112.7449],
-      endCoord: [-7.2655, 112.7515],
-      steps: [
-        { instruction: 'Mulai dari Jl. Pemuda 45, gunakan rampa barat elevasi 0°', detail: 'Trotoar mulus selebar 2.4m, ubin pemandu utuh', distance: '45 m', icon: 'turn_right' },
-        { instruction: 'Lurus mengikuti ubin kuning bertekstur garis', detail: 'Bebas halangan pohon rendah dan bebas parkir liar', distance: '180 m', icon: 'straight' },
-        { instruction: 'Menyeberang di Pelican Crossing Balai Pemuda', detail: 'Audio chirp bunyi pemandu aktif, rampa landai sisi seberang', distance: '35 m', icon: 'volume_up' },
-        { instruction: 'Tiba di Halte Integrasi Balai Pemuda', detail: 'Elevator aksesibel dan pintu rampa halte siap', distance: '160 m', icon: 'check_circle' }
-      ]
-    },
-    'rsud-soetomo': {
-      title: 'Tujuan: RSUD Dr. Soetomo Surabaya',
-      subtitle: 'Balai Kota Surabaya ke Gedung Rawat Jalan RSUD Soetomo',
-      origin: 'Balai Kota Surabaya, Jl. Walikota Mustajab',
-      destination: 'RSUD Dr. Soetomo (Jl. Mayjen Prof. Dr. Moestopo)',
-      baseMinutes: 20,
-      routeBDuration: '20 mnt',
-      routeBDistance: '1,6 km',
-      routeBDescription: 'Rampa landai kontinu 4.5° via Jl. Kusuma Bangsa dengan pelintasan berbunyi',
+    'balaikota-grandcity': {
+      title: 'Tujuan: Grand City Surabaya',
+      subtitle: 'Balai Kota Surabaya ke Grand City Surabaya',
+      origin: 'Balai Kota Surabaya, Jl. Taman Surya',
+      destination: 'Grand City Surabaya',
+      baseMinutes: 22,
+      routeBDuration: '22 mnt',
+      routeBDistance: '1.68 km',
+      routeBDescription: 'Jalur guiding block dan rampa halus, 100% ramah disabilitas',
       routeADuration: '18 mnt',
-      routeADistance: '1,4 km',
-      routeADescription: 'Jalur terpendek (tanpa kanopi peneduh, rampa agak curam)',
-      turnInstruction: 'Lurus ke arah timur Jl. Walikota Mustajab lalu Jl. Kusuma Bangsa menuju RSUD Soetomo',
+      routeADistance: '1.45 km',
+      routeADescription: 'Jalur pejalan kaki standar umum',
+      turnInstruction: 'Lurus ke arah timur menuju Grand City Surabaya',
       startCoord: [-7.2628, 112.7530],
-      endCoord: [-7.2678, 112.7582],
+      endCoord: [-7.2726, 112.7527],
       steps: [
-        { instruction: 'Mulai dari Balai Kota Surabaya arah Jl. Walikota Mustajab', detail: 'Gunakan ubin pemandu di trotoar sisi selatan', distance: '120 m', icon: 'turn_right' },
-        { instruction: 'Lurus menyusuri koridor Jl. Kusuma Bangsa', detail: 'Trotoar berkanopi peneduh, lebar bersih 2.2m', distance: '650 m', icon: 'straight' },
-        { instruction: 'Lewati rampa akses penyeberangan Stasiun Gubeng', detail: 'Kelandaian aman 4.5°, pegangan tangan ganda', distance: '380 m', icon: 'ramp_right' },
-        { instruction: 'Tiba di Lobi Rawat Jalan RSUD Dr. Soetomo', detail: 'Pintu otomatis lebar 1.8m ramah kursi roda', distance: '450 m', icon: 'check_circle' }
-      ]
-    },
-    'detour-bollard': {
-      title: 'Rute Pengalihan: Bypass Bollard Sempit',
-      subtitle: 'Pengalihan Halangan Bollard Jl. Pemuda ke Balai Kota',
-      origin: 'Jl. Pemuda No. 34 (Titik Bollard Terblokir)',
-      destination: 'Balai Kota Surabaya via Rampa Halus Sisi Kanan',
-      baseMinutes: 6,
-      routeBDuration: '6 mnt',
-      routeBDistance: '380m',
-      routeBDescription: 'Pengalihan via rampa halus drop-off (+30m, lebar celah 120cm aman kursi roda)',
-      routeADuration: '5 mnt',
-      routeADistance: '350m',
-      routeADescription: 'Jalur lurus (TERBLOKIR: celah bollard <55cm tidak muat kursi roda)',
-      turnInstruction: 'Ambil rampa halus sisi kanan untuk menghindari bollard sempit',
-      startCoord: [-7.2650, 112.7463],
-      endCoord: [-7.2628, 112.7530],
-      steps: [
-        { instruction: 'Belok kanan 15m sebelum titik bollard sempit', detail: 'Masuk jalur ramp halus gedung perkantoran', distance: '30 m', icon: 'turn_right' },
-        { instruction: 'Lalui rampa landai kemiringan 4.5° dengan pegangan', detail: 'Lebar bersih 1.5m bebas pembatas tiang sempit', distance: '120 m', icon: 'straight' },
-        { instruction: 'Kembali ke trotoar utama Jl. Pemuda sisi utara', detail: 'Ubin pemandu kuning kembali terhubung mulus', distance: '90 m', icon: 'alt_route' },
-        { instruction: 'Lanjut menuju Balai Kota Surabaya', detail: 'Area pejalan kaki ramah disabilitas', distance: '140 m', icon: 'check_circle' }
+        { instruction: 'Mulai dari Balai Kota Surabaya arah Jl. Taman Surya', detail: 'Gunakan ubin pemandu di trotoar sisi selatan', distance: '150 m', icon: 'straight' },
+        { instruction: 'Lurus menyusuri Jl. Yos Sudarso menuju selatan', detail: 'Trotoar lebar 2.4m dengan ubin kuning bertekstur', distance: '460 m', icon: 'straight' },
+        { instruction: 'Belok kiri ke Jl. Kusuma Bangsa', detail: 'Rampa landai tersedia di tikungan', distance: '380 m', icon: 'turn_left' },
+        { instruction: 'Tiba di Grand City Surabaya', detail: 'Pintu masuk aksesibel tersedia di sisi barat', distance: '690 m', icon: 'check_circle' }
       ]
     }
   };
 
-  const isCustomDest = selectedDest === 'custom' || Boolean(routeIntent?.destination && !['balai-pemuda', 'rsud-soetomo', 'detour-bollard'].includes(selectedDest));
-  const presetDestInfo = destinations[selectedDest] || destinations['balai-pemuda'];
+  const hasDestination = Boolean(selectedDest || routeIntent?.destination);
+  const isCustomDest = selectedDest === 'custom' || Boolean(routeIntent?.destination && !['balaikota-grandcity'].includes(selectedDest));
+  const presetDestInfo = (selectedDest && destinations[selectedDest]) ? destinations[selectedDest] : (destinations['balaikota-grandcity'] || {});
 
   const activeOrigin = isCustomDest
     ? (manualOrigin || routeIntent?.origin || (coords ? {
@@ -279,15 +232,15 @@ export default function PlanRoute({ setActiveTab }) {
         name: 'Lokasi GPS',
         source: 'gps'
       } : {
-        lat: presetDestInfo.startCoord[0],
-        lng: presetDestInfo.startCoord[1],
-        name: presetDestInfo.origin,
+        lat: presetDestInfo.startCoord ? presetDestInfo.startCoord[0] : -7.2628,
+        lng: presetDestInfo.startCoord ? presetDestInfo.startCoord[1] : 112.7530,
+        name: presetDestInfo.origin || 'Balai Kota Surabaya',
         source: 'preset'
       }))
     : {
-        lat: presetDestInfo.startCoord[0],
-        lng: presetDestInfo.startCoord[1],
-        name: presetDestInfo.origin,
+        lat: presetDestInfo.startCoord ? presetDestInfo.startCoord[0] : -7.2628,
+        lng: presetDestInfo.startCoord ? presetDestInfo.startCoord[1] : 112.7530,
+        name: presetDestInfo.origin || 'Balai Kota Surabaya',
         source: 'preset'
       };
 
@@ -320,11 +273,11 @@ export default function PlanRoute({ setActiveTab }) {
     lat: routeIntent.destination.lat,
     lng: routeIntent.destination.lng,
     name: routeIntent.destination.name
-  } : {
-    lat: destInfo.endCoord[0],
-    lng: destInfo.endCoord[1],
-    name: destInfo.destination
-  };
+  } : (presetDestInfo.endCoord ? {
+    lat: presetDestInfo.endCoord[0],
+    lng: presetDestInfo.endCoord[1],
+    name: presetDestInfo.destination
+  } : null);
 
   const effectiveSteps = (routeData?.[activeRouteKey]?.steps?.length > 0)
     ? routeData[activeRouteKey].steps.map((st, idx, arr) => {
@@ -361,7 +314,11 @@ export default function PlanRoute({ setActiveTab }) {
     Number.isFinite(Number(point.lng)) && Number(point.lng) >= -180 && Number(point.lng) <= 180;
 
   const loadRoute = async () => {
-    if (!routeIntentReady) return;
+    if (!hasDestination || !routeIntentReady) {
+      setRouteData(null);
+      setIsLoadingRoute(false);
+      return;
+    }
     if (!hasValidPoint(activeOrigin) || !hasValidPoint(activeDestination)) {
       setRouteData(null);
       setIsLoadingRoute(false);
@@ -392,7 +349,7 @@ export default function PlanRoute({ setActiveTab }) {
 
   useEffect(() => {
     loadRoute();
-  }, [selectedProfile, selectedDest, activeOrigin?.lat, activeOrigin?.lng, activeDestination.lat, activeDestination.lng, routeIntentReady]);
+  }, [selectedProfile, selectedDest, activeOrigin?.lat, activeOrigin?.lng, activeDestination?.lat, activeDestination?.lng, routeIntentReady, hasDestination]);
 
   // Auto-play panduan suara turn-by-turn navigasi saat dipicu oleh Asisten AI (Ramah Tuna Netra)
   useEffect(() => {
@@ -431,6 +388,7 @@ export default function PlanRoute({ setActiveTab }) {
 
   // Inisialisasi Peta Leaflet
   useEffect(() => {
+    if (!hasDestination) return;
     if (!mapContainerRef.current) return;
     if (mapInstanceRef.current) return;
 
@@ -489,7 +447,7 @@ export default function PlanRoute({ setActiveTab }) {
     if (!coordsB?.length && activeOrigin && activeDestination) {
       coordsB = [
         [activeOrigin.lat, activeOrigin.lng],
-        selectedDest === 'rsud-soetomo' ? [-7.2655, 112.7515] : [-7.2648, 112.7480],
+        [-7.2677, 112.7528],
         [activeDestination.lat, activeDestination.lng]
       ];
     }
@@ -826,6 +784,41 @@ export default function PlanRoute({ setActiveTab }) {
   };
 
   // =========================================================================
+  // VIEW 0: USER BELUM MENENTUKAN RUTE (Minimalis & Estetis)
+  // =========================================================================
+  if (!hasDestination) {
+    return (
+      <div className="min-h-[calc(100vh-5rem)] w-full flex items-center justify-center p-4 sm:p-6 animate-fadeIn">
+        <div className="w-full max-w-md bg-surface-container-lowest rounded-3xl p-8 sm:p-10 border border-outline-variant/30 shadow-lg flex flex-col items-center text-center gap-6">
+          <div className="w-20 h-20 rounded-full bg-primary/10 text-primary flex items-center justify-center shadow-inner">
+            <span className="material-symbols-outlined text-4xl" style={{ fontVariationSettings: "'FILL' 1" }}>
+              navigation
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-on-surface tracking-tight">
+              User Belum Menentukan Rute
+            </h1>
+            <p className="text-sm text-on-surface-variant font-medium leading-relaxed">
+              Halaman ini belum dapat diakses karena Anda belum memilih rute perjalanan. Silakan tentukan rute dan destinasi Anda di Dashboard terlebih dahulu.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('home')}
+            className="w-full min-h-[48px] py-3.5 px-6 rounded-full bg-primary text-on-primary font-bold text-sm sm:text-base shadow-md hover:bg-primary-container active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2"
+          >
+            <span className="material-symbols-outlined text-xl">explore</span>
+            <span>Tentukan Rute di Dashboard</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // =========================================================================
   // VIEW A: NAVIGASI RUTE AKTIF INTERAKTIF (Langkah demi Langkah)
   // =========================================================================
   if (isNavigating) {
@@ -968,7 +961,7 @@ export default function PlanRoute({ setActiveTab }) {
                   : 'bg-primary text-on-primary hover:bg-primary-container active:scale-95'
               }`}
             >
-              <span>{navStepIndex >= effectiveSteps.length - 1 ? '🎉 Tiba di Tujuan' : 'Langkah Selanjutnya'}</span>
+              <span>{navStepIndex >= effectiveSteps.length - 1 ? 'Tiba di Tujuan' : 'Langkah Selanjutnya'}</span>
               <span className="material-symbols-outlined text-base">
                 {navStepIndex >= effectiveSteps.length - 1 ? 'check' : 'arrow_forward'}
               </span>
@@ -1026,50 +1019,21 @@ export default function PlanRoute({ setActiveTab }) {
           <p className="text-xs text-on-surface-variant font-medium mt-0.5">{destInfo.subtitle}</p>
         </div>
 
-        {/* Destination Selector Pill Switcher (3 Pilihan Rute Surabaya Riil) */}
+        {/* Destination Selector Pill Switcher */}
         <div className="flex items-center gap-1.5 flex-wrap">
           <div className="flex items-center bg-surface-container p-1 rounded-full border border-outline-variant/30 text-xs font-bold shadow-xs">
             <button
               type="button"
               onClick={() => {
-                setSelectedDest('balai-pemuda');
+                setSelectedDest('balaikota-grandcity');
                 setRouteIntent(null);
                 setNavStepIndex(0);
               }}
               className={`px-3 py-1.5 rounded-full transition-all flex items-center gap-1 cursor-pointer ${
-                selectedDest === 'balai-pemuda' ? 'bg-primary text-white shadow-xs' : 'text-on-surface-variant hover:text-on-surface'
+                selectedDest === 'balaikota-grandcity' ? 'bg-primary text-white shadow-xs' : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
-              <span>Halte Balai Pemuda</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedDest('rsud-soetomo');
-                setRouteIntent(null);
-                setNavStepIndex(0);
-              }}
-              className={`px-3 py-1.5 rounded-full transition-all flex items-center gap-1 cursor-pointer ${
-                selectedDest === 'rsud-soetomo' ? 'bg-primary text-white shadow-xs' : 'text-on-surface-variant hover:text-on-surface'
-              }`}
-            >
-              <span>RSUD Dr. Soetomo</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedDest('detour-bollard');
-                setRouteIntent(null);
-                setNavStepIndex(0);
-              }}
-              className={`px-3 py-1.5 rounded-full transition-all flex items-center gap-1 cursor-pointer ${
-                selectedDest === 'detour-bollard' ? 'bg-secondary text-white shadow-xs' : 'text-on-surface-variant hover:text-on-surface'
-              }`}
-            >
-              <span className="material-symbols-outlined text-xs">alt_route</span>
-              <span>Bypass Bollard</span>
+              <span>Balai Kota ke Grand City</span>
             </button>
 
             {routeIntent?.destination && (
@@ -1085,7 +1049,7 @@ export default function PlanRoute({ setActiveTab }) {
                 title={routeIntent.destination.name}
               >
                 <span className="material-symbols-outlined text-xs">my_location</span>
-                <span className="truncate max-w-[120px]">📍 {routeIntent.destination.name}</span>
+                <span className="truncate max-w-[120px]">{routeIntent.destination.name}</span>
               </button>
             )}
           </div>

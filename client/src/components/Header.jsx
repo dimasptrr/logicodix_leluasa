@@ -83,7 +83,7 @@ export default function Header({
         type="button"
         onClick={handleLogoClick}
         aria-label="Kembali ke beranda Leluasa"
-        className="flex items-center gap-2.5 shrink-0 group focus:outline focus:outline-[3px] focus:outline-primary focus:outline-offset-2 rounded-lg"
+        className="flex items-center gap-2.5 shrink-0 group rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 transition-all duration-200"
       >
         <img
           src="/logo.png"
@@ -120,10 +120,10 @@ export default function Header({
               key={link.id}
               type="button"
               onClick={() => navigate(link.id)}
-              className={`h-full px-4 text-sm font-semibold transition-colors whitespace-nowrap focus:outline focus:outline-[3px] focus:outline-primary focus-visible:outline-offset-[-3px] border-b-2 cursor-pointer ${
+              className={`h-full px-4 text-sm font-semibold transition-all duration-200 whitespace-nowrap outline-none relative border-b-2 cursor-pointer ${
                 isActive
                   ? 'text-primary border-primary font-bold'
-                  : 'text-on-surface-variant border-transparent hover:text-on-surface'
+                  : 'text-on-surface-variant border-transparent hover:text-on-surface hover:border-primary/30'
               }`}
               aria-current={isActive ? 'page' : undefined}
             >
@@ -142,7 +142,7 @@ export default function Header({
           <button
             aria-label={isHighContrast ? 'Nonaktifkan Mode Kontras Tinggi' : 'Aktifkan Mode Kontras Tinggi'}
             onClick={handleToggleHighContrast}
-            className={`min-h-[40px] min-w-[40px] flex items-center justify-center rounded-full transition-all active:scale-95 focus:outline focus:outline-[3px] focus:outline-primary ${
+            className={`min-h-[40px] min-w-[40px] flex items-center justify-center rounded-full transition-all duration-200 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
               isHighContrast ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container'
             }`}
             type="button"
@@ -158,7 +158,7 @@ export default function Header({
               setUnreadCount(0);
               if (onOpenNotifications) onOpenNotifications();
             }}
-            className="relative min-h-[40px] min-w-[40px] flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-all active:scale-95 focus:outline focus:outline-[3px] focus:outline-primary"
+            className="relative min-h-[40px] min-w-[40px] flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-all duration-200 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
             type="button"
             title="Pemberitahuan Sistem"
           >
@@ -180,7 +180,7 @@ export default function Header({
           type="button"
           onClick={() => navigate('report-obstacle')}
           aria-label="Buka formulir lapor hambatan baru"
-          className="flex items-center gap-1.5 min-h-[40px] px-4 rounded-full bg-primary text-on-primary font-bold text-sm shadow-sm hover:opacity-90 active:scale-95 transition-all focus:outline focus:outline-[3px] focus:outline-primary focus:outline-offset-2 whitespace-nowrap cursor-pointer"
+          className="flex items-center gap-1.5 min-h-[40px] px-4 rounded-full bg-primary text-on-primary font-bold text-sm shadow-sm hover:opacity-90 active:scale-95 transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 whitespace-nowrap cursor-pointer"
         >
           <span className="material-symbols-outlined text-[18px]" aria-hidden="true">notification_important</span>
           <span className="hidden sm:inline text-xs font-bold">Lapor Hambatan</span>
@@ -192,7 +192,7 @@ export default function Header({
           onClick={() => navigate('reports-impact')}
           aria-label="Buka profil kontributor dan riwayat laporan"
           title="Profil Dian Kartika - Riwayat & Kontribusi"
-          className="hidden lg:flex w-9 h-9 rounded-full bg-secondary-container border-2 border-secondary/30 items-center justify-center cursor-pointer hover:scale-105 active:scale-95 transition-all overflow-hidden focus:outline focus:outline-[3px] focus:outline-primary"
+          className="hidden lg:flex w-9 h-9 rounded-full bg-secondary-container border-2 border-secondary/30 items-center justify-center cursor-pointer hover:scale-105 active:scale-95 transition-all duration-200 overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
         >
           <img
             src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80"
@@ -205,7 +205,7 @@ export default function Header({
         <button
           onClick={onOpenMobileMenu}
           aria-label="Buka menu navigasi"
-          className="lg:hidden min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-colors focus:outline focus:outline-[3px] focus:outline-primary"
+          className="lg:hidden min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           type="button"
         >
           <span className="material-symbols-outlined text-[26px]" aria-hidden="true">menu</span>

@@ -2,6 +2,40 @@ import React, { useState, useEffect, useRef } from 'react';
 import useGeolocation from '../features/dashboard/hooks/useGeolocation.js';
 import { geocodeSearch } from '../features/dashboard/services/safeApi.js';
 
+// Ikon LUMI: orb bercahaya dengan bintang di tengah
+function LumiIcon({ size = 24, className = '' }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 48 48"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id="lumiGrad" x1="6" y1="4" x2="42" y2="44" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#4F7BFF" />
+          <stop offset="100%" stopColor="#10B981" />
+        </linearGradient>
+      </defs>
+      <circle cx="24" cy="24" r="22" fill="url(#lumiGrad)" />
+      <circle cx="24" cy="24" r="22" fill="none" stroke="#ffffff" strokeOpacity="0.35" strokeWidth="1.5" />
+      {/* Bintang utama */}
+      <path
+        d="M24 9 L27.2 20.8 L39 24 L27.2 27.2 L24 39 L20.8 27.2 L9 24 L20.8 20.8 Z"
+        fill="#ffffff"
+      />
+      {/* Bintang kecil */}
+      <path
+        d="M36 8 L37.1 11.9 L41 13 L37.1 14.1 L36 18 L34.9 14.1 L31 13 L34.9 11.9 Z"
+        fill="#FFE083"
+      />
+    </svg>
+  );
+}
+
 // Ekstraksi tujuan rute dari kalimat percakapan bahasa Indonesia
 function extractDestinationQuery(rawText) {
   if (!rawText) return null;
@@ -46,6 +80,7 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
   const [speakingIndex, setSpeakingIndex] = useState(null);
   const [micError, setMicError] = useState('');
   const [isSearchingRoute, setIsSearchingRoute] = useState(false);
+  const [micSupported, setMicSupported] = useState(true);
   const messagesEndRef = useRef(null);
 
   // Mode Navigasi: 'voice' (Tunjukkan Rute & Putar Suara / Ramah Tuna Netra) vs 'silent' (Hanya Tunjukkan Rute)
@@ -66,11 +101,11 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
     }
   };
 
-  // Riwayat percakapan Chatbot Asisten AI
+  // Riwayat percakapan Chatbot LUMI
   const [messages, setMessages] = useState([
     {
       sender: 'ai',
-      text: 'Halo! Saya Asisten AI Leluasa. Anda bisa bertanya lewat suara atau teks tentang rute trotoar ramah disabilitas, ubin pemandu (guiding block), rampa kursi roda, atau kondisi cuaca di Surabaya.',
+      text: 'Halo! Saya LUMI, asisten AI Leluasa. Anda bisa bertanya lewat suara atau teks tentang rute trotoar ramah disabilitas, ubin pemandu (guiding block), rampa kursi roda, atau kondisi cuaca di Surabaya.',
       card: null
     },
     {
@@ -93,40 +128,125 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
   ]);
 
   const recognitionRef = useRef(null);
+  const isListeningRef = useRef(false);
+  // Ref ke handler terbaru agar callback mic tidak memakai state lama (stale closure)
+  const handleSendMessageRef = useRef(null);
+  const micErrorTimerRef = useRef(null);
+
+  const showMicError = (msg, duration = 5000) => {
+    setMicError(msg);
+    if (micErrorTimerRef.current) clearTimeout(micErrorTimerRef.current);
+    if (duration) {
+      micErrorTimerRef.current = setTimeout(() => setMicError(''), duration);
+    }
+  };
+
+  const setListening = (val) => {
+    isListeningRef.current = val;
+    setIsListening(val);
+  };
 
   // Inisialisasi Speech Recognition (Web Speech API)
   useEffect(() => {
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRec) {
-      const rec = new SpeechRec();
-      rec.continuous = false;
-      rec.interimResults = false;
-      rec.lang = 'id-ID';
-
-      rec.onresult = (event) => {
-        const text = event.results[0][0].transcript;
-        setIsListening(false);
-        handleSendMessage(text);
-      };
-
-      rec.onerror = (event) => {
-        console.warn('Speech recognition error:', event.error);
-        setIsListening(false);
-        if (event.error === 'not-allowed') {
-          setMicError('Izin mikrofon belum diberikan. Silakan aktifkan di pengaturan browser Anda.');
-        } else {
-          setMicError('Suara tidak terdengar jelas. Silakan coba tekan mikrofon lagi.');
-        }
-        setTimeout(() => setMicError(''), 4500);
-      };
-
-      rec.onend = () => {
-        setIsListening(false);
-      };
-
-      recognitionRef.current = rec;
+    if (!SpeechRec) {
+      setMicSupported(false);
+      return;
     }
+
+    const rec = new SpeechRec();
+    rec.continuous = false;
+    rec.interimResults = true; // tampilkan teks live saat user bicara
+    rec.lang = 'id-ID';
+    rec.maxAlternatives = 1;
+
+    let finalTranscript = '';
+
+    rec.onstart = () => {
+      finalTranscript = '';
+      setListening(true);
+    };
+
+    rec.onresult = (event) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const t = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += t;
+        } else {
+          interim += t;
+        }
+      }
+      // Tampilkan teks sementara di kolom input
+      setInputText((finalTranscript + interim).trim());
+    };
+
+    rec.onerror = (event) => {
+      console.warn('Speech recognition error:', event.error);
+      setListening(false);
+      switch (event.error) {
+        case 'not-allowed':
+        case 'service-not-allowed':
+          showMicError('Izin mikrofon ditolak. Klik ikon gembok di address bar, izinkan Mikrofon, lalu coba lagi.', 7000);
+          break;
+        case 'audio-capture':
+          showMicError('Mikrofon tidak ditemukan. Pastikan perangkat mikrofon terpasang dan tidak dipakai aplikasi lain.', 7000);
+          break;
+        case 'no-speech':
+          showMicError('Suara tidak terdengar. Coba bicara lebih dekat ke mikrofon.');
+          break;
+        case 'network':
+          showMicError('Pengenalan suara butuh koneksi internet. Periksa koneksi Anda.');
+          break;
+        case 'aborted':
+          break; // dihentikan manual, bukan error
+        default:
+          showMicError('Suara tidak terdengar jelas. Silakan coba tekan mikrofon lagi.');
+      }
+    };
+
+    rec.onend = () => {
+      setListening(false);
+      // Kirim otomatis hasil ucapan final
+      const spoken = finalTranscript.trim();
+      finalTranscript = '';
+      if (spoken && handleSendMessageRef.current) {
+        handleSendMessageRef.current(spoken);
+      }
+    };
+
+    recognitionRef.current = rec;
+
+    return () => {
+      // Cleanup: matikan mic saat komponen di-unmount
+      rec.onresult = null;
+      rec.onerror = null;
+      rec.onend = null;
+      rec.onstart = null;
+      try {
+        rec.abort();
+      } catch (e) {
+        // ignore
+      }
+      recognitionRef.current = null;
+    };
   }, []);
+
+  // Matikan mic & suara saat modal ditutup
+  useEffect(() => {
+    if (!isOpen) {
+      if (recognitionRef.current && isListeningRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch (e) {
+          // ignore
+        }
+      }
+      setListening(false);
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      setSpeakingIndex(null);
+    }
+  }, [isOpen]);
 
   // Keyboard shortcut Escape untuk menutup modal dan mematikan audio
   useEffect(() => {
@@ -139,7 +259,7 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen]);
+  }, [isOpen, onClose]);
 
   // Scroll otomatis ke pesan terbaru
   useEffect(() => {
@@ -153,44 +273,74 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
   // Toggle Microphone
   const toggleListening = () => {
     setMicError('');
-    if (isListening) {
+    if (isListeningRef.current) {
       stopListening();
     } else {
       startListening();
     }
   };
 
-  const startListening = () => {
-    if (recognitionRef.current) {
+  // Minta izin mikrofon secara eksplisit, lalu mulai merekam
+  const startListening = async () => {
+    if (!recognitionRef.current) {
+      showMicError('Browser Anda belum mendukung input suara. Gunakan Chrome atau Edge, atau ketik pertanyaan Anda.', 6000);
+      return;
+    }
+
+    // Mic hanya bisa diakses lewat HTTPS atau localhost
+    if (typeof window !== 'undefined' && !window.isSecureContext) {
+      showMicError('Mikrofon butuh koneksi aman (HTTPS atau localhost).', 6000);
+      return;
+    }
+
+    stopSpeaking();
+
+    // Langkah 1: minta izin mikrofon (memunculkan popup izin browser)
+    if (navigator.mediaDevices?.getUserMedia) {
       try {
-        stopSpeaking();
-        setIsListening(true);
-        recognitionRef.current.start();
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Izin didapat, tutup stream karena SpeechRecognition membuka mic sendiri
+        stream.getTracks().forEach((track) => track.stop());
       } catch (err) {
-        setIsListening(false);
+        console.warn('Izin mikrofon gagal:', err);
+        if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
+          showMicError('Izin mikrofon ditolak. Klik ikon gembok di address bar, izinkan Mikrofon, lalu coba lagi.', 7000);
+        } else if (err.name === 'NotFoundError' || err.name === 'OverconstrainedError') {
+          showMicError('Mikrofon tidak ditemukan di perangkat ini.', 6000);
+        } else if (err.name === 'NotReadableError') {
+          showMicError('Mikrofon sedang dipakai aplikasi lain. Tutup aplikasi tersebut lalu coba lagi.', 6000);
+        } else {
+          showMicError('Tidak bisa mengakses mikrofon. Coba lagi.');
+        }
+        return;
       }
-    } else {
-      setMicError('Browser Anda belum mendukung input suara mikrofon. Silakan gunakan ketik teks.');
-      setTimeout(() => setMicError(''), 4500);
+    }
+
+    // Langkah 2: mulai pengenalan suara
+    try {
+      setInputText('');
+      recognitionRef.current.start();
+    } catch (err) {
+      // InvalidStateError jika sudah berjalan
+      console.warn('Gagal memulai pengenalan suara:', err);
+      setListening(false);
     }
   };
 
   const stopListening = () => {
-    if (recognitionRef.current) {
+    if (recognitionRef.current && isListeningRef.current) {
       try {
-        recognitionRef.current.stop();
+        recognitionRef.current.stop(); // onend akan mengirim hasil ucapan
       } catch (e) {
         // ignore
       }
-      setIsListening(false);
     }
   };
 
   // Logika Pemutaran Suara: Klik untuk Bicara, Klik lagi untuk Stop, Klik lagi untuk Ulangi dari Awal
   const handleToggleVoicePlayback = (textToSpeak, msgIndex) => {
     if (!('speechSynthesis' in window)) {
-      setMicError('Browser tidak mendukung output sintesis suara.');
-      setTimeout(() => setMicError(''), 3000);
+      showMicError('Browser tidak mendukung output sintesis suara.', 3000);
       return;
     }
 
@@ -376,16 +526,21 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
       window.__leluasaRouteIntent = routeIntent;
     }
 
-    const nextMessages = [
-      ...messages,
-      { sender: 'user', text: query, card: null },
-      { sender: 'ai', text: reply, card: cardData }
-    ];
-    setMessages(nextMessages);
+    // Pakai functional update agar tidak bergantung pada state lama
+    let newAiIndex = 0;
+    setMessages((prev) => {
+      const next = [
+        ...prev,
+        { sender: 'user', text: query, card: null },
+        { sender: 'ai', text: reply, card: cardData }
+      ];
+      newAiIndex = next.length - 1;
+      return next;
+    });
 
     // Otomatis bunyikan jawaban AI dan tandai tombol suara aktif
-    const newAiIndex = nextMessages.length - 1;
-    handleToggleVoicePlayback(reply, newAiIndex);
+    // (hitung indeks langsung dari panjang pesan saat ini + 2 pesan baru)
+    handleToggleVoicePlayback(reply, messages.length + 1);
 
     // Jika perintah mengarahkan ke tab tertentu, buka otomatis setelah 3 detik
     if (targetTab && onNavigateTab) {
@@ -401,6 +556,9 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
       }, 3000);
     }
   };
+
+  // Selalu arahkan ref ke handler terbaru
+  handleSendMessageRef.current = handleSendMessage;
 
   const quickPrompts = [
     'Rute Halte Balai Pemuda',
@@ -418,17 +576,17 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
     >
       {/* DESAIN MODAL LEBAR ELEGAN UNTUK WEB LAPTOP */}
       <div className="relative w-full max-w-2xl lg:max-w-4xl h-[82vh] max-h-[720px] bg-surface-container-lowest rounded-[32px] shadow-2xl flex flex-col border-2 border-outline-variant/30 overflow-hidden">
-        
+
         {/* HEADER CHATBOT (LAPTOP WEB) */}
         <div className="px-6 py-4 bg-surface-container-lowest border-b border-surface-container flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-primary text-on-primary flex items-center justify-center shadow-sm">
-              <span className="material-symbols-outlined text-2xl" aria-hidden="true">smart_toy</span>
+            <div className="w-11 h-11 rounded-2xl bg-surface-container flex items-center justify-center shadow-sm">
+              <LumiIcon size={32} />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h2 id="chatbot-heading" className="text-base sm:text-lg font-extrabold text-on-surface tracking-tight">
-                  Asisten AI Leluasa
+                  LUMI
                 </h2>
                 <span className="px-2 py-0.5 rounded-full bg-secondary/15 text-secondary text-[11px] font-bold flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-secondary inline-block animate-pulse"></span>
@@ -436,7 +594,7 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
                 </span>
               </div>
               <p className="text-xs font-semibold text-on-surface-variant">
-                Panduan Suara, Rute Aksesibel, &amp; Info Trotoar Surabaya
+                Asisten AI Leluasa · Panduan Suara &amp; Rute Aksesibel Surabaya
               </p>
             </div>
           </div>
@@ -449,7 +607,7 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
               onClose();
             }}
             className="w-10 h-10 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant transition-colors cursor-pointer"
-            aria-label="Tutup asisten AI"
+            aria-label="Tutup LUMI"
           >
             <span className="material-symbols-outlined text-xl" aria-hidden="true">close</span>
           </button>
@@ -457,9 +615,17 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
 
         {/* NOTIFIKASI ERROR MIKROFON (BILA ADA) */}
         {micError && (
-          <div className="px-6 py-2.5 bg-error-container text-on-error-container text-xs font-semibold flex items-center gap-2 shrink-0">
-            <span className="material-symbols-outlined text-base" aria-hidden="true">info</span>
-            <span>{micError}</span>
+          <div role="alert" className="px-6 py-2.5 bg-error-container text-on-error-container text-xs font-semibold flex items-center gap-2 shrink-0">
+            <span className="material-symbols-outlined text-base" aria-hidden="true">mic_off</span>
+            <span className="flex-1">{micError}</span>
+            <button
+              type="button"
+              onClick={() => setMicError('')}
+              className="cursor-pointer"
+              aria-label="Tutup pesan"
+            >
+              <span className="material-symbols-outlined text-base" aria-hidden="true">close</span>
+            </button>
           </div>
         )}
 
@@ -475,8 +641,8 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
                 className={`flex items-start gap-3 ${isAi ? 'justify-start' : 'justify-end'}`}
               >
                 {isAi && (
-                  <div className="w-9 h-9 rounded-full bg-primary text-on-primary flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
-                    <span className="material-symbols-outlined text-base" aria-hidden="true">auto_awesome</span>
+                  <div className="shrink-0 mt-0.5 shadow-xs rounded-full">
+                    <LumiIcon size={36} />
                   </div>
                 )}
 
@@ -508,7 +674,7 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
                               <p className="text-[11px] text-on-surface-variant font-medium">{m.card.subtitle}</p>
                             </div>
                           </div>
-                          
+
                           {/* Tombol Buka Rute: Mengarahkan ke Rute / Dashboard dengan navigasi langkah */}
                           <button
                             type="button"
@@ -565,6 +731,17 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
               </div>
             );
           })}
+
+          {/* Indikator LUMI sedang mencari lokasi */}
+          {isSearchingRoute && (
+            <div className="flex items-center gap-3">
+              <LumiIcon size={36} className="animate-pulse" />
+              <div className="px-4 py-2.5 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 text-xs font-semibold text-primary flex items-center gap-2">
+                <span className="material-symbols-outlined text-base animate-spin" aria-hidden="true">progress_activity</span>
+                <span>LUMI sedang mencari lokasi...</span>
+              </div>
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
 
@@ -632,13 +809,20 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
           <button
             type="button"
             onClick={toggleListening}
+            disabled={!micSupported}
             aria-label={isListening ? 'Sedang merekam suara, klik untuk berhenti' : 'Bicara menggunakan mikrofon'}
-            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
               isListening
                 ? 'bg-error text-white ring-4 ring-error/30 animate-pulse'
                 : 'bg-surface-container hover:bg-surface-container-high text-primary'
             }`}
-            title={isListening ? 'Sedang Mendengarkan... Klik untuk Selesai' : 'Klik untuk Bicara via Mikrofon'}
+            title={
+              !micSupported
+                ? 'Browser ini tidak mendukung input suara (gunakan Chrome atau Edge)'
+                : isListening
+                ? 'Sedang Mendengarkan... Klik untuk Selesai'
+                : 'Klik untuk Bicara via Mikrofon'
+            }
           >
             <span className="material-symbols-outlined text-2xl" aria-hidden="true">
               {isListening ? 'mic' : 'mic_none'}
@@ -648,7 +832,7 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
           {/* Kolom ketik teks */}
           <input
             type="text"
-            placeholder={isListening ? 'Sedang mendengarkan ucapan Anda...' : 'Tanya rute aksesibel, ubin pemandu, atau kondisi trotoar Surabaya...'}
+            placeholder={isListening ? 'LUMI sedang mendengarkan Anda...' : 'Tanya LUMI: rute aksesibel, ubin pemandu, atau kondisi trotoar Surabaya...'}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={(e) => {
