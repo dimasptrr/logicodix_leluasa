@@ -155,17 +155,86 @@ app.get('/api/obstacles', async (req, res) => {
   });
 });
 
-app.get('/api/weather', (req, res) => {
+app.get('/api/weather', async (req, res) => {
+  let condition = 'Cerah Berawan';
+  let temperature = 30;
+  let humidity = 70;
+  let rainProbability = 20;
+  let conditionIcon = 'partly_cloudy_day';
+  let isLive = false;
+
+  try {
+    const lat = req.query.lat || -7.2575;
+    const lng = req.query.lng || 112.7521;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const omRes = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code&timezone=Asia%2FJakarta`,
+      { signal: controller.signal }
+    );
+    clearTimeout(timeoutId);
+
+    if (omRes.ok) {
+      const omData = await omRes.json();
+      const cur = omData.current;
+      temperature = Math.round(cur.temperature_2m);
+      humidity = Math.round(cur.relative_humidity_2m);
+      const precip = cur.precipitation || 0;
+      const code = cur.weather_code || 0;
+      isLive = true;
+
+      if (code >= 80 || precip > 5) {
+        condition = 'Hujan Deras';
+        rainProbability = 90;
+        conditionIcon = 'thunderstorm';
+      } else if (code >= 61 || precip > 1) {
+        condition = 'Hujan';
+        rainProbability = 80;
+        conditionIcon = 'rainy';
+      } else if (code >= 51 || precip > 0) {
+        condition = 'Gerimis Ringan';
+        rainProbability = 60;
+        conditionIcon = 'grain';
+      } else if (code >= 1 && code <= 3) {
+        condition = 'Cerah Berawan';
+        rainProbability = 20;
+        conditionIcon = 'partly_cloudy_day';
+      } else {
+        condition = 'Cerah';
+        rainProbability = 10;
+        conditionIcon = 'wb_sunny';
+      }
+    }
+  } catch (err) {
+    // Fallback baseline jika koneksi luar timeout
+  }
+
+  const isRainy = rainProbability >= 50;
+  const tractionIndex = isRainy ? 45 : 88;
+  const tractionStatus = isRainy ? 'caution' : 'safe';
+  const tractionLabel = isRainy ? 'Traksi Berkurang (Ubin Basah Licin)' : 'Traksi Sangat Baik (Ubin Kering)';
+  const alertMessage = isRainy ? 'Waspada Permukaan Trotoar Basah' : 'Waktu Bepergian Optimal';
+  const advisoryText = isRainy
+    ? `Kelembapan ${humidity}% dan potensi hujan dapat membuat ubin trotoar keramik dekoratif menjadi licin. Kursi roda disarankan melaju di bawah 4 km/jam.`
+    : `Kondisi cuaca ${condition.toLowerCase()} dengan suhu ${temperature}°C. Permukaan trotoar kering dan memiliki daya cengkeram optimal untuk mobilitas mandiri kursi roda.`;
+
   res.json({
     status: 'success',
     data: {
-      condition: 'Cerah Berawan',
-      temperature: 31,
-      humidity: 68,
-      rainProbability: 15,
-      tractionIndex: 88,
-      tractionStatus: 'safe',
-      tractionLabel: 'Traksi Sangat Baik (Ubin Kering)'
+      condition,
+      conditionIcon,
+      temperature,
+      humidity,
+      rainProbability,
+      precipitationProb: rainProbability,
+      tractionIndex,
+      tractionStatus,
+      tractionLabel,
+      alertMessage,
+      advisoryText,
+      isLive,
+      latitude: Number(lat),
+      longitude: Number(lng)
     }
   });
 });

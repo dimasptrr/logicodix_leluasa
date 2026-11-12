@@ -174,17 +174,6 @@ export default function Header({
           </button>
         </div>
 
-        {/* 4. Modal Pengaturan Profil Aksesibilitas */}
-        <button
-          aria-label="Buka Modal Preferensi Aksesibilitas"
-          onClick={onOpenAccessibility}
-          className="flex items-center gap-1.5 min-h-[38px] px-3 rounded-full border border-outline-variant text-on-surface hover:bg-surface-container font-semibold text-sm transition-all active:scale-95 focus:outline focus:outline-[3px] focus:outline-primary"
-          type="button"
-          title="Buka Pengaturan Profil Pengguna & Alat Bantu"
-        >
-          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">accessibility_new</span>
-          <span className="hidden sm:inline text-xs font-semibold">Aksesibilitas</span>
-        </button>
 
         {/* 5. CTA Tunggal: Lapor Hambatan Baru */}
         <button
