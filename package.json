@@ -17,5 +17,8 @@
     "inclusive-mobility"
   ],
   "author": "Leluasa Team (Dimas, Erlinda, Caca, Kaka)",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^10.0.7"
+  }
 }

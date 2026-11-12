@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { fetchRouteComparison } from '../features/dashboard/services/safeApi.js';
 import useGeolocation from '../features/dashboard/hooks/useGeolocation.js';
-import MockDataBadge from '../components/MockDataBadge.jsx';
 
 // Hitung koordinat presisi titik langkah aktif di sepanjang garis rute
 function getStepCoordinate(stepIndex, totalSteps, coordinates, origin, destination, currentStep) {
@@ -135,7 +134,6 @@ export default function PlanRoute({ setActiveTab }) {
   const [navStepIndex, setNavStepIndex] = useState(0);
   const [isSpeakingNav, setIsSpeakingNav] = useState(false);
   const [hapticActive, setHapticActive] = useState(true);
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
   const [routeError, setRouteError] = useState(null);
   const [routeIntent, setRouteIntent] = useState(null);
@@ -595,10 +593,6 @@ export default function PlanRoute({ setActiveTab }) {
       }).addTo(map);
     }
   }, [coords, accuracy, isNavigating]);
-
-  const toggleFilter = (key) => {
-    setActiveFilters(prev => ({ ...prev, [key]: !prev[key] }));
-  };
 
   // Mulai Navigasi Aktif
   const handleStartNav = () => {
@@ -1065,13 +1059,11 @@ export default function PlanRoute({ setActiveTab }) {
             <span>+ Buat Rute dari Lokasi Saya</span>
           </button>
 
-          {isCustomDest ? (
+          {isCustomDest && (
             <span className="px-2.5 py-1 rounded-full bg-secondary/15 text-secondary border border-secondary/30 text-xs font-bold flex items-center gap-1 shrink-0">
               <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
               <span>GPS Riil Aktif</span>
             </span>
-          ) : (
-            <MockDataBadge />
           )}
         </div>
       </div>
@@ -1224,69 +1216,6 @@ export default function PlanRoute({ setActiveTab }) {
             </button>
           </div>
         </div>
-      </div>
-
-      {/* PROFIL & FILTER JALUR */}
-      <div className="bg-surface-container-lowest rounded-2xl p-4 border border-outline-variant/30 flex flex-col gap-3">
-        <div
-          className="flex items-center justify-between cursor-pointer"
-          onClick={() => setFiltersExpanded(!filtersExpanded)}
-        >
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary text-lg">tune</span>
-            <span className="text-xs sm:text-sm font-bold text-on-surface">
-              Pengaturan Profil Mobilitas &amp; Parameter Aksesibilitas
-            </span>
-          </div>
-          <div className="flex items-center gap-1 text-primary text-xs font-bold">
-            <span>{Object.values(activeFilters).filter(Boolean).length} Parameter Aktif</span>
-            <span className="material-symbols-outlined text-base">
-              {filtersExpanded ? 'expand_less' : 'expand_more'}
-            </span>
-          </div>
-        </div>
-
-        {filtersExpanded && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-outline-variant/20 animate-fadeIn">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-on-surface-variant">Profil Pengguna</label>
-              <select
-                className="w-full h-11 px-3 rounded-xl bg-surface-container text-on-surface text-xs font-semibold focus:outline-none"
-                value={selectedProfile}
-                onChange={(e) => setSelectedProfile(e.target.value)}
-              >
-                <option value="electric">Kursi Roda Listrik (Lebar 68cm)</option>
-                <option value="manual">Kursi Roda Manual (Utamakan Rampa)</option>
-                <option value="scooter">Skuter Mobilitas (Radius Putar 110cm)</option>
-                <option value="caregiver">Didorong Pendamping (Kelandaian &lt;8%)</option>
-              </select>
-            </div>
-
-            <div className="flex flex-wrap gap-1.5 items-center">
-              {[
-                { key: 'avoidBarriers', label: 'Hindari rintangan terblokir' },
-                { key: 'prioritizeCurbRamps', label: 'Prioritaskan rampa landai' },
-                { key: 'avoidSteepSlopes', label: 'Hindari tanjakan curam >6%' },
-                { key: 'preferShadedWalkways', label: 'Jalur berteduh/beratap' },
-                { key: 'avoidSlipperyTiles', label: 'Hindari ubin licin saat basah' }
-              ].map(f => (
-                <button
-                  key={f.key}
-                  type="button"
-                  onClick={() => toggleFilter(f.key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer ${
-                    activeFilters[f.key] ? 'bg-secondary-container text-secondary font-bold' : 'bg-surface-container text-on-surface-variant'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-sm">
-                    {activeFilters[f.key] ? 'check_box' : 'check_box_outline_blank'}
-                  </span>
-                  <span>{f.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* PANDUAN TIAP BELOKAN (STEP LIST) */}

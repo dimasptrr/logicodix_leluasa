@@ -9,13 +9,39 @@ export default function Header({
   onOpenNotifications,
   onOpenMobileMenu,
   onNavigateHome,
-  // Props opsional (bila dikirim dari App)
+  // Props navigasi riwayat dari App
   activeTab,
-  setActiveTab
+  setActiveTab,
+  canGoBack,
+  onGoBack,
+  previousTab
 }) {
   const [currentTab, setCurrentTab] = useState(activeTab || 'home');
   const [unreadCount, setUnreadCount] = useState(2);
   const [isHighContrast, setIsHighContrast] = useState(false);
+
+  const TAB_LABELS = {
+    'home': 'Dashboard',
+    'explore-map': 'Peta Navigasi',
+    'plan-route': 'Rute & Perbandingan',
+    'report-obstacle': 'Lapor Hambatan',
+    'reports-impact': 'Riwayat Komunitas',
+    'weather-intelligence': 'Intelijen Cuaca',
+  };
+
+  const resolvedActiveTab = activeTab || currentTab;
+  const isBackEnabled = canGoBack !== undefined ? canGoBack : (resolvedActiveTab !== 'home');
+  const previousTabLabel = previousTab
+    ? (TAB_LABELS[previousTab] || previousTab)
+    : (resolvedActiveTab !== 'home' ? 'Dashboard' : '');
+
+  const handleBackClick = () => {
+    if (typeof onGoBack === 'function') {
+      onGoBack();
+    } else if (typeof window !== 'undefined' && window.history.length > 1) {
+      window.history.back();
+    }
+  };
 
   // Sinkronkan tab aktif bila ada perubahan via props atau event window
   useEffect(() => {
@@ -73,10 +99,26 @@ export default function Header({
     { id: 'weather-intelligence', label: 'Intelijen Cuaca' },
   ];
 
-  const resolvedActiveTab = activeTab || currentTab;
-
   return (
-    <header className="fixed top-0 left-0 right-0 h-16 sm:h-[72px] bg-surface-container-lowest/97 backdrop-blur-xl shadow-[0_1px_6px_rgba(16,42,67,0.07)] z-40 flex items-center px-3 sm:px-6 lg:px-8 gap-3 border-b border-outline-variant/20">
+    <header className="fixed top-0 left-0 right-0 h-16 sm:h-[72px] bg-surface-container-lowest/97 backdrop-blur-xl shadow-[0_1px_6px_rgba(16,42,67,0.07)] z-40 flex items-center px-3 sm:px-6 lg:px-8 gap-2.5 sm:gap-3.5 border-b border-outline-variant/20">
+
+      {/* Button Back di Pojok Kiri Atas */}
+      <button
+        type="button"
+        onClick={handleBackClick}
+        disabled={!isBackEnabled}
+        aria-label={isBackEnabled ? `Kembali ke ${previousTabLabel || 'halaman sebelumnya'}` : 'Kembali ke halaman sebelumnya'}
+        title={isBackEnabled ? `Kembali ke ${previousTabLabel || 'halaman sebelumnya'}` : 'Tidak ada halaman sebelumnya'}
+        className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-200 outline-none shrink-0 ${
+          isBackEnabled
+            ? 'bg-surface-container hover:bg-primary hover:text-white text-primary shadow-xs cursor-pointer active:scale-90 ring-1 ring-outline-variant/40'
+            : 'opacity-30 text-on-surface-variant cursor-not-allowed bg-surface-container/50'
+        }`}
+      >
+        <span className="material-symbols-outlined text-[20px] sm:text-[22px]" aria-hidden="true">
+          arrow_back
+        </span>
+      </button>
 
       {/* Logo / Brand — Mengarah ke Beranda (Dashboard) */}
       <button

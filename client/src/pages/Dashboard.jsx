@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import useGeolocation from '../features/dashboard/hooks/useGeolocation.js';
-import MockDataBadge from '../components/MockDataBadge.jsx';
 import { geocodeSearch, reverseGeocode } from '../features/dashboard/services/safeApi.js';
+import StraightDirectionArrow, {
+  calculateBearing,
+  getBearingDescription
+} from '../components/StraightDirectionArrow.jsx';
 
 // Data Lokasi Surabaya Populer untuk Pencarian & Multi-Stop
 const SURABAYA_DESTINATIONS = [
@@ -537,9 +540,6 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
                     {hasSelectedDestination ? 'Navigasi Rute Aktif' : 'Peta Navigasi Surabaya'}
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <MockDataBadge />
-                </div>
               </div>
               <h1 className="text-headline-sm font-headline-sm text-primary font-bold text-base sm:text-lg">
                 {hasSelectedDestination ? 'Panduan Rute Taktil Surabaya' : 'Cari & Tentukan Rute Tujuan'}
@@ -847,21 +847,37 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
                 </div>
 
                 {/* Big Direction Arrow & Turn Instruction */}
-                <div className="flex items-start gap-3.5 my-1">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-primary text-on-primary flex items-center justify-center shrink-0 shadow-md">
-                    <span className="material-symbols-outlined text-2xl sm:text-3xl" style={{ fontVariationSettings: "'FILL' 1" }} aria-hidden="true">
-                      turn_right
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h2 className="text-base sm:text-lg font-headline-sm text-on-surface font-extrabold leading-tight">
-                      Menuju {stop1?.name || 'tujuan pilihan'}
-                    </h2>
-                    <p className="text-xs sm:text-sm text-on-surface-variant font-medium mt-1 truncate">
-                      {currentRouteSubtitle}
-                    </p>
-                  </div>
-                </div>
+                {(() => {
+                  const activeOriginCoord = customOrigin || userCoords || { lat: -7.2642, lng: 112.7449 };
+                  const dashboardBearing = (activeOriginCoord && stop1)
+                    ? calculateBearing(activeOriginCoord.lat, activeOriginCoord.lng, stop1.lat, stop1.lng)
+                    : 90;
+                  const dashboardBearingDesc = getBearingDescription(dashboardBearing);
+
+                  return (
+                    <div className="flex items-start gap-3.5 my-1">
+                      <div
+                        className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-primary text-on-primary flex items-center justify-center shrink-0 shadow-md transition-transform duration-300"
+                        title={`Arah Navigasi: ${dashboardBearingDesc.label} (${dashboardBearing}°)`}
+                      >
+                        <StraightDirectionArrow bearing={dashboardBearing} size={28} strokeWidth={3} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                            {dashboardBearingDesc.shortLabel}
+                          </span>
+                        </div>
+                        <h2 className="text-base sm:text-lg font-headline-sm text-on-surface font-extrabold leading-tight">
+                          Menuju {stop1?.name || 'tujuan pilihan'}
+                        </h2>
+                        <p className="text-xs sm:text-sm text-on-surface-variant font-medium mt-0.5 truncate">
+                          {currentRouteSubtitle}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* 3 BADGE KONDISI TROTOAR: DIUBAH 1 BARIS KEBAWAH (VERTIKAL) SESUAI INSTRUKSI */}
                 <div className="flex flex-col gap-2.5 pt-3 pb-1 border-t border-surface-container">

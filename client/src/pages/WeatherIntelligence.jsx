@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { fetchWeather, reverseGeocode } from '../features/dashboard/services/safeApi.js';
 import useGeolocation from '../features/dashboard/hooks/useGeolocation.js';
-import MockDataBadge from '../components/MockDataBadge.jsx';
 
 export default function WeatherIntelligence({ setActiveTab }) {
   const [weather, setWeather] = useState(null);
@@ -61,7 +60,6 @@ export default function WeatherIntelligence({ setActiveTab }) {
               <span>Sesuai GPS Lokasi Anda</span>
             </span>
           )}
-          <MockDataBadge />
         </div>
         {errorMessage && (
           <div className="p-3 sm:p-4 rounded-xl bg-warning-container text-on-warning-container border border-warning/40 text-xs flex items-center justify-between shadow-xs my-2">

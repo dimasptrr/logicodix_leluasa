@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { fetchObstacles, upvoteObstacle, resolveObstacle, dispatchDpupr, fetchRouteComparison } from '../features/dashboard/services/safeApi.js';
 import useGeolocation from '../features/dashboard/hooks/useGeolocation.js';
-import MockDataBadge from '../components/MockDataBadge.jsx';
 
 // Format waktu relatif berbasis WIB (Jakarta / Surabaya GMT+7)
 function formatReportTimeWIB(dateString) {

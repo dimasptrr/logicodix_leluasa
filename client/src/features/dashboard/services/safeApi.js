@@ -35,13 +35,72 @@ function activateFallback() {
   }
 }
 
+// const SUPABASE_REST_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL)
+//   ? `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/laporan_leluasa`
+//   : 'https://ifqkpxeydmznkwakzygn.supabase.co/rest/v1/laporan_leluasa';
+// const SUPABASE_KEY = (typeof import.meta !== 'undefined' && (import.meta.env?.VITE_SUPABASE_KEY || import.meta.env?.VITE_SUPABASE_ANON_KEY)) || '';
+
+async function fetchFromSupabaseDirectly() {
+  try {
+    const res = await fetch(`${SUPABASE_REST_URL}?select=*&order=created_at.desc`, {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`
+      }
+    });
+    if (!res.ok) return [];
+    const rows = await res.json();
+    return rows.map(r => ({
+      id: String(r.id),
+      title: r.obstacle_type || 'Rintangan Trotoar',
+      name: r.obstacle_type || 'Rintangan Trotoar',
+      location: `Titik GPS (${r.latitude?.toFixed(6)}, ${r.longitude?.toFixed(6)})`,
+      location_text: `Titik GPS (${r.latitude?.toFixed(6)}, ${r.longitude?.toFixed(6)})`,
+      category: r.obstacle_type,
+      severity: r.severity || 'difficult',
+      status: r.verification_status || 'active',
+      lat: r.latitude,
+      lng: r.longitude,
+      latitude: r.latitude,
+      longitude: r.longitude,
+      coordinates: { lat: r.latitude, lng: r.longitude },
+      clearance: r.gap_width === 'less_80' ? 65 : r.gap_width === '80_120' ? 95 : 120,
+      clearance_cm: r.gap_width === 'less_80' ? 65 : r.gap_width === '80_120' ? 95 : 120,
+      upvotes: 1,
+      confirmedCount: 1,
+      reported_at: r.created_at,
+      created_at: r.created_at,
+      reportedTime: r.created_at,
+      notes: r.weather_condition || '',
+      image_url: r.photo_url || 'https://images.unsplash.com/photo-1584467735871-8e85353a8413?w=600',
+      photo_url: r.photo_url
+    }));
+  } catch (e) {
+    console.warn('[safeApi] Supabase direct fetch warning:', e.message);
+    return [];
+  }
+}
+
 export async function fetchObstacles(filters = {}) {
   try {
     const res = await realApi.fetchObstacles(filters);
     return res;
   } catch (err) {
     activateFallback();
-    let data = [...inMemoryObstacles];
+
+    // Ambil laporan riil langsung dari database Supabase jika server lokal belum online
+    let realSupabaseData = [];
+    try {
+      realSupabaseData = await fetchFromSupabaseDirectly();
+    } catch (_) { }
+
+    const existingIds = new Set(realSupabaseData.map(r => String(r.id)));
+    const merged = [
+      ...realSupabaseData,
+      ...inMemoryObstacles.filter(o => !existingIds.has(String(o.id)))
+    ];
+
+    let data = [...merged];
 
     if (filters.severity && filters.severity !== 'all') {
       data = data.filter(obs => obs.severity === filters.severity);
@@ -84,7 +143,63 @@ export async function fetchObstacleById(id) {
 }
 
 export async function createObstacle(obstacleData) {
-  return realApi.createObstacle(obstacleData);
+  try {
+    const res = await realApi.createObstacle(obstacleData);
+    if (res?.data) {
+      inMemoryObstacles.unshift(res.data);
+    }
+    return res;
+  } catch (err) {
+    // Jika server backend offline, simpan langsung ke Supabase
+    try {
+      const publicPhotoUrl = obstacleData.uploadedImage?.startsWith('data:')
+        ? 'https://images.unsplash.com/photo-1584467735871-8e85353a8413?w=600'
+        : (obstacleData.uploadedImage || 'https://images.unsplash.com/photo-1584467735871-8e85353a8413?w=600');
+
+      const payload = {
+        photo_url: publicPhotoUrl,
+        latitude: Number(obstacleData.coordinates?.lat || obstacleData.lat),
+        longitude: Number(obstacleData.coordinates?.lng || obstacleData.lng),
+        obstacle_type: String(obstacleData.category || obstacleData.title).trim(),
+        severity: obstacleData.severity === 'passable' ? 'caution' : obstacleData.severity,
+        gap_width: String(!obstacleData.clearance ? 'less_80' : obstacleData.clearance < 80 ? 'less_80' : obstacleData.clearance <= 120 ? '80_120' : 'more_120'),
+        verification_status: 'pending',
+        weather_condition: obstacleData.notes ? String(obstacleData.notes).slice(0, 100) : 'Rintangan trotoar dilaporkan oleh warga.'
+      };
+
+      const resSup = await fetch(SUPABASE_REST_URL, {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=representation'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (resSup.ok) {
+        const createdRows = await resSup.json();
+        const newObs = {
+          id: String(createdRows[0]?.id || Date.now()),
+          title: obstacleData.title,
+          category: obstacleData.category,
+          severity: obstacleData.severity,
+          status: 'pending',
+          lat: payload.latitude,
+          lng: payload.longitude,
+          notes: obstacleData.notes,
+          photo_url: publicPhotoUrl,
+          created_at: new Date().toISOString()
+        };
+        inMemoryObstacles.unshift(newObs);
+        return { success: true, isMock: true, data: newObs };
+      }
+    } catch (e2) {
+      console.warn('[safeApi] Direct Supabase insert fallback failed:', e2.message);
+    }
+    throw err;
+  }
 }
 
 export async function upvoteObstacle(id) {

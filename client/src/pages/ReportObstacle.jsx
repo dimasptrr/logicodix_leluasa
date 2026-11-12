@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import { createObstacle, geocodeSearch, reverseGeocode } from '../features/dashboard/services/safeApi.js';
 import useGeolocation from '../features/dashboard/hooks/useGeolocation.js';
-import MockDataBadge from '../components/MockDataBadge.jsx';
 
 const MAX_PHOTO_BYTES = 1.5 * 1024 * 1024;
 
@@ -579,7 +578,6 @@ export default function ReportObstacle({ setActiveTab }) {
             Bantu sesama pengguna kursi roda dan pejalan kaki menjelajahi kota Surabaya dengan aman.
           </p>
         </div>
-        <MockDataBadge />
       </div>
 
       {/* Alert Galat */}

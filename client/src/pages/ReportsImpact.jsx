@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { fetchStats, fetchObstacles } from '../features/dashboard/services/safeApi.js';
-import MockDataBadge from '../components/MockDataBadge.jsx';
 
 export default function ReportsImpact({ setActiveTab }) {
   const [stats, setStats] = useState(null);
@@ -84,7 +83,6 @@ Status DPUPR: Diteruskan ke Tim Pemeliharaan Kota Surabaya`;
               <span className="material-symbols-outlined text-sm">assessment</span>
               <span>DASHBOARD WARGA · DPUPR SURABAYA</span>
             </div>
-            <MockDataBadge />
           </div>
           <h1 className="font-headline-lg text-xl sm:text-2xl lg:text-3xl text-primary font-bold tracking-tight">
             Laporan & Dampak Komunitas

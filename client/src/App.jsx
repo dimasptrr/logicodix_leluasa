@@ -13,6 +13,7 @@ import VoiceAssistantModal from './components/VoiceAssistantModal.jsx';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
+  const [historyStack, setHistoryStack] = useState(['home']);
   const [searchQuery, setSearchQuery] = useState('');
   const [accessibilityOpen, setAccessibilityOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
@@ -25,6 +26,78 @@ export default function App() {
     audioWayfinding: true,
     largeTouchTargets: false
   });
+
+  // Navigasi dengan pencatatan riwayat (history stack)
+  const handleSetActiveTab = (tab) => {
+    if (tab === 'voice-assistant') {
+      setVoiceOpen(true);
+      return;
+    }
+    if (tab === activeTab) return;
+
+    setHistoryStack((prev) => {
+      if (prev[prev.length - 1] === tab) return prev;
+      return [...prev, tab];
+    });
+    setActiveTab(tab);
+
+    try {
+      window.history.pushState({ tab }, '', window.location.pathname);
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  // Logika Tombol Back (Kembali ke halaman sebelumnya yang sudah dipencet)
+  const handleGoBack = () => {
+    if (historyStack.length > 1) {
+      setHistoryStack((prev) => {
+        const next = [...prev];
+        next.pop(); // buang halaman aktif saat ini
+        const prevTab = next[next.length - 1];
+        setActiveTab(prevTab);
+        return next;
+      });
+    } else if (activeTab !== 'home') {
+      setActiveTab('home');
+      setHistoryStack(['home']);
+    }
+  };
+
+  const canGoBack = historyStack.length > 1 || activeTab !== 'home';
+  const previousTab = historyStack.length > 1
+    ? historyStack[historyStack.length - 2]
+    : (activeTab !== 'home' ? 'home' : null);
+
+  // Dengarkan custom event navigasi global
+  useEffect(() => {
+    const handleNavEvent = (e) => {
+      if (e.detail?.tab) {
+        handleSetActiveTab(e.detail.tab);
+      }
+    };
+    window.addEventListener('leluasa:navigate', handleNavEvent);
+    return () => window.removeEventListener('leluasa:navigate', handleNavEvent);
+  }, [activeTab]);
+
+  // Dukungan tombol Back browser (popstate)
+  useEffect(() => {
+    const handlePopState = (e) => {
+      if (e.state?.tab) {
+        const targetTab = e.state.tab;
+        setActiveTab(targetTab);
+        setHistoryStack((prev) => {
+          const idx = prev.lastIndexOf(targetTab);
+          if (idx !== -1) {
+            return prev.slice(0, idx + 1);
+          }
+          return [...prev, targetTab];
+        });
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Global 'V' shortcut for voice command modal
   useEffect(() => {
@@ -43,7 +116,7 @@ export default function App() {
 
   const handleSearchSubmit = (query) => {
     if (query) {
-      setActiveTab('plan-route');
+      handleSetActiveTab('plan-route');
     }
   };
 
@@ -57,13 +130,7 @@ export default function App() {
       {/* Desktop & Mobile Drawer Sidebar */}
       <Sidebar
         activeTab={activeTab}
-        setActiveTab={(tab) => {
-          if (tab === 'voice-assistant') {
-            setVoiceOpen(true);
-          } else {
-            setActiveTab(tab);
-          }
-        }}
+        setActiveTab={handleSetActiveTab}
         onToggleAccessibility={() => setAccessibilityOpen(true)}
         isMobileOpen={isMobileMenuOpen}
         onCloseMobile={() => setIsMobileMenuOpen(false)}
@@ -80,7 +147,12 @@ export default function App() {
           onOpenAccessibility={() => setAccessibilityOpen(true)}
           onOpenNotifications={handleOpenNotifications}
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
-          onNavigateHome={() => setActiveTab('home')}
+          onNavigateHome={() => handleSetActiveTab('home')}
+          activeTab={activeTab}
+          setActiveTab={handleSetActiveTab}
+          canGoBack={canGoBack}
+          onGoBack={handleGoBack}
+          previousTab={previousTab}
         />
 
         {/* Global Notification Banner */}
@@ -105,38 +177,38 @@ export default function App() {
         <main className="relative pt-16 sm:pt-20 min-h-[calc(100vh-4rem)] sm:min-h-[calc(100vh-5rem)] bg-surface w-full flex-1">
           {activeTab === 'home' && (
             <Dashboard
-              setActiveTab={setActiveTab}
+              setActiveTab={handleSetActiveTab}
               onOpenVoice={() => setVoiceOpen(true)}
             />
           )}
 
           {activeTab === 'explore-map' && (
             <ExploreMap
-              setActiveTab={setActiveTab}
+              setActiveTab={handleSetActiveTab}
             />
           )}
 
           {activeTab === 'plan-route' && (
             <PlanRoute
-              setActiveTab={setActiveTab}
+              setActiveTab={handleSetActiveTab}
             />
           )}
 
           {activeTab === 'report-obstacle' && (
             <ReportObstacle
-              setActiveTab={setActiveTab}
+              setActiveTab={handleSetActiveTab}
             />
           )}
 
           {activeTab === 'reports-impact' && (
             <ReportsImpact
-              setActiveTab={setActiveTab}
+              setActiveTab={handleSetActiveTab}
             />
           )}
 
           {activeTab === 'weather-intelligence' && (
             <WeatherIntelligence
-              setActiveTab={setActiveTab}
+              setActiveTab={handleSetActiveTab}
             />
           )}
         </main>
@@ -145,7 +217,7 @@ export default function App() {
       {/* Mobile Bottom Navigation (Visible on screens < lg) */}
       <MobileBottomNav
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleSetActiveTab}
       />
 
       {/* Modals */}
@@ -160,7 +232,7 @@ export default function App() {
         isOpen={voiceOpen}
         onClose={() => setVoiceOpen(false)}
         onNavigateTab={(tab) => {
-          setActiveTab(tab);
+          handleSetActiveTab(tab);
           setVoiceOpen(false);
         }}
       />
