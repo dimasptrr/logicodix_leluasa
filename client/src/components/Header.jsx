@@ -151,8 +151,8 @@ export default function Header({
         </span>
       </button>
 
-      {/* Search Bar */}
-      <div className="relative flex-1 min-w-0 max-w-xs xl:max-w-sm">
+      {/* Search Bar - Hanya tampil di desktop/tablet (md ke atas) agar di mobile tidak mendesak elemen lain */}
+      <div className="hidden md:flex relative flex-1 min-w-0 max-w-xs xl:max-w-sm">
         <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[20px]" aria-hidden="true">
           search
         </span>
@@ -193,7 +193,7 @@ export default function Header({
       <div className="flex items-center gap-1 sm:gap-2 ml-auto shrink-0">
 
         {/* Icon controls: contrast, wake word mic, notifications */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
           {/* Tombol Panggil AI & Status Wake Word */}
           <button
             type="button"
@@ -208,7 +208,7 @@ export default function Header({
               }
               onOpenVoice();
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 cursor-pointer ${
+            className={`flex items-center gap-1 sm:gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-full text-xs font-bold transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 cursor-pointer shrink-0 ${
               wakeWordPermissionStatus === 'denied'
                 ? 'bg-error/15 text-error border border-error/30 hover:bg-error/25'
                 : wakeWordPermissionStatus === 'prompt'
@@ -227,7 +227,7 @@ export default function Header({
             aria-label="Status Wake Word Asisten Suara LUMI"
           >
             <span
-              className={`w-2 h-2 rounded-full ${
+              className={`w-2 h-2 rounded-full shrink-0 ${
                 wakeWordPermissionStatus === 'denied'
                   ? 'bg-error'
                   : wakeWordPermissionStatus === 'prompt'
@@ -237,10 +237,10 @@ export default function Header({
                   : 'bg-outline'
               }`}
             />
-            <span className="material-symbols-outlined text-[17px]">
+            <span className="material-symbols-outlined text-[17px] shrink-0">
               {wakeWordPermissionStatus === 'denied' ? 'mic_off' : 'mic'}
             </span>
-            <span className="hidden sm:inline">
+            <span className="hidden sm:inline whitespace-nowrap">
               {wakeWordPermissionStatus === 'denied'
                 ? 'Mic Terblokir'
                 : wakeWordPermissionStatus === 'prompt'
@@ -253,7 +253,7 @@ export default function Header({
           <button
             aria-label={isHighContrast ? 'Nonaktifkan Mode Kontras Tinggi' : 'Aktifkan Mode Kontras Tinggi'}
             onClick={handleToggleHighContrast}
-            className={`hidden md:flex min-h-[40px] min-w-[40px] items-center justify-center rounded-full transition-all duration-200 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
+            className={`hidden md:flex min-h-[40px] min-w-[40px] items-center justify-center rounded-full transition-all duration-200 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 shrink-0 ${
               isHighContrast ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container'
             }`}
             type="button"
@@ -267,25 +267,25 @@ export default function Header({
             type="button"
             onClick={onOpenNotifications}
             aria-label="Buka notifikasi sistem dan info perbaikan DPUPR"
-            className="relative min-h-[40px] min-w-[40px] flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 cursor-pointer"
+            className="relative min-h-[38px] min-w-[38px] sm:min-h-[40px] sm:min-w-[40px] flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 cursor-pointer shrink-0"
             title="2 Pemberitahuan: Perbaikan DPUPR & Info Cuaca"
           >
-            <span className="material-symbols-outlined text-[22px]" aria-hidden="true">notifications</span>
-            <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-error text-white text-[10px] font-extrabold flex items-center justify-center shadow-xs">
+            <span className="material-symbols-outlined text-[20px] sm:text-[22px]" aria-hidden="true">notifications</span>
+            <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-error text-white text-[10px] font-extrabold flex items-center justify-center shadow-xs">
               2
             </span>
           </button>
         </div>
 
-        {/* 5. CTA Tunggal: Lapor Hambatan Baru */}
+        {/* 5. CTA Tunggal: Lapor Hambatan Baru (Hanya tampil di layar sedang sm ke atas agar mobile tetap bersih) */}
         <button
           type="button"
           onClick={() => navigate('report-obstacle')}
           aria-label="Buka formulir lapor hambatan baru"
-          className="flex items-center gap-1.5 min-h-[40px] px-3.5 sm:px-4 rounded-full bg-primary text-on-primary font-bold text-xs sm:text-sm shadow-sm hover:opacity-90 active:scale-95 transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 whitespace-nowrap cursor-pointer"
+          className="hidden sm:flex items-center gap-1.5 min-h-[40px] px-3.5 sm:px-4 rounded-full bg-primary text-on-primary font-bold text-xs sm:text-sm shadow-sm hover:opacity-90 active:scale-95 transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 whitespace-nowrap cursor-pointer shrink-0"
         >
           <span className="material-symbols-outlined text-[18px]" aria-hidden="true">notification_important</span>
-          <span className="hidden sm:inline text-xs font-bold">Lapor Hambatan</span>
+          <span className="text-xs font-bold">Lapor Hambatan</span>
         </button>
 
         {/* Profil & Poin Reward Warga */}
@@ -294,15 +294,15 @@ export default function Header({
           onClick={() => navigate('profile')}
           aria-label={`Buka Profil dan Reward Warga. Anda memiliki ${profile?.points?.toLocaleString('id-ID') || 0} Poin`}
           title={`Profil: ${profile?.name || 'Warga Leluasa'} · Klik untuk Tukar Poin Reward Tiket`}
-          className={`flex items-center gap-2 pl-2 sm:pl-2.5 pr-1 py-1 rounded-full border transition-all duration-200 outline-none cursor-pointer group ${
+          className={`flex items-center gap-1.5 sm:gap-2 pl-2 sm:pl-2.5 pr-1 py-1 rounded-full border transition-all duration-200 outline-none cursor-pointer group shrink-0 ${
             resolvedActiveTab === 'profile'
               ? 'bg-amber-400/20 border-amber-400 text-amber-900 dark:text-amber-200 ring-2 ring-amber-400/40 shadow-xs'
               : 'bg-surface-container hover:bg-amber-500/10 border-outline-variant/40 text-on-surface'
           }`}
         >
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
             <span className="material-symbols-outlined text-amber-500 text-[18px] group-hover:scale-110 transition-transform">stars</span>
-            <span className="text-xs font-extrabold text-amber-700 dark:text-amber-300">
+            <span className="text-xs font-extrabold text-amber-700 dark:text-amber-300 whitespace-nowrap">
               {profile?.points?.toLocaleString('id-ID') || '0'}
             </span>
             <span className="hidden xl:inline text-[11px] font-semibold text-on-surface-variant">Poin</span>
@@ -320,10 +320,10 @@ export default function Header({
         <button
           onClick={onOpenMobileMenu}
           aria-label="Buka menu navigasi"
-          className="lg:hidden min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          className="lg:hidden min-h-[38px] min-w-[38px] sm:min-h-[44px] sm:min-w-[44px] flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 shrink-0"
           type="button"
         >
-          <span className="material-symbols-outlined text-[26px]" aria-hidden="true">menu</span>
+          <span className="material-symbols-outlined text-[24px] sm:text-[26px]" aria-hidden="true">menu</span>
         </button>
       </div>
     </header>

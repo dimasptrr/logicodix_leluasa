@@ -8,6 +8,7 @@ import {
   getUserReports,
   resolveDpuprReport
 } from '../features/rewards/rewardService.js';
+import { fetchObstacles } from '../features/dashboard/services/safeApi.js';
 
 export default function Profile({ setActiveTab }) {
   const [profile, setProfile] = useState(getUserProfile());
@@ -43,6 +44,50 @@ export default function Profile({ setActiveTab }) {
     };
   }, []);
 
+  // Sinkronkan data riil rintangan dari database Supabase / Riwayat Komunitas
+  useEffect(() => {
+    async function syncCommunityReports() {
+      try {
+        const obsRes = await fetchObstacles();
+        if (obsRes?.data && Array.isArray(obsRes.data) && obsRes.data.length > 0) {
+          const mapped = obsRes.data.map((obs) => {
+            const isResolved = obs.status === 'resolved';
+            return {
+              id: String(obs.id),
+              sp4nTicket: `SP4N-LAPOR #DSDABM-2026-00${obs.id}`,
+              title: obs.title || obs.name || 'Rintangan Trotoar',
+              location: obs.location || obs.location_text || 'Surabaya',
+              coordinates: { lat: Number(obs.lat ?? obs.latitude), lng: Number(obs.lng ?? obs.longitude) },
+              category: obs.category || 'Rintangan Trotoar',
+              severity: obs.severity || 'difficult',
+              status: isResolved ? 'resolved' : 'in_progress',
+              reportedBy: obs.reporter || 'Dian Kartika Putri',
+              reportedDate: obs.reported_at ? new Date(obs.reported_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '11 Nov 2026',
+              durationHours: isResolved ? 'Tuntas Diperbaiki' : 'Dalam Antrean Satgas',
+              agency: 'DSDABM & Dishub Kota Surabaya',
+              teamLeader: 'Satgas UPTD Pemeliharaan Wilayah Surabaya Pusat',
+              pointsAwarded: isResolved ? 100 : 50,
+              communityConfirmations: obs.confirmedCount || obs.upvotes || 1,
+              workSummary: isResolved
+                ? 'Perbaikan fisik trotoar telah diselesaikan tuntas oleh satgas DPUPR di lokasi.'
+                : 'Laporan warga telah masuk antrean satgas DSDABM / DPUPR Surabaya untuk tindakan normalisasi lapangan.',
+              accessibilityImpact: isResolved
+                ? 'Jalur trotoar kini 100% mulus dan ramah disabilitas.'
+                : 'Akan dinormalisasi sesuai standar rampa 1:12 dan lebar bersih trotoar minimal 120 cm.',
+              photo_url: obs.photo_url || obs.image_url,
+              beforeImage: obs.photo_url || obs.image_url,
+              beforeCaption: `Kondisi Dilaporkan: ${obs.title || obs.category} (${obs.severity === 'impassable' ? 'Tidak bisa dilewati' : 'Sulit dilewati'})`
+            };
+          });
+          setReports(mapped);
+        }
+      } catch (err) {
+        // Fallback to local user reports
+      }
+    }
+    syncCommunityReports();
+  }, []);
+
   const showToast = (msg) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(''), 4000);
@@ -50,9 +95,27 @@ export default function Profile({ setActiveTab }) {
 
   const handleResolveReport = (reportId) => {
     try {
-      const res = resolveDpuprReport(reportId);
+      resolveDpuprReport(reportId);
       setProfile(getUserProfile());
-      setReports(getUserReports());
+      setReports((prev) =>
+        prev.map((r) =>
+          String(r.id) === String(reportId)
+            ? {
+                ...r,
+                status: 'resolved',
+                completedDate: 'Hari ini, Baru saja',
+                durationHours: '24 Jam Pengerjaan Tuntas',
+                agency: 'DSDABM Kota Surabaya · Satgas UPTD Pemeliharaan Trotoar',
+                teamLeader: 'Tim Reaksi Cepat Surabaya',
+                pointsAwarded: 100,
+                workSummary: 'Perbaikan fisik trotoar telah diselesaikan tuntas oleh satgas DPUPR / DSDABM di lokasi, aksesibilitas telah dipulihkan.',
+                accessibilityImpact: 'Jalur trotoar kini 100% mulus, aman, dan dapat dilintasi kursi roda maupun tongkat tunanetra.',
+                afterImage: 'https://images.unsplash.com/photo-1517649763962-0c623266ddc0?auto=format&fit=crop&w=600&q=80',
+                afterCaption: 'Kondisi Sesudah: Selesai diperbaiki tuntas oleh satgas DPUPR Surabaya.'
+              }
+            : r
+        )
+      );
       setHistory(getPointsHistory());
       showToast(`🎉 Satgas DPUPR telah menyelesaikan perbaikan laporan ini! Bonus +100 Poin Leluasa berhasil ditambahkan ke profil Anda!`);
     } catch (err) {
