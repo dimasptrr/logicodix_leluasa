@@ -36,27 +36,47 @@ function LumiIcon({ size = 24, className = '' }) {
   );
 }
 
-// Ekstraksi tujuan rute dari kalimat percakapan bahasa Indonesia
-function extractDestinationQuery(rawText) {
+// Ekstraksi asal dan tujuan rute dari kalimat percakapan bahasa Indonesia
+function extractRouteEndpoints(rawText) {
   if (!rawText) return null;
   const text = rawText.trim();
+  const clean = text.replace(/^(?:tolong|coba|bisa|mohon)?\s*(?:carikan|cari|buatkan|tampilkan|pandu|tuntun|buka|arahkan)?\s*(?:rute|navigasi|jalur|jalan)?\s*/i, '').trim();
 
-  // Pola 1: "dari ... ke <tujuan> (rutenya|rute)?"
-  const fromToMatch = text.match(/dari\s+.*?\s+ke\s+([^,.\n?]+?)(?:\s+(?:rutenya|rute|jalurnya|dong|ya|sekarang|tolong))?[\s.?!]*$/i);
-  if (fromToMatch && fromToMatch[1]) {
-    return cleanDestString(fromToMatch[1]);
+  // Pola 1: "dari <asal> ke <tujuan>" atau "dari <asal> menuju <tujuan>"
+  let m = clean.match(/^dari\s+(.+?)\s+(?:ke|menuju|arah|sampai)\s+(.+?)(?:\s+(?:rutenya|rute|jalurnya|dong|ya|sekarang|tolong|plis))?[\s.?!]*$/i);
+  if (m && m[1] && m[2]) {
+    return {
+      origin: cleanDestString(m[1]),
+      destination: cleanDestString(m[2])
+    };
   }
 
-  // Pola 2: "ke / menuju / arah <tujuan> (rutenya|rute)?"
-  const toMatch = text.match(/(?:ke|menuju|arah)\s+([^,.\n?]+?)(?:\s+(?:rutenya|rute|jalurnya|dong|ya|sekarang|tolong))?[\s.?!]*$/i);
-  if (toMatch && toMatch[1]) {
-    return cleanDestString(toMatch[1]);
+  // Pola 2: "<asal> ke <tujuan>" (Contoh: "grand city ke balai kota")
+  m = clean.match(/^(.+?)\s+(?:ke|menuju|arah|sampai)\s+(.+?)(?:\s+(?:rutenya|rute|jalurnya|dong|ya|sekarang|tolong|plis))?[\s.?!]*$/i);
+  if (m && m[1] && m[2]) {
+    const originCandidate = cleanDestString(m[1]).replace(/^(?:saya\s+mau|mau|ingin|pengen)\s+/i, '');
+    return {
+      origin: originCandidate,
+      destination: cleanDestString(m[2])
+    };
   }
 
-  // Pola 3: "rute / jalan / jalur <tujuan>"
-  const routePrefixMatch = text.match(/^(?:rute|jalur|jalan|navigasi|cari rute|tampilkan rute)\s+(?:ke\s+|menuju\s+)?([^,.\n?]+?)(?:\s+(?:rutenya|rute|jalurnya|dong|ya|sekarang|tolong))?[\s.?!]*$/i);
-  if (routePrefixMatch && routePrefixMatch[1]) {
-    return cleanDestString(routePrefixMatch[1]);
+  // Pola 3: Hanya tujuan ("ke <tujuan>", "menuju <tujuan>")
+  m = clean.match(/^(?:ke|menuju|arah)\s+(.+?)(?:\s+(?:rutenya|rute|jalurnya|dong|ya|sekarang|tolong|plis))?[\s.?!]*$/i);
+  if (m && m[1]) {
+    return {
+      origin: null,
+      destination: cleanDestString(m[1])
+    };
+  }
+
+  // Pola 4: "rute / jalur / navigasi <tujuan>"
+  m = text.match(/^(?:rute|jalur|jalan|navigasi|cari rute|tampilkan rute)\s+(?:ke\s+|menuju\s+)?([^,.\n?]+?)(?:\s+(?:rutenya|rute|jalurnya|dong|ya|sekarang|tolong))?[\s.?!]*$/i);
+  if (m && m[1]) {
+    return {
+      origin: null,
+      destination: cleanDestString(m[1])
+    };
   }
 
   return null;
@@ -65,11 +85,11 @@ function extractDestinationQuery(rawText) {
 function cleanDestString(str) {
   if (!str) return '';
   let s = str.trim();
-  // Hilangkan sisa frase "lokasi saya..." jika ada
+  s = s.replace(/^(?:dari|ke|menuju|arah)\s+/i, '');
   s = s.replace(/^(?:lokasi\s+saya\s+(?:saat\s+ini\s+)?ke\s+)/i, '');
-  // Ubah variasi alun2 menjadi alun-alun
   s = s.replace(/\balun\s*2\b/gi, 'alun-alun');
   s = s.replace(/\brs\b/gi, 'RSUD');
+  s = s.replace(/\s+(?:dong|ya|sekarang|tolong|plis|rutenya|rute|jalurnya)$/i, '');
   return s.trim();
 }
 
@@ -404,40 +424,92 @@ export default function VoiceAssistantModal({
     let cardData = null;
     let routeIntent = null;
 
-    // 1. Ekstraksi tujuan otomatis menggunakan regex bahasa Indonesia
-    const extractedDest = extractDestinationQuery(query);
+    // 1. Ekstraksi asal dan tujuan rute otomatis menggunakan NLP / Regex
+    const routeEndpoints = extractRouteEndpoints(query);
 
-    // 2. Deteksi apakah rute menuju preset Surabaya atau lokasi kustom di luar Surabaya
-    if (lower.includes('soetomo') || lower.includes('rsud')) {
-      targetTab = 'plan-route';
+    if (routeEndpoints && routeEndpoints.destination) {
+      // PENCARIAN RUTE DINAMIS (Misal: "grand city ke balai kota", "dari tunjungan plaza ke balai pemuda", dll)
+      setIsSearchingRoute(true);
+      const centerLat = coords?.lat || -7.2575;
+      const centerLng = coords?.lng || 112.7521;
+      let resolvedDest = null;
+      let resolvedOrigin = null;
+
+      try {
+        const destPromise = geocodeSearch(routeEndpoints.destination, centerLat, centerLng);
+        const originPromise = routeEndpoints.origin ? geocodeSearch(routeEndpoints.origin, centerLat, centerLng) : Promise.resolve(null);
+
+        const [destRes, origRes] = await Promise.all([destPromise, originPromise]);
+
+        if (destRes && Array.isArray(destRes.data) && destRes.data.length > 0) {
+          resolvedDest = destRes.data[0];
+        }
+        if (origRes && Array.isArray(origRes.data) && origRes.data.length > 0) {
+          resolvedOrigin = origRes.data[0];
+        }
+      } catch (err) {
+        console.warn('Geocoding gagal:', err);
+      } finally {
+        setIsSearchingRoute(false);
+      }
+
+      const destLat = resolvedDest ? resolvedDest.lat : (coords?.lat ? coords.lat + 0.005 : -7.2593);
+      const destLng = resolvedDest ? resolvedDest.lng : (coords?.lng ? coords.lng + 0.005 : 112.7470);
+      const destDisplayName = resolvedDest?.name || routeEndpoints.destination;
+
+      let originData = null;
+      if (resolvedOrigin) {
+        originData = {
+          lat: resolvedOrigin.lat,
+          lng: resolvedOrigin.lng,
+          name: resolvedOrigin.name,
+          source: 'search'
+        };
+      } else if (routeEndpoints.origin) {
+        originData = {
+          lat: centerLat,
+          lng: centerLng,
+          name: routeEndpoints.origin,
+          source: 'search'
+        };
+      } else if (coords) {
+        originData = {
+          lat: coords.lat,
+          lng: coords.lng,
+          name: 'Lokasi GPS Saya',
+          source: 'gps'
+        };
+      }
+
       routeIntent = {
-        destination: { id: 'rsud-soetomo', name: 'RSUD Dr. Soetomo Surabaya', lat: -7.2678, lng: 112.7582 },
+        origin: originData,
+        destination: {
+          lat: destLat,
+          lng: destLng,
+          name: destDisplayName,
+          id: `custom-${Date.now()}`
+        },
         autoPlayVoice: navVoiceMode === 'voice'
       };
-      reply = `Menyiapkan rute aksesibel ke RSUD Dr. Soetomo: trotoar ubin pemandu via Jl. Kusuma Bangsa bebas dari rintangan proyek galian.${navVoiceMode === 'voice' ? ' Panduan suara turn-by-turn akan langsung aktif.' : ' Membuka peta rute navigasi visual...'}`;
-      cardData = {
-        title: 'Jalur Akses RSUD Dr. Soetomo',
-        badge: navVoiceMode === 'voice' ? '🔊 Panduan Suara Aktif' : 'Rampa Landai 4.5°',
-        subtitle: 'Jl. Kusuma Bangsa • 10 mnt (650m)',
-        tags: ['Ubin Pemandu Utuh', 'Bebas Hambatan', 'Lift Aksesibel'],
-        targetTab: 'plan-route',
-        targetRouteKey: 'rsud-soetomo',
-        routeIntent
-      };
-    } else if (lower.includes('pemuda') || lower.includes('halte') || (lower.includes('balai') && !lower.includes('kota'))) {
+
       targetTab = 'plan-route';
-      routeIntent = {
-        destination: { id: 'balai-pemuda', name: 'Halte Integrasi Balai Pemuda', lat: -7.2655, lng: 112.7515 },
-        autoPlayVoice: navVoiceMode === 'voice'
-      };
-      reply = `Menyiapkan rute Halte Balai Pemuda: belok kanan 45m dari Jl. Pemuda dengan ubin pemandu teratur.${navVoiceMode === 'voice' ? ' Panduan suara turn-by-turn akan langsung aktif.' : ' Membuka peta rute navigasi visual...'}`;
+      const isCustomOrigin = originData && originData.source === 'search';
+      const originLabel = isCustomOrigin ? originData.name : (coords ? 'Lokasi GPS Anda' : 'Titik Awal');
+
+      reply = isCustomOrigin
+        ? `Menyiapkan rute aksesibel dari ${originData.name} menuju ${destDisplayName}.${navVoiceMode === 'voice' ? ' Memutar panduan suara langkah demi langkah...' : ' Mengarahkan ke peta navigasi visual...'}`
+        : `Menyiapkan rute aksesibel menuju ${destDisplayName}.${navVoiceMode === 'voice' ? ' Memutar panduan suara langkah demi langkah...' : ' Mengarahkan ke peta navigasi visual...'}`;
+
       cardData = {
-        title: 'Rute Halte Balai Pemuda',
-        badge: navVoiceMode === 'voice' ? '🔊 Panduan Suara Aktif' : '100% Ramah Roda',
-        subtitle: 'Jl. Pemuda Surabaya • 8 mnt (420m)',
-        tags: ['Jalur Kuning', 'Elevator 10m', 'Trotoar Rata'],
+        title: isCustomOrigin ? `Rute ${originData.name} ke ${destDisplayName}` : `Rute ke ${destDisplayName}`,
+        badge: navVoiceMode === 'voice' ? '🔊 Panduan Suara Aktif' : '🗺️ Peta Visual',
+        subtitle: `${originLabel} menuju ${destDisplayName}`,
+        tags: [
+          'Rute Ramah Disabilitas',
+          'Deteksi Cerdas AI',
+          navVoiceMode === 'voice' ? 'Turn-by-turn Suara' : 'Peta Interaktif'
+        ],
         targetTab: 'plan-route',
-        targetRouteKey: 'balai-pemuda',
         routeIntent
       };
     } else if (lower.includes('kuliner') || lower.includes('makan') || lower.includes('sentra')) {
@@ -466,57 +538,6 @@ export default function VoiceAssistantModal({
         tags: ['Rampa Halus 120cm', 'Bypass Tiang', 'Kursi Roda Aman'],
         targetTab: 'plan-route',
         targetRouteKey: 'detour-bollard',
-        routeIntent
-      };
-    } else if (extractedDest) {
-      // 3. PENCARIAN RUTE KE LOKASI DINAMIS (Misal: "alun2 probolinggo", "kopi kenangan probolinggo", dll)
-      setIsSearchingRoute(true);
-      let resolvedPlace = null;
-
-      try {
-        const geoRes = await geocodeSearch(extractedDest, coords?.lat, coords?.lng);
-        if (geoRes && Array.isArray(geoRes.data) && geoRes.data.length > 0) {
-          resolvedPlace = geoRes.data[0];
-        }
-      } catch (err) {
-        console.warn('Geocoding gagal:', err);
-      } finally {
-        setIsSearchingRoute(false);
-      }
-
-      const destLat = resolvedPlace ? resolvedPlace.lat : (coords?.lat ? coords.lat + 0.005 : -7.7545);
-      const destLng = resolvedPlace ? resolvedPlace.lng : (coords?.lng ? coords.lng + 0.005 : 113.2159);
-      const destDisplayName = resolvedPlace?.name || extractedDest;
-
-      routeIntent = {
-        origin: coords ? {
-          lat: coords.lat,
-          lng: coords.lng,
-          name: 'Lokasi GPS Saya',
-          source: 'gps'
-        } : null,
-        destination: {
-          lat: destLat,
-          lng: destLng,
-          name: destDisplayName,
-          id: `custom-${Date.now()}`
-        },
-        autoPlayVoice: navVoiceMode === 'voice'
-      };
-
-      targetTab = 'plan-route';
-      reply = `Menyiapkan rute aksesibel menuju ${destDisplayName}.${navVoiceMode === 'voice' ? ' Mengarahkan ke peta dan memutar panduan suara langkah demi langkah...' : ' Mengarahkan langsung ke peta rute navigasi...'}`;
-
-      cardData = {
-        title: `Rute ke ${destDisplayName}`,
-        badge: navVoiceMode === 'voice' ? '🔊 Panduan Suara Aktif' : '🗺️ Peta Visual',
-        subtitle: `${coords ? 'Dari Lokasi GPS Anda' : 'Dari Titik Awal'} menuju ${destDisplayName}`,
-        tags: [
-          'Rute Ramah Disabilitas',
-          'Deteksi Cerdas AI',
-          navVoiceMode === 'voice' ? 'Turn-by-turn Suara' : 'Peta Interaktif'
-        ],
-        targetTab: 'plan-route',
         routeIntent
       };
     } else if (lower.includes('lapor') || lower.includes('rusak') || lower.includes('hambatan') || lower.includes('kabel') || lower.includes('foto')) {
