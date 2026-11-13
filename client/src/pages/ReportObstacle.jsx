@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import { createObstacle, geocodeSearch, reverseGeocode } from '../features/dashboard/services/safeApi.js';
 import useGeolocation from '../features/dashboard/hooks/useGeolocation.js';
+import { addReportPoints, getUserProfile, addUserReport } from '../features/rewards/rewardService.js';
 
 const MAX_PHOTO_BYTES = 1.5 * 1024 * 1024;
 
@@ -62,6 +63,7 @@ export default function ReportObstacle({ setActiveTab }) {
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [reportTicketId, setReportTicketId] = useState('');
+  const [earnedPoints, setEarnedPoints] = useState(0);
 
   const fileInputRef = useRef(null);
   const mapContainerRef = useRef(null);
@@ -447,6 +449,26 @@ export default function ReportObstacle({ setActiveTab }) {
       });
 
       setReportTicketId(result.data.id);
+      
+      // Berikan reward poin warga atas kontribusi laporan & simpan ke riwayat laporan warga real-time
+      const pointsBonus = 50;
+      addReportPoints(category, pointsBonus);
+      setEarnedPoints(pointsBonus);
+
+      addUserReport({
+        id: result.data.id,
+        sp4nTicket: `SP4N-LAPOR #DSDABM-2026-${result.data.id}`,
+        title: `${category} di ${locationText.split(',')[0]}`,
+        location: locationText.trim(),
+        coordinates: selectedLocation ? { lat: selectedLocation.lat, lng: selectedLocation.lng } : { lat: -7.2575, lng: 112.7521 },
+        category,
+        severity,
+        notes: reportNote,
+        photo_url: uploadedImage,
+        beforeImage: uploadedImage,
+        beforeCaption: `Kondisi Dilaporkan: ${category} (${severity === 'impassable' ? 'Tidak bisa dilewati' : 'Sulit dilewati'})`
+      });
+
       setSubmitSuccess(true);
     } catch (err) {
       setSubmitError(err.message || 'Gagal mengirimkan laporan. Silakan coba kembali.');
@@ -457,6 +479,7 @@ export default function ReportObstacle({ setActiveTab }) {
 
   const resetForm = () => {
     setSubmitSuccess(false);
+    setEarnedPoints(0);
     setSubmitError(null);
     setUploadedImage(null);
     setNotes('');
@@ -487,6 +510,34 @@ export default function ReportObstacle({ setActiveTab }) {
             <p className="text-xs sm:text-sm text-on-surface-variant max-w-md">
               Terima kasih atas kontribusi Anda membantu pejalan kaki dan pengguna kursi roda di Surabaya.
             </p>
+          </div>
+
+          {/* Reward Poin Banner */}
+          <div className="w-full p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-400/20 to-amber-500/15 border-2 border-amber-400/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-left shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-amber-400 text-slate-900 flex items-center justify-center font-extrabold shadow-md shrink-0">
+                <span className="material-symbols-outlined text-2xl">stars</span>
+              </div>
+              <div>
+                <span className="text-[11px] font-black text-amber-800 dark:text-amber-200 uppercase tracking-wider block">
+                  🎉 Reward Poin Warga Ditambahkan
+                </span>
+                <span className="text-sm font-bold text-on-surface block">
+                  +{earnedPoints || 50} Poin Leluasa Masuk ke Profil Anda!
+                </span>
+                <p className="text-[11px] text-on-surface-variant mt-0.5">
+                  Tukarkan poin ini dengan Tiket Terusan Feeder WiraWiri atau Tiket Suroboyo Bus.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('profile')}
+              className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs shadow-sm flex items-center gap-1.5 shrink-0 cursor-pointer transition-all active:scale-95"
+            >
+              <span>Tukar Tiket</span>
+              <span className="material-symbols-outlined text-sm">arrow_forward</span>
+            </button>
           </div>
 
           <div className="w-full p-4 rounded-2xl bg-surface-container-low border border-outline-variant/20 flex flex-col gap-2 text-left text-xs">

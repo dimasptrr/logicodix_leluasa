@@ -8,6 +8,7 @@ import PlanRoute from './pages/PlanRoute.jsx';
 import ReportObstacle from './pages/ReportObstacle.jsx';
 import ReportsImpact from './pages/ReportsImpact.jsx';
 import WeatherIntelligence from './pages/WeatherIntelligence.jsx';
+import Profile from './pages/Profile.jsx';
 import AccessibilityModal from './components/AccessibilityModal.jsx';
 import VoiceAssistantModal from './components/VoiceAssistantModal.jsx';
 import useWakeWord from './features/dashboard/hooks/useWakeWord.js';
@@ -238,6 +239,12 @@ export default function App() {
 
           {activeTab === 'weather-intelligence' && (
             <WeatherIntelligence
+              setActiveTab={handleSetActiveTab}
+            />
+          )}
+
+          {activeTab === 'profile' && (
+            <Profile
               setActiveTab={handleSetActiveTab}
             />
           )}

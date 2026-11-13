@@ -34,6 +34,7 @@ export default function Sidebar({
     { id: 'report-obstacle', label: 'Buat Laporan', icon: 'notification_important', isAction: true },
     { id: 'reports-impact', label: 'Riwayat & Verifikasi Komunitas', icon: 'history' },
     { id: 'weather-intelligence', label: 'Intelijen Cuaca', icon: 'routine' },
+    { id: 'profile', label: 'Profil & Reward Warga', icon: 'military_tech' },
   ];
 
   const handleItemClick = (id) => {

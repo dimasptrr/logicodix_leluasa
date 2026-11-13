@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getUserProfile } from '../features/rewards/rewardService.js';
 
 export default function Header({
   searchQuery,
@@ -24,6 +25,13 @@ export default function Header({
 }) {
   const [currentTab, setCurrentTab] = useState(activeTab || 'home');
   const [isHighContrast, setIsHighContrast] = useState(false);
+  const [profile, setProfile] = useState(getUserProfile());
+
+  useEffect(() => {
+    const handleRewards = () => setProfile(getUserProfile());
+    window.addEventListener('leluasa:rewards-updated', handleRewards);
+    return () => window.removeEventListener('leluasa:rewards-updated', handleRewards);
+  }, []);
 
   const TAB_LABELS = {
     'home': 'Dashboard',
@@ -32,6 +40,7 @@ export default function Header({
     'report-obstacle': 'Lapor Hambatan',
     'reports-impact': 'Riwayat Komunitas',
     'weather-intelligence': 'Intelijen Cuaca',
+    'profile': 'Profil & Reward Warga',
   };
 
   const resolvedActiveTab = activeTab || currentTab;
@@ -252,6 +261,20 @@ export default function Header({
           >
             <span className="material-symbols-outlined text-[22px]" aria-hidden="true">contrast</span>
           </button>
+
+          {/* Notifikasi Sistem / Pembaruan Trotoar */}
+          <button
+            type="button"
+            onClick={onOpenNotifications}
+            aria-label="Buka notifikasi sistem dan info perbaikan DPUPR"
+            className="relative min-h-[40px] min-w-[40px] flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 cursor-pointer"
+            title="2 Pemberitahuan: Perbaikan DPUPR & Info Cuaca"
+          >
+            <span className="material-symbols-outlined text-[22px]" aria-hidden="true">notifications</span>
+            <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-error text-white text-[10px] font-extrabold flex items-center justify-center shadow-xs">
+              2
+            </span>
+          </button>
         </div>
 
         {/* 5. CTA Tunggal: Lapor Hambatan Baru */}
@@ -259,10 +282,38 @@ export default function Header({
           type="button"
           onClick={() => navigate('report-obstacle')}
           aria-label="Buka formulir lapor hambatan baru"
-          className="flex items-center gap-1.5 min-h-[40px] px-4 rounded-full bg-primary text-on-primary font-bold text-sm shadow-sm hover:opacity-90 active:scale-95 transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 whitespace-nowrap cursor-pointer"
+          className="flex items-center gap-1.5 min-h-[40px] px-3.5 sm:px-4 rounded-full bg-primary text-on-primary font-bold text-xs sm:text-sm shadow-sm hover:opacity-90 active:scale-95 transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 whitespace-nowrap cursor-pointer"
         >
           <span className="material-symbols-outlined text-[18px]" aria-hidden="true">notification_important</span>
           <span className="hidden sm:inline text-xs font-bold">Lapor Hambatan</span>
+        </button>
+
+        {/* Profil & Poin Reward Warga */}
+        <button
+          type="button"
+          onClick={() => navigate('profile')}
+          aria-label={`Buka Profil dan Reward Warga. Anda memiliki ${profile?.points?.toLocaleString('id-ID') || 0} Poin`}
+          title={`Profil: ${profile?.name || 'Warga Leluasa'} · Klik untuk Tukar Poin Reward Tiket`}
+          className={`flex items-center gap-2 pl-2 sm:pl-2.5 pr-1 py-1 rounded-full border transition-all duration-200 outline-none cursor-pointer group ${
+            resolvedActiveTab === 'profile'
+              ? 'bg-amber-400/20 border-amber-400 text-amber-900 dark:text-amber-200 ring-2 ring-amber-400/40 shadow-xs'
+              : 'bg-surface-container hover:bg-amber-500/10 border-outline-variant/40 text-on-surface'
+          }`}
+        >
+          <div className="flex items-center gap-1">
+            <span className="material-symbols-outlined text-amber-500 text-[18px] group-hover:scale-110 transition-transform">stars</span>
+            <span className="text-xs font-extrabold text-amber-700 dark:text-amber-300">
+              {profile?.points?.toLocaleString('id-ID') || '0'}
+            </span>
+            <span className="hidden xl:inline text-[11px] font-semibold text-on-surface-variant">Poin</span>
+          </div>
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden border-2 border-primary/40 shadow-xs shrink-0 group-hover:border-primary transition-colors">
+            <img
+              src={profile?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80'}
+              alt={profile?.name || 'Foto Profil'}
+              className="w-full h-full object-cover"
+            />
+          </div>
         </button>
 
         {/* Mobile hamburger */}

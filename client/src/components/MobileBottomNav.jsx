@@ -13,6 +13,7 @@ export default function MobileBottomNav({ activeTab, setActiveTab }) {
     { id: 'plan-route',      label: 'Rute',    icon: 'alt_route' },
     { id: 'report-obstacle', label: 'Lapor',   icon: 'notification_important' },
     { id: 'reports-impact',  label: 'Riwayat', icon: 'history' },
+    { id: 'profile',         label: 'Reward',  icon: 'military_tech' },
   ];
 
   const isTabActive = (tab) => tab.id === activeTab;
