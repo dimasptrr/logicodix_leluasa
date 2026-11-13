@@ -34,7 +34,7 @@ export const REWARD_CATALOG = [
     badge: 'Paling Populer',
     badgeColor: 'bg-primary text-white',
     icon: 'directions_bus',
-    image: 'https://images.unsplash.com/photo-1570125909232-eb263c188f7e?auto=format&fit=crop&w=400&q=80',
+    image: '/images/wirawiri-bus.jpg',
     description: '1 Tiket Feeder WiraWiri rute manapun di Surabaya. Armada low-floor dengan rampa aksesibel kursi roda.',
     terms: 'Berlaku 30 hari sejak penukaran. Tunjukkan QR Code tiket kepada helper/kondektur bus.',
     quota: 'Tersedia'
@@ -48,7 +48,7 @@ export const REWARD_CATALOG = [
     badge: 'Ramah Kursi Roda',
     badgeColor: 'bg-secondary text-white',
     icon: 'airport_shuttle',
-    image: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=400&q=80',
+    image: '/images/suroboyo-bus.jpg',
     description: 'Akses bebas naik Suroboyo Bus koridor manapun seharian penuh tanpa bayar botol plastik.',
     terms: 'Berlaku untuk 1 hari perjalanan dari jam 05:30 - 21:00 WIB di seluruh koridor aktif.',
     quota: 'Tersedia'

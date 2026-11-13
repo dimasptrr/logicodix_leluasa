@@ -60,6 +60,18 @@ export default function Profile({ setActiveTab }) {
     }
   };
 
+  const handleGoToCatalog = () => {
+    setSubTab('catalog');
+    setTimeout(() => {
+      const el = document.getElementById('katalog-tiket-bus');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        el.classList.add('ring-4', 'ring-amber-400/60');
+        setTimeout(() => el.classList.remove('ring-4', 'ring-amber-400/60'), 2000);
+      }
+    }, 60);
+  };
+
   const handleOpenRedeemModal = (item) => {
     if (profile.points < item.pointsCost) {
       showToast(`Poin Anda belum cukup (${profile.points} Poin). Perlu ${item.pointsCost} Poin untuk ${item.title}.`);
@@ -169,10 +181,11 @@ export default function Profile({ setActiveTab }) {
             <div className="flex flex-col gap-1.5">
               <button
                 type="button"
-                onClick={() => setSubTab('catalog')}
+                onClick={handleGoToCatalog}
                 className="px-4 py-2 rounded-xl bg-amber-400 text-slate-900 font-extrabold text-xs shadow-md hover:bg-amber-300 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                title="Buka dan scroll ke Katalog Tiket Bus Surabaya"
               >
-                <span className="material-symbols-outlined text-base">redeem</span>
+                <span className="material-symbols-outlined text-base">directions_bus</span>
                 <span>Tukar Tiket Bus</span>
               </button>
               <button
@@ -281,8 +294,8 @@ export default function Profile({ setActiveTab }) {
               : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
           }`}
         >
-          <span className="material-symbols-outlined text-base">redeem</span>
-          <span>Katalog Tukar Reward ({REWARD_CATALOG.length})</span>
+          <span className="material-symbols-outlined text-base">directions_bus</span>
+          <span>Katalog Tiket Bus ({REWARD_CATALOG.length})</span>
         </button>
 
         <button
@@ -329,22 +342,41 @@ export default function Profile({ setActiveTab }) {
       </div>
 
       {/* =========================================================================
-          TAB 1: KATALOG TUKAR REWARD (WIRAWIRI SUROBOYO & SUROBOYO BUS)
+          TAB 1: KATALOG TIKET BUS SURABAYA (WIRAWIRI SUROBOYO & SUROBOYO BUS)
           ========================================================================= */}
       {activeTab === 'catalog' && (
-        <div className="flex flex-col gap-4 animate-fadeIn">
+        <div id="katalog-tiket-bus" className="flex flex-col gap-4 animate-fadeIn scroll-mt-28 rounded-3xl p-1 transition-all duration-300">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="font-headline-sm text-base sm:text-lg font-bold text-primary">
-                Katalog Reward Transportasi Surabaya
+              <h2 className="font-headline-sm text-base sm:text-lg font-bold text-primary flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-xl">directions_bus</span>
+                <span>Katalog Tiket Bus Surabaya</span>
               </h2>
               <p className="text-xs text-on-surface-variant mt-0.5">
-                Tukarkan poin laporan Anda dengan tiket transportasi umum ramah disabilitas (WiraWiri Suroboyo &amp; Suroboyo Bus).
+                Tukarkan poin laporan Anda dengan tiket perjalanan resmi WiraWiri Suroboyo dan Suroboyo Bus ramah disabilitas.
               </p>
             </div>
-            <span className="text-xs font-extrabold text-primary bg-primary/10 px-3 py-1.5 rounded-full border border-primary/20">
-              Poin Tersedia: {profile.points} Poin
+            <span className="text-xs font-extrabold text-primary bg-primary/10 px-3.5 py-1.5 rounded-full border border-primary/20 flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-amber-500 text-sm">stars</span>
+              <span>Poin Anda: {profile.points.toLocaleString('id-ID')} Poin</span>
             </span>
+          </div>
+
+          {/* Banner Edukasi: Apa itu Tiket Bus Leluasa & Cara Pakainya */}
+          <div className="p-4 sm:p-4.5 rounded-2xl bg-gradient-to-r from-primary/10 via-secondary/10 to-primary/10 border border-primary/25 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-primary text-white flex items-center justify-center font-bold shrink-0 shadow-sm">
+                <span className="material-symbols-outlined text-xl">confirmation_number</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-extrabold text-primary text-xs sm:text-sm">
+                  Cara Menggunakan Tiket Bus dari Poin Laporan Trotoar:
+                </span>
+                <p className="text-[11px] text-on-surface-variant mt-0.5 leading-relaxed">
+                  Pilih tiket di bawah &gt; Klik <strong>"Tukar Poin"</strong> &gt; Sistem menerbitkan <strong>E-Tiket QR Code</strong> resmi &gt; Tunjukkan QR Code kepada petugas/helper bus saat naik untuk bepergian gratis tanpa bayar botol atau tunai!
+                </p>
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
@@ -357,9 +389,13 @@ export default function Profile({ setActiveTab }) {
                 >
                   <div className="relative h-44 sm:h-48 w-full overflow-hidden bg-surface-container">
                     <img
-                      src={item.image}
+                      src={item.image || (item.id === 'wirawiri-single' ? '/images/wirawiri-bus.jpg' : '/images/suroboyo-bus.jpg')}
                       alt={item.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = item.id === 'wirawiri-single' ? '/images/wirawiri-bus.jpg' : '/images/suroboyo-bus.jpg';
+                      }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                     
