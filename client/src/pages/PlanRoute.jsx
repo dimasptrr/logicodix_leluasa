@@ -181,7 +181,7 @@ function formatStepManeuver(st, idx, arr, destName) {
   return { icon, instruction };
 }
 
-export default function PlanRoute({ setActiveTab }) {
+export default function PlanRoute({ setActiveTab, onNavigatingChange }) {
   const [routeData, setRouteData] = useState(null);
   const [routeIntent, setRouteIntent] = useState(() => {
     if (typeof window !== 'undefined' && window.__leluasaRouteIntent) {
@@ -247,6 +247,21 @@ export default function PlanRoute({ setActiveTab }) {
 
   const shouldAutoPlayVoiceRef = useRef(false);
   const hasAutoPlayedVoiceRef = useRef(false);
+
+  // Sinkronkan status navigasi aktif ke parent (App.jsx) agar header global otomatis hilang hanya saat navigasi rute aktif di peta
+  useEffect(() => {
+    if (typeof onNavigatingChange === 'function') {
+      onNavigatingChange(isNavigating);
+    }
+  }, [isNavigating, onNavigatingChange]);
+
+  useEffect(() => {
+    return () => {
+      if (typeof onNavigatingChange === 'function') {
+        onNavigatingChange(false);
+      }
+    };
+  }, [onNavigatingChange]);
 
   // Periksa apakah ada target rute yang dikirim dari Asisten Suara atau Dashboard
   useEffect(() => {

@@ -22,6 +22,7 @@ export default function App() {
   const [autoStartListening, setAutoStartListening] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [notificationToast, setNotificationToast] = useState('');
+  const [isNavigatingMode, setIsNavigatingMode] = useState(false);
 
   // Voice Wake Word ("Hai LUMI" / "Halo LUMI") di latar belakang
   const {
@@ -57,6 +58,9 @@ export default function App() {
     if (tab === 'voice-assistant') {
       setVoiceOpen(true);
       return;
+    }
+    if (tab !== 'plan-route') {
+      setIsNavigatingMode(false);
     }
     if (tab === activeTab) return;
 
@@ -161,10 +165,10 @@ export default function App() {
         onCloseMobile={() => setIsMobileMenuOpen(false)}
       />
 
-      {/* Main Layout Area (pl-0 on mobile, pl-80 on desktop jika bukan plan-route) */}
-      <div className={`pl-0 ${activeTab === 'plan-route' ? '' : 'lg:pl-80'} pb-20 lg:pb-0 min-h-screen flex flex-col w-full`}>
-        {/* Top Responsive Header (Dihilangkan saat di halaman rute & perbandingan agar fokus ke navigasi) */}
-        {activeTab !== 'plan-route' && (
+      {/* Main Layout Area (pl-0 on mobile, pl-80 on desktop jika bukan sedang navigasi aktif) */}
+      <div className={`pl-0 ${isNavigatingMode && activeTab === 'plan-route' ? '' : 'lg:pl-80'} pb-20 lg:pb-0 min-h-screen flex flex-col w-full`}>
+        {/* Top Responsive Header: Tampil di semua halaman, hanya disembunyikan saat pengguna sedang dalam mode panduan navigasi aktif di peta */}
+        {(!isNavigatingMode || activeTab !== 'plan-route') && (
           <Header
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
@@ -206,8 +210,8 @@ export default function App() {
           </div>
         )}
 
-        {/* Content Workspace (pt-0 pada plan-route, pt-16/pt-20 pada halaman lain dengan Header) */}
-        <main className={`relative ${activeTab === 'plan-route' ? 'pt-0 min-h-screen' : 'pt-16 sm:pt-20 min-h-[calc(100vh-4rem)] sm:min-h-[calc(100vh-5rem)]'} bg-surface w-full flex-1`}>
+        {/* Content Workspace (pt-0 pada saat navigasi rute aktif di peta, pt-16/pt-[72px] pada halaman lain dengan Header) */}
+        <main className={`relative ${isNavigatingMode && activeTab === 'plan-route' ? 'pt-0 min-h-screen' : 'pt-16 sm:pt-[72px] min-h-[calc(100vh-4rem)] sm:min-h-[calc(100vh-4.5rem)]'} bg-surface w-full flex-1`}>
           {activeTab === 'home' && (
             <Dashboard
               setActiveTab={handleSetActiveTab}
@@ -224,6 +228,7 @@ export default function App() {
           {activeTab === 'plan-route' && (
             <PlanRoute
               setActiveTab={handleSetActiveTab}
+              onNavigatingChange={setIsNavigatingMode}
             />
           )}
 

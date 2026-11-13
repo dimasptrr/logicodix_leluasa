@@ -150,8 +150,8 @@ export default function Header({
         </span>
       </button>
 
-      {/* Search Bar - Hanya tampil di desktop/tablet (md ke atas) agar di mobile tidak mendesak elemen lain */}
-      <div className="hidden md:flex relative flex-1 min-w-0 max-w-xs xl:max-w-sm">
+      {/* Search Bar - Hanya tampil di monitor lebar (2xl ke atas) agar di laptop layar standar dan mobile tidak mendesak tombol navigasi */}
+      <div className="hidden 2xl:flex relative w-56 xl:w-64 shrink-0">
         <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[20px]" aria-hidden="true">
           search
         </span>
@@ -166,8 +166,8 @@ export default function Header({
         />
       </div>
 
-      {/* Desktop Nav Links: Mengarah ke halaman yang tepat dan terverifikasi */}
-      <nav aria-label="Navigasi Utama" className="hidden lg:flex items-end gap-0 h-full">
+      {/* Desktop Nav Links: Tampil rapi mulai layar xl (laptop & desktop), tanpa desak-desakan */}
+      <nav aria-label="Navigasi Utama" className="hidden xl:flex items-end gap-1 h-full">
         {navLinks.map((link) => {
           const isActive = resolvedActiveTab === link.id;
           return (
@@ -175,8 +175,8 @@ export default function Header({
               key={link.id}
               type="button"
               onClick={() => navigate(link.id)}
-              className={`h-full px-4 text-sm font-semibold transition-all duration-200 whitespace-nowrap outline-none relative border-b-2 cursor-pointer ${isActive
-                  ? 'text-primary border-primary font-bold'
+              className={`h-full px-2.5 2xl:px-4 text-xs 2xl:text-sm font-bold transition-all duration-200 whitespace-nowrap outline-none relative border-b-2 cursor-pointer ${isActive
+                  ? 'text-primary border-primary'
                   : 'text-on-surface-variant border-transparent hover:text-on-surface hover:border-primary/30'
                 }`}
               aria-current={isActive ? 'page' : undefined}
@@ -236,7 +236,7 @@ export default function Header({
             <span className="material-symbols-outlined text-[17px] shrink-0">
               {wakeWordPermissionStatus === 'denied' ? 'mic_off' : 'mic'}
             </span>
-            <span className="hidden sm:inline whitespace-nowrap">
+            <span className="hidden 2xl:inline whitespace-nowrap">
               {wakeWordPermissionStatus === 'denied'
                 ? 'Mic Terblokir'
                 : wakeWordPermissionStatus === 'prompt'
@@ -249,7 +249,7 @@ export default function Header({
           <button
             aria-label={isHighContrast ? 'Nonaktifkan Mode Kontras Tinggi' : 'Aktifkan Mode Kontras Tinggi'}
             onClick={handleToggleHighContrast}
-            className={`hidden md:flex min-h-[40px] min-w-[40px] items-center justify-center rounded-full transition-all duration-200 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 shrink-0 ${isHighContrast ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container'
+            className={`hidden 2xl:flex min-h-[40px] min-w-[40px] items-center justify-center rounded-full transition-all duration-200 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 shrink-0 ${isHighContrast ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container'
               }`}
             type="button"
             title="Klik untuk Kontras Tinggi Nyata"
@@ -258,14 +258,14 @@ export default function Header({
           </button>
         </div>
 
-        {/* 5. CTA Tunggal: Lapor Hambatan Baru (Hanya tampil di layar sedang sm ke atas agar mobile tetap bersih) */}
+        {/* 5. CTA Tunggal: Lapor Hambatan Baru */}
         <button
           type="button"
           onClick={() => navigate('report-obstacle')}
           aria-label="Buka formulir lapor hambatan baru"
-          className="hidden sm:flex items-center gap-1.5 min-h-[40px] px-3.5 sm:px-4 rounded-full bg-primary text-on-primary font-bold text-xs sm:text-sm shadow-sm hover:opacity-90 active:scale-95 transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 whitespace-nowrap cursor-pointer shrink-0"
+          className="hidden xl:flex items-center gap-1.5 min-h-[38px] px-3.5 rounded-full bg-primary text-on-primary font-bold text-xs shadow-sm hover:opacity-90 active:scale-95 transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 whitespace-nowrap cursor-pointer shrink-0"
         >
-          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">notification_important</span>
+          <span className="material-symbols-outlined text-[17px]" aria-hidden="true">notification_important</span>
           <span className="text-xs font-bold">Lapor Hambatan</span>
         </button>
 
@@ -296,11 +296,11 @@ export default function Header({
           </div>
         </button>
 
-        {/* Mobile hamburger */}
+        {/* Mobile / Tablet hamburger: Tampil di layar < xl agar laptop layar sedang tetap bersih dan tidak bertabrakan */}
         <button
           onClick={onOpenMobileMenu}
           aria-label="Buka menu navigasi"
-          className="lg:hidden min-h-[38px] min-w-[38px] sm:min-h-[44px] sm:min-w-[44px] flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 shrink-0"
+          className="xl:hidden min-h-[38px] min-w-[38px] sm:min-h-[44px] sm:min-w-[44px] flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 shrink-0"
           type="button"
         >
           <span className="material-symbols-outlined text-[24px] sm:text-[26px]" aria-hidden="true">menu</span>
