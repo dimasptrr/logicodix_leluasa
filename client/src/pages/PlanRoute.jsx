@@ -220,6 +220,7 @@ export default function PlanRoute({ setActiveTab, onNavigatingChange }) {
   const [proximityAlert, setProximityAlert] = useState(null);
   const [acknowledgedObstacleIds, setAcknowledgedObstacleIds] = useState(() => new Set());
   const warnedObstacleIdsRef = useRef(new Set());
+  const isDemoAlertRef = useRef(false);
   const [routeIntentReady, setRouteIntentReady] = useState(() => {
     if (typeof window !== 'undefined' && (window.__leluasaRouteIntent || window.__leluasaTargetRoute)) {
       return true;
@@ -1010,6 +1011,7 @@ export default function PlanRoute({ setActiveTab, onNavigatingChange }) {
 
     // 2. Tandai rintangan ini telah di-verifikasi oleh pengguna (tidak akan muncul lagi)
     setAcknowledgedObstacleIds((prev) => new Set([...prev, idStr]));
+    isDemoAlertRef.current = false;
     setProximityAlert(null);
 
     // 3. Ucapkan konfirmasi singkat
@@ -1024,6 +1026,7 @@ export default function PlanRoute({ setActiveTab, onNavigatingChange }) {
   // Deteksi Kedekatan Real-Time 10 Meter Sebelum Hambatan Saat Navigasi Aktif
   useEffect(() => {
     if (!isNavigating) {
+      isDemoAlertRef.current = false;
       setProximityAlert(null);
       return;
     }
@@ -1100,7 +1103,10 @@ export default function PlanRoute({ setActiveTab, onNavigatingChange }) {
         }
       }
     } else {
-      setProximityAlert(null);
+      // Jangan timpa/hilangkan alert jika sedang dipicu lewat tombol Uji Demo 10m
+      if (!isDemoAlertRef.current) {
+        setProximityAlert(null);
+      }
     }
   }, [isNavigating, coords?.lat, coords?.lng, navStepIndex, effectiveSteps, routeData, activeRouteKey, routeObstacles, acknowledgedObstacleIds, hapticActive]);
 
@@ -1119,6 +1125,7 @@ export default function PlanRoute({ setActiveTab, onNavigatingChange }) {
 
   // Trigger Simulasi / Pengujian Peringatan 10 Meter Khusus Demo & Penjurian Hackathon
   const handleTrigger10mDemo = () => {
+    isDemoAlertRef.current = true;
     const targetObs = routeObstacles[0] || {
       id: '5',
       title: 'Bollard / Pembatas',
@@ -1188,14 +1195,28 @@ export default function PlanRoute({ setActiveTab, onNavigatingChange }) {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('home')}
-            className="w-full min-h-[48px] py-3.5 px-6 rounded-full bg-primary text-on-primary font-bold text-sm sm:text-base shadow-md hover:bg-primary-container active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2"
-          >
-            <span className="material-symbols-outlined text-xl">explore</span>
-            <span>Tentukan Rute di Dashboard</span>
-          </button>
+          <div className="flex flex-col w-full gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedDest('grand-city');
+                setRouteIntentReady(true);
+              }}
+              className="w-full min-h-[48px] py-3.5 px-6 rounded-full bg-primary text-on-primary font-bold text-sm sm:text-base shadow-md hover:bg-primary-container active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-xl">play_circle</span>
+              <span>Muat Rute Demo (Grand City ➔ Balai Kota)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('home')}
+              className="w-full min-h-[44px] py-2.5 px-6 rounded-full bg-surface-container-high text-on-surface font-bold text-sm hover:bg-surface-container-highest active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 border border-outline-variant/40"
+            >
+              <span className="material-symbols-outlined text-lg">explore</span>
+              <span>Pilih Rute di Dashboard</span>
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -1662,7 +1683,7 @@ export default function PlanRoute({ setActiveTab, onNavigatingChange }) {
           </div>
 
           {/* CTA TOMBOL MULAI NAVIGASI */}
-          <div className="pt-2">
+          <div className="pt-2 flex flex-col gap-2">
             <button
               onClick={handleStartNav}
               className="w-full min-h-[54px] py-3.5 px-6 rounded-full bg-primary text-on-primary font-bold text-sm sm:text-base shadow-md hover:bg-primary-container flex items-center justify-center gap-3 active:scale-95 transition-transform duration-150 cursor-pointer"
@@ -1671,6 +1692,11 @@ export default function PlanRoute({ setActiveTab, onNavigatingChange }) {
               <span>Mulai Panduan Navigasi</span>
               <span className="material-symbols-outlined text-2xl">arrow_forward</span>
             </button>
+
+            <div className="bg-error/10 border border-error/30 rounded-xl px-3 py-2 flex items-center gap-2 text-xs text-error font-medium">
+              <span className="material-symbols-outlined text-base shrink-0 font-bold">lightbulb</span>
+              <span><strong>Tips Demo Hackathon:</strong> Klik tombol di atas, lalu tekan tombol merah <strong>[⚠️ Uji Demo 10m]</strong> di dalam layar peta untuk menampilkan peringatan suara LUMI + getaran zona 10 meter.</span>
+            </div>
           </div>
         </div>
       </div>
