@@ -160,44 +160,44 @@ export default function Profile({ setActiveTab }) {
       )}
 
       {/* HEADER SECTION: KARTU PROFIL & STATUS KONTRIBUTOR WARGA */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-primary via-primary/95 to-secondary p-5 sm:p-7 text-white shadow-xl">
-        <div className="absolute top-0 right-0 -mt-10 -mr-10 w-64 h-64 rounded-full bg-white/10 blur-2xl pointer-events-none" />
-        <div className="absolute bottom-0 right-1/4 -mb-10 w-48 h-48 rounded-full bg-amber-400/15 blur-xl pointer-events-none" />
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary via-primary/95 to-secondary p-4 sm:p-5 text-white shadow-lg">
+        <div className="absolute top-0 right-0 -mt-8 -mr-8 w-48 h-48 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+        <div className="absolute bottom-0 right-1/4 -mb-8 w-36 h-36 rounded-full bg-amber-400/15 blur-xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          {/* Sisi Kiri: Foto, Nama, Badge */}
-          <div className="flex items-center gap-4 sm:gap-5">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* Sisi Kiri: Foto Wajah Kompak, Nama, Badge */}
+          <div className="flex items-center gap-3 sm:gap-4">
             <div className="relative shrink-0">
-              <div className="w-18 h-18 sm:w-22 sm:h-22 rounded-2xl sm:rounded-3xl border-3 border-white/40 overflow-hidden shadow-lg bg-surface-container">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl border-2 border-white/50 overflow-hidden shadow-md bg-surface-container">
                 <img
                   src={profile.avatar}
                   alt={`Foto Profil ${profile.name}`}
                   className="w-full h-full object-cover"
                 />
               </div>
-              <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-[10px] shadow" title="Akun Warga Terverifikasi">
-                <span className="material-symbols-outlined text-xs text-white">verified</span>
+              <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-[9px] shadow" title="Akun Warga Terverifikasi">
+                <span className="material-symbols-outlined text-[11px] text-white">verified</span>
               </span>
             </div>
 
             <div className="flex flex-col">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="font-headline-lg text-lg sm:text-2xl font-extrabold tracking-tight">
+                <h1 className="font-headline-sm text-sm sm:text-base font-bold tracking-tight">
                   {profile.name}
                 </h1>
-                <span className="px-2.5 py-0.5 rounded-full bg-amber-400/25 border border-amber-300/40 text-amber-200 text-[11px] font-bold flex items-center gap-1">
-                  <span className="material-symbols-outlined text-xs">military_tech</span>
+                <span className="px-2 py-0.5 rounded-full bg-amber-400/25 border border-amber-300/40 text-amber-200 text-[10px] font-semibold flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[12px]">military_tech</span>
                   <span>{profile.badge}</span>
                 </span>
               </div>
-              <p className="text-xs text-white/80 mt-0.5 flex items-center gap-1 font-medium">
-                <span className="material-symbols-outlined text-xs">location_on</span>
+              <p className="text-[11px] text-white/80 mt-0.5 flex items-center gap-1 font-medium">
+                <span className="material-symbols-outlined text-[13px]">location_on</span>
                 <span>{profile.district} · {profile.city}</span>
               </p>
-              <div className="flex items-center gap-2 mt-2 flex-wrap text-[11px] font-semibold text-white/90">
-                <span className="px-2 py-0.5 rounded-md bg-white/15">ID #{profile.id}</span>
-                <span className="px-2 py-0.5 rounded-md bg-white/15">Bergabung {profile.joinedDate}</span>
-                <span className="px-2 py-0.5 rounded-md bg-emerald-400/20 text-emerald-200 font-bold flex items-center gap-1">
+              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap text-[10px] font-medium text-white/90">
+                <span className="px-1.5 py-0.5 rounded bg-white/15">ID #{profile.id}</span>
+                <span className="px-1.5 py-0.5 rounded bg-white/15">Bergabung {profile.joinedDate}</span>
+                <span className="px-1.5 py-0.5 rounded bg-emerald-400/20 text-emerald-200 font-bold flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   <span>{profile.level}</span>
                 </span>
@@ -206,25 +206,25 @@ export default function Profile({ setActiveTab }) {
           </div>
 
           {/* Sisi Kanan: Saldo Poin & Tombol Aksi Cepat */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-black/20 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-white/20 shrink-0">
-            <div className="flex flex-col pr-0 sm:pr-4 sm:border-r border-white/20">
-              <span className="text-[11px] uppercase tracking-wider text-white/70 font-bold flex items-center gap-1">
-                <span className="material-symbols-outlined text-sm text-amber-400">stars</span>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-black/20 backdrop-blur-md p-3 sm:p-3.5 rounded-xl border border-white/20 shrink-0">
+            <div className="flex flex-col pr-0 sm:pr-3 sm:border-r border-white/20">
+              <span className="text-[10px] uppercase tracking-wider text-white/70 font-semibold flex items-center gap-1">
+                <span className="material-symbols-outlined text-[13px] text-amber-400">stars</span>
                 <span>Saldo Poin Leluasa</span>
               </span>
-              <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-2xl sm:text-3xl font-extrabold text-amber-300 tracking-tight">
+              <div className="flex items-baseline gap-1 mt-0.5">
+                <span className="text-xl sm:text-2xl font-extrabold text-amber-300 tracking-tight">
                   {profile.points.toLocaleString('id-ID')}
                 </span>
-                <span className="text-xs font-bold text-white/90">Poin</span>
+                <span className="text-xs font-semibold text-white/90">Poin</span>
               </div>
-              <div className="w-full bg-white/20 h-1.5 rounded-full mt-2 overflow-hidden">
+              <div className="w-full bg-white/20 h-1.5 rounded-full mt-1.5 overflow-hidden">
                 <div
                   className="bg-amber-400 h-full rounded-full transition-all duration-500"
                   style={{ width: `${profile.levelProgress}%` }}
                 />
               </div>
-              <span className="text-[10px] text-white/70 mt-1 font-medium">
+              <span className="text-[9px] text-white/70 mt-0.5 font-medium">
                 {profile.levelProgress}% menuju Level 5 (Jawara Trotoar)
               </span>
             </div>
@@ -233,18 +233,18 @@ export default function Profile({ setActiveTab }) {
               <button
                 type="button"
                 onClick={() => setSubTab('catalog')}
-                className="px-4 py-2 rounded-xl bg-amber-400 text-slate-900 font-extrabold text-xs shadow-md hover:bg-amber-300 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                className="px-3.5 py-1.5 rounded-lg bg-amber-400 text-slate-900 font-bold text-xs shadow-xs hover:bg-amber-300 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1"
               >
-                <span className="material-symbols-outlined text-base">redeem</span>
+                <span className="material-symbols-outlined text-sm">redeem</span>
                 <span>Tukar Tiket Bus</span>
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('report-obstacle')}
-                className="px-4 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold text-[11px] transition-all cursor-pointer flex items-center justify-center gap-1"
+                className="px-3 py-1 rounded-lg bg-white/15 hover:bg-white/25 text-white font-medium text-[10px] transition-all cursor-pointer flex items-center justify-center gap-1"
               >
                 <span className="material-symbols-outlined text-xs">add</span>
-                <span>Lapor &amp; Raih +50 Poin</span>
+                <span>Lapor (+50 Poin)</span>
               </button>
             </div>
           </div>
