@@ -1,6 +1,7 @@
 {
   "name": "logicodix-leluasa",
   "version": "1.0.0",
+  "type": "module",
   "description": "Leluasa Accessible Sidewalk Navigation & Mobility System - LOGICODIX 2026",
   "scripts": {
     "server": "npm --prefix server run dev",
@@ -8,6 +9,11 @@
     "start": "npm --prefix server run start",
     "build": "npm --prefix client run build",
     "ai": "uvicorn app.main:app --reload --port 8000 --app-dir ai-service"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
   },
   "keywords": [
     "logicodix",
