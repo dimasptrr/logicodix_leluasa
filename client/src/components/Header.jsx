@@ -265,21 +265,6 @@ export default function Header({
           <span className="hidden sm:inline text-xs font-bold">Lapor Hambatan</span>
         </button>
 
-        {/* 6. Avatar Pengguna: Mengarah ke Halaman Riwayat & Kontribusi Profil */}
-        <button
-          type="button"
-          onClick={() => navigate('reports-impact')}
-          aria-label="Buka profil kontributor dan riwayat laporan"
-          title="Profil Dian Kartika - Riwayat & Kontribusi"
-          className="hidden lg:flex w-9 h-9 rounded-full bg-secondary-container border-2 border-secondary/30 items-center justify-center cursor-pointer hover:scale-105 active:scale-95 transition-all duration-200 overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-        >
-          <img
-            src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80"
-            alt="Foto Profil Dian Kartika"
-            className="w-full h-full object-cover"
-          />
-        </button>
-
         {/* Mobile hamburger */}
         <button
           onClick={onOpenMobileMenu}

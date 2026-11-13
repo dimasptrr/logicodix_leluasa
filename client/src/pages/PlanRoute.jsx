@@ -334,6 +334,38 @@ export default function PlanRoute({ setActiveTab }) {
     Number.isFinite(Number(point.lat)) && Number(point.lat) >= -90 && Number(point.lat) <= 90 &&
     Number.isFinite(Number(point.lng)) && Number(point.lng) >= -180 && Number(point.lng) <= 180;
 
+  // Fitur Tukar Arah Rute (Swap Origin & Destination ala KAI)
+  const handleSwapRoute = () => {
+    if (!activeOrigin || !activeDestination) return;
+    const oldOrigin = activeOrigin;
+    const oldDest = activeDestination;
+
+    const swappedIntent = {
+      ...routeIntent,
+      origin: {
+        lat: Number(oldDest.lat),
+        lng: Number(oldDest.lng),
+        name: oldDest.name,
+        source: 'manual'
+      },
+      destination: {
+        lat: Number(oldOrigin.lat),
+        lng: Number(oldOrigin.lng),
+        name: oldOrigin.name,
+        id: oldOrigin.id || `swap-${Date.now()}`
+      }
+    };
+
+    setManualOrigin(swappedIntent.origin);
+    setRouteIntent(swappedIntent);
+    setIsNavigating(false);
+    setCurrentStepIndex(0);
+
+    if ('vibrate' in navigator) {
+      navigator.vibrate([40, 30, 40]);
+    }
+  };
+
   const loadRoute = async () => {
     if (!hasDestination || !routeIntentReady) {
       setRouteData(null);
@@ -1299,6 +1331,19 @@ export default function PlanRoute({ setActiveTab }) {
               </span>
               <span className="truncate max-w-[200px]">{activeDestination.name}</span>
             </div>
+          )}
+
+          {/* Tombol Tukar Arah Rute (⇅ ala KAI) */}
+          {activeDestination && (
+            <button
+              type="button"
+              onClick={handleSwapRoute}
+              className="px-3.5 py-1.5 rounded-full bg-secondary/15 hover:bg-secondary/25 text-secondary border border-secondary/30 font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer shrink-0"
+              title="Tukar Titik Awal dan Tujuan (Putar Balik Rute)"
+            >
+              <span className="material-symbols-outlined text-sm">swap_vert</span>
+              <span>Tukar Arah (⇅)</span>
+            </button>
           )}
 
           {/* Tombol Pintas Buat Rute Riil dari Lokasi GPS User */}

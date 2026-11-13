@@ -64,10 +64,6 @@ Status DPUPR: Diteruskan ke Tim Pemeliharaan Kota Surabaya`;
     }
   };
 
-  const handlePrintSummary = () => {
-    window.print();
-  };
-
   const handleDeleteReport = async (report) => {
     const confirmDelete = window.confirm(
       `Yakin ingin menghapus laporan "${report.title || 'Rintangan'}" (ID #${report.id})?\n\nLaporan ini dan foto terkait akan dihapus secara permanen dari database Supabase.`
@@ -112,25 +108,13 @@ Status DPUPR: Diteruskan ke Tim Pemeliharaan Kota Surabaya`;
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h1 className="font-headline-lg text-xl sm:text-2xl lg:text-3xl text-primary font-bold tracking-tight">
-            Laporan & Dampak Komunitas
-          </h1>
-          <p className="font-body-md text-xs sm:text-sm text-on-surface-variant max-w-2xl">
-            Dashboard transparansi publik real-time yang menampilkan rintangan trotoar yang dilaporkan warga, diverifikasi sesama pengguna kursi roda, dan tiket perbaikan resmi yang diteruskan ke DPUPR Kota Surabaya.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          <button
-            onClick={handlePrintSummary}
-            className="min-h-[44px] px-3.5 rounded-xl bg-surface-container-lowest text-primary text-xs font-semibold hover:bg-surface-container transition-colors shadow-xs flex items-center gap-1.5"
-          >
-            <span className="material-symbols-outlined text-base">print</span>
-            <span>Cetak / PDF</span>
-          </button>
-        </div>
+      <div className="flex flex-col gap-1">
+        <h1 className="font-headline-lg text-xl sm:text-2xl lg:text-3xl text-primary font-bold tracking-tight">
+          Laporan & Dampak Komunitas
+        </h1>
+        <p className="font-body-md text-xs sm:text-sm text-on-surface-variant max-w-2xl">
+          Dashboard transparansi publik real-time yang menampilkan rintangan trotoar yang dilaporkan warga, diverifikasi sesama pengguna kursi roda, dan tiket perbaikan resmi yang diteruskan ke DPUPR Kota Surabaya.
+        </p>
       </div>
 
       {/* Error state */}

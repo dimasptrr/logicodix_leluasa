@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
-import { fetchObstacles, upvoteObstacle, resolveObstacle, dispatchDpupr, deleteObstacle, fetchRouteComparison } from '../features/dashboard/services/safeApi.js';
+import { fetchObstacles, upvoteObstacle, resolveObstacle, dispatchDpupr, deleteObstacle } from '../features/dashboard/services/safeApi.js';
 import useGeolocation from '../features/dashboard/hooks/useGeolocation.js';
 import EditObstacleModal from '../components/EditObstacleModal.jsx';
 
@@ -40,7 +40,7 @@ export default function ExploreMap({ setActiveTab }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [activeLayerMode, setActiveLayerMode] = useState('standard');
-  const [searchQuery, setSearchQuery] = useState('Jl. Pemuda, Surabaya');
+  const [searchQuery, setSearchQuery] = useState('');
   const [actionFeedback, setActionFeedback] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState(null);
@@ -141,9 +141,6 @@ export default function ExploreMap({ setActiveTab }) {
     markersGroupRef.current = L.layerGroup().addTo(map);
     mapInstanceRef.current = map;
 
-    // Render Koridor Ramah Kursi Roda
-    renderCorridors(routesGroupRef.current);
-
     // Jika ada rintangan target dari daftar laporan, jangan timpa fokus kamera dengan GPS posisi user
     centerOnNextLocationRef.current = !hasValidTarget;
 
@@ -236,102 +233,6 @@ export default function ExploreMap({ setActiveTab }) {
     });
   }, [obstacles]);
 
-  const renderCorridors = async (layerGroup) => {
-    try {
-      const res = await fetchRouteComparison();
-      const routeB = res.data?.routeB;
-
-      // 1. Gambar Rute Utama AI Leluasa
-      const safeCoords = routeB?.coordinates?.length ? routeB.coordinates : [
-        [-7.2642, 112.7449],
-        [-7.2647, 112.7456],
-        [-7.2650, 112.7463],
-        [-7.2653, 112.7472],
-        [-7.2656, 112.7485],
-        [-7.2659, 112.7497],
-        [-7.2662, 112.7508],
-        [-7.2664, 112.7518]
-      ];
-
-      L.polyline(safeCoords, {
-        color: '#2563EB',
-        weight: 6,
-        opacity: 0.95,
-        lineCap: 'round',
-        lineJoin: 'round'
-      }).addTo(layerGroup);
-
-      // Jalur Kuning Panduan Ubin Taktil
-      L.polyline(safeCoords, {
-        color: '#FACC15',
-        weight: 3,
-        opacity: 0.9,
-        dashArray: '6, 6',
-        lineCap: 'round',
-        lineJoin: 'round'
-      }).addTo(layerGroup);
-
-      // 2. Jalur Alternatif Hijau Putus-putus
-      const detourCoords = [
-        [-7.2652, 112.7471],
-        [-7.2650, 112.7474],
-        [-7.2652, 112.7486],
-        [-7.2656, 112.7488]
-      ];
-      L.polyline(detourCoords, {
-        color: '#16A34A',
-        weight: 4,
-        dashArray: '5, 5',
-        opacity: 0.9
-      }).addTo(layerGroup);
-
-      // Marker Balai Pemuda
-      const balaiIcon = L.divIcon({
-        className: 'balai-marker',
-        html: `
-          <div class="px-2.5 py-1 rounded-lg bg-surface-container-lowest text-primary font-bold text-[10px] shadow-md border border-outline-variant/30 whitespace-nowrap flex items-center gap-1">
-            <span class="material-symbols-outlined text-xs text-primary">domain</span>
-            <span>Balai Pemuda Surabaya</span>
-          </div>
-        `,
-        iconSize: [0, 0],
-        iconAnchor: [60, 20]
-      });
-      L.marker([-7.2638, 112.7445], { icon: balaiIcon }).addTo(layerGroup);
-
-      // Marker Ramp Halus 4°
-      const rampIcon = L.divIcon({
-        className: 'ramp-marker',
-        html: `
-          <div class="px-2.5 py-0.5 rounded-full bg-secondary-container text-secondary font-bold text-[10px] shadow-md border border-secondary/40 whitespace-nowrap flex items-center gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
-            <span>Ramp Halus 4° (Bisa Dilalui)</span>
-          </div>
-        `,
-        iconSize: [0, 0],
-        iconAnchor: [70, 10]
-      });
-      L.marker([-7.2648, 112.7495], { icon: rampIcon }).addTo(layerGroup);
-
-      // Marker Halte Trans Semanggi
-      const halteIcon = L.divIcon({
-        className: 'halte-marker',
-        html: `
-          <div class="px-2 py-0.5 rounded-lg bg-surface-container-lowest text-on-surface font-semibold text-[10px] shadow-xs border border-outline-variant/30 whitespace-nowrap flex items-center gap-1">
-            <span class="material-symbols-outlined text-xs text-secondary">directions_bus</span>
-            <span>Halte Trans Semanggi</span>
-          </div>
-        `,
-        iconSize: [0, 0],
-        iconAnchor: [50, 10]
-      });
-      L.marker([-7.2668, 112.7505], { icon: halteIcon }).addTo(layerGroup);
-
-    } catch (err) {
-      console.warn('Fallback rendering corridors:', err);
-    }
-  };
-
   const updateUserGpsMarker = (map, lat, lng) => {
     const userHtml = `
       <div class="relative flex flex-col items-center justify-center cursor-pointer -translate-x-1/2 -translate-y-1/2">
@@ -373,11 +274,11 @@ export default function ExploreMap({ setActiveTab }) {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(
-        'Trotoar Balai Pemuda Surabaya. Rute terbaik saat ini: Trotoar Halte Bundaran HI. Kondisi aman, lebar 2.2 meter, ubin pemandu lengkap, kemiringan rampa 6 derajat.'
+        'Peta Pantau Aksesibilitas Leluasa aktif. Menampilkan laporan kondisi trotoar dan rintangan di sekitar Anda.'
       );
       utterance.lang = 'id-ID';
       window.speechSynthesis.speak(utterance);
-      setActionFeedback('Membacakan panduan audio rute ramah akses...');
+      setActionFeedback('Membacakan panduan audio...');
       setTimeout(() => setActionFeedback(''), 4000);
     }
   };

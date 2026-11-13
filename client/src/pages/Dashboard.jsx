@@ -7,65 +7,6 @@ import StraightDirectionArrow, {
   getBearingDescription
 } from '../components/StraightDirectionArrow.jsx';
 
-// Data Lokasi Surabaya Populer untuk Pencarian & Multi-Stop
-const SURABAYA_DESTINATIONS = [
-  {
-    id: 'rsud-soetomo',
-    name: 'RSUD Dr. Soetomo',
-    category: 'Fasilitas Kesehatan',
-    address: 'Jl. Mayjen Prof. Dr. Moestopo No. 6-8',
-    lat: -7.2678,
-    lng: 112.7582,
-    accessibility: '100% Rampa & Lift',
-    time: '10 Menit',
-    distance: '650 m'
-  },
-  {
-    id: 'sentra-kuliner',
-    name: 'Sentra Kuliner Pemuda',
-    category: 'Sentra Kuliner & UMKM',
-    address: 'Jl. Pemuda Sisi Selatan',
-    lat: -7.2662,
-    lng: 112.7485,
-    accessibility: 'Trotoar Lebar Bebas Parkir Liar',
-    time: '6 Menit',
-    distance: '380 m'
-  },
-  {
-    id: 'halte-pemuda',
-    name: 'Halte Integrasi Balai Pemuda',
-    category: 'Halte Trans Semanggi',
-    address: 'Jl. Pemuda No. 45, Embong Kaliasin',
-    lat: -7.2655,
-    lng: 112.7515,
-    accessibility: 'Elevator & Ubin Pemandu Kuning',
-    time: '8 Menit',
-    distance: '420 m'
-  },
-  {
-    id: 'balai-kota',
-    name: 'Balai Kota Surabaya',
-    category: 'Pusat Pemerintahan',
-    address: 'Jl. Taman Surya No. 1',
-    lat: -7.2628,
-    lng: 112.7530,
-    accessibility: 'Arkade Teduh & Rampa 1:12',
-    time: '14 Menit',
-    distance: '850 m'
-  },
-  {
-    id: 'tunjungan-plaza',
-    name: 'Tunjungan Plaza Mall',
-    category: 'Pusat Perbelanjaan',
-    address: 'Jl. Jenderal Basuki Rahmat',
-    lat: -7.2618,
-    lng: 112.7392,
-    accessibility: 'Jembatan Penyeberangan Berlift',
-    time: '18 Menit',
-    distance: '1,1 km'
-  }
-];
-
 export default function Dashboard({ setActiveTab, onOpenVoice }) {
   // State Navigasi Tujuan & Multi-Stop
   const [hasSelectedDestination, setHasSelectedDestination] = useState(false);
@@ -223,38 +164,15 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
     };
   }, [hasSelectedDestination]);
 
-  // Pasang Pin Lokasi di Peta Leaflet
+  // Pasang Pin Lokasi di Peta Leaflet (Hanya lokasi yang dipilih user melalui peta / pencarian)
   useEffect(() => {
     if (!leafletInstanceRef.current || !markersLayerRef.current || hasSelectedDestination) return;
 
     const layer = markersLayerRef.current;
     layer.clearLayers();
 
-    // Pin destinasi Surabaya
-    SURABAYA_DESTINATIONS.forEach((dest) => {
-      const isSelected = stop1?.id === dest.id || stop2?.id === dest.id;
-      const destMarkerHtml = `
-        <div class="flex flex-col items-center -translate-x-1/2 -translate-y-full cursor-pointer hover:scale-110 transition-transform">
-          <div class="px-2.5 py-0.5 rounded-full ${isSelected ? 'bg-secondary' : 'bg-primary'} text-white font-bold text-[10px] shadow-lg whitespace-nowrap mb-1">
-            ${dest.name}
-          </div>
-          <div class="w-8 h-8 rounded-full ${isSelected ? 'bg-secondary' : 'bg-surface-container-lowest border-2 border-primary'} text-primary flex items-center justify-center shadow-md">
-            <span class="material-symbols-outlined text-base ${isSelected ? 'text-white' : 'text-primary'}">
-              ${dest.id.includes('rsud') ? 'local_hospital' : dest.id.includes('kuliner') ? 'restaurant' : 'location_on'}
-            </span>
-          </div>
-        </div>
-      `;
-      const icon = L.divIcon({ className: `dest-pin-${dest.id}`, html: destMarkerHtml, iconSize: [0, 0] });
-      const marker = L.marker([dest.lat, dest.lng], { icon }).addTo(layer);
-
-      marker.on('click', () => {
-        handleSelectLocation(dest);
-      });
-    });
-
-    // Pin untuk Stop 1 jika merupakan lokasi kustom / hasil pencarian / klik peta
-    if (stop1 && !SURABAYA_DESTINATIONS.some(d => d.id === stop1.id)) {
+    // Pin untuk Tujuan 1 (Stop 1) jika dipilih oleh user
+    if (stop1 && stop1.lat && stop1.lng) {
       const stop1MarkerHtml = `
         <div class="flex flex-col items-center -translate-x-1/2 -translate-y-full cursor-pointer hover:scale-110 transition-transform">
           <div class="px-2.5 py-0.5 rounded-full bg-secondary text-white font-bold text-[10px] shadow-lg whitespace-nowrap mb-1">
@@ -269,8 +187,8 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
       L.marker([stop1.lat, stop1.lng], { icon }).addTo(layer);
     }
 
-    // Pin untuk Stop 2 jika kustom
-    if (stop2 && !SURABAYA_DESTINATIONS.some(d => d.id === stop2.id)) {
+    // Pin untuk Tujuan 2 (Stop 2) jika dipilih oleh user
+    if (stop2 && stop2.lat && stop2.lng) {
       const stop2MarkerHtml = `
         <div class="flex flex-col items-center -translate-x-1/2 -translate-y-full cursor-pointer hover:scale-110 transition-transform">
           <div class="px-2.5 py-0.5 rounded-full bg-amber-500 text-white font-bold text-[10px] shadow-lg whitespace-nowrap mb-1">
@@ -359,16 +277,106 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
     ? `${originLabel} → ${stop1?.name} → ${stop2?.name}`
     : stop1
     ? `${originLabel} → ${stop1?.name}`
-    : 'Menuju Halte Balai Pemuda Surabaya';
+    : 'Pilih Tujuan Perjalanan';
 
   const currentRouteSubtitle = stop2
-    ? `2 Perhentian: ${stop1?.address.split(',')[0]} → ${stop2?.address.split(',')[0]}`
+    ? `2 Perhentian: ${stop1?.address?.split(',')[0]} → ${stop2?.address?.split(',')[0]}`
     : stop1
-    ? `${stop1?.address} (${stop1?.accessibility})`
-    : 'Jl. Pemuda ke Halte Balai Pemuda';
+    ? `${stop1?.address || ''} ${stop1?.accessibility ? `(${stop1.accessibility})` : ''}`
+    : 'Ketik lokasi tujuan atau klik titik mana pun di peta';
 
-  const estimatedTime = stop2 ? '16 Menit' : stop1 ? stop1.time : '8 Menit';
-  const estimatedDistance = stop2 ? '1,1 km' : stop1 ? stop1.distance : '420 m';
+  const estimatedTime = stop2 ? '16 Menit' : stop1 ? stop1.time || '10 Menit' : '-';
+  const estimatedDistance = stop2 ? '1,1 km' : stop1 ? stop1.distance || '500 m' : '-';
+
+  // Fitur Tukar Lokasi (Swap Origin & Destination ala KAI)
+  const handleSwapLocations = () => {
+    // 1. Tentukan representasi Titik Awal saat ini (customOrigin atau GPS)
+    const currentOriginObj = customOrigin
+      ? {
+          id: customOrigin.id || 'custom-origin',
+          name: customOrigin.name,
+          address: customOrigin.address || customOrigin.name,
+          lat: Number(customOrigin.lat),
+          lng: Number(customOrigin.lng),
+          accessibility: customOrigin.accessibility,
+          time: customOrigin.time,
+          distance: customOrigin.distance
+        }
+      : coords
+      ? {
+          id: 'gps-origin',
+          name: 'Lokasi Saya',
+          address: `Titik GPS (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)})`,
+          lat: Number(coords.lat),
+          lng: Number(coords.lng)
+        }
+      : null;
+
+    // Jika keduanya kosong, tidak ada yang perlu ditukar
+    if (!currentOriginObj && !stop1) return;
+
+    // 2. Simpan nilai sebelum pertukaran
+    const oldOrigin = currentOriginObj;
+    const oldStop1 = stop1;
+
+    // 3. Update Titik Awal: oldStop1 menjadi Titik Awal baru
+    if (oldStop1) {
+      setCustomOrigin({
+        id: oldStop1.id || `custom-${Date.now()}`,
+        name: oldStop1.name,
+        address: oldStop1.address || oldStop1.name,
+        lat: Number(oldStop1.lat),
+        lng: Number(oldStop1.lng),
+        accessibility: oldStop1.accessibility,
+        time: oldStop1.time,
+        distance: oldStop1.distance
+      });
+      setIsEditingOrigin(false);
+    } else {
+      setCustomOrigin(null);
+    }
+
+    // 4. Update Tujuan 1 (Stop 1): oldOrigin menjadi Tujuan 1 baru
+    if (oldOrigin) {
+      setStop1({
+        id: oldOrigin.id || `dest-${Date.now()}`,
+        name: oldOrigin.name,
+        address: oldOrigin.address || oldOrigin.name,
+        lat: Number(oldOrigin.lat),
+        lng: Number(oldOrigin.lng)
+      });
+    } else {
+      setStop1(null);
+    }
+
+    // 5. Urutan stop2 tetap logis dan tidak berubah secara tidak sengaja
+
+    // 6. Reset pencarian
+    setSearchQuery('');
+    setIsSearchFocused(false);
+
+    // 7. Update peta Leaflet secara dinamis
+    if (leafletInstanceRef.current) {
+      const map = leafletInstanceRef.current;
+      if (oldOrigin && oldStop1) {
+        const bounds = L.latLngBounds([
+          [oldStop1.lat, oldStop1.lng],
+          [oldOrigin.lat, oldOrigin.lng]
+        ]);
+        if (stop2?.lat && stop2?.lng) {
+          bounds.extend([stop2.lat, stop2.lng]);
+        }
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16, animate: true });
+      } else if (oldOrigin) {
+        map.panTo([oldOrigin.lat, oldOrigin.lng], { animate: true });
+      }
+    }
+
+    // 8. Haptic feedback getaran taktil
+    if ('vibrate' in navigator && hapticEnabled) {
+      navigator.vibrate([40, 30, 40]);
+    }
+  };
 
   const handleApplyRoute = () => {
     if (!stop1) return;
@@ -385,21 +393,21 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
 
   // Handler untuk event rute eksternal (dari Asisten Suara AI)
   useEffect(() => {
-    const applyDest = (destId) => {
-      const found = SURABAYA_DESTINATIONS.find(d => d.id === destId);
-      if (found) {
-        handleSelectLocation(found);
+    const applyDest = (dest) => {
+      if (!dest) return;
+      if (typeof dest === 'object' && dest.lat && dest.lng) {
+        handleSelectLocation(dest);
       }
     };
 
-    if (window.__leluasaDashboardDestination) {
+    if (window.__leluasaDashboardDestination && typeof window.__leluasaDashboardDestination === 'object') {
       applyDest(window.__leluasaDashboardDestination);
       window.__leluasaDashboardDestination = null;
     }
 
     const handler = (e) => {
-      if (e.detail?.destId) {
-        applyDest(e.detail.destId);
+      if (e.detail?.dest && typeof e.detail.dest === 'object') {
+        applyDest(e.detail.dest);
       }
     };
     window.addEventListener('leluasa:dashboard-route', handler);
@@ -486,11 +494,6 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
     window.speechSynthesis.speak(utterance);
     setIsSpeaking(true);
   };
-
-  const filteredDestinations = SURABAYA_DESTINATIONS.filter(d =>
-    d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    d.address.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   return (
     <div className="min-h-[calc(100vh-5rem)] h-full flex flex-col justify-between w-full max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3 pb-20 lg:pb-3 animate-fadeIn">
@@ -581,8 +584,7 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           e.preventDefault();
-                          if (filteredDestinations.length > 0) handleSelectLocation(filteredDestinations[0]);
-                          else if (liveSearchResults.length > 0) handleSelectLocation(liveSearchResults[0]);
+                          if (liveSearchResults.length > 0) handleSelectLocation(liveSearchResults[0]);
                         }
                       }}
                       className="w-full bg-transparent font-medium text-on-surface placeholder:text-outline focus:outline-none mt-0.5"
@@ -604,6 +606,23 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold shrink-0">
                   {customOrigin ? 'Kustom' : 'GPS'}
                 </span>
+              </div>
+
+              {/* Tombol Tukar Lokasi (Swap Origin & Destination ala KAI) */}
+              <div className="flex items-center justify-center -my-1.5 relative z-10">
+                <button
+                  type="button"
+                  onClick={handleSwapLocations}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-lowest hover:bg-secondary/15 text-primary hover:text-secondary border border-outline-variant shadow-xs hover:shadow-sm transition-all duration-200 active:scale-95 cursor-pointer text-xs font-bold group select-none"
+                  title="Tukar Titik Awal dan Tujuan (⇅)"
+                  aria-label="Tukar Titik Awal dan Tujuan"
+                >
+                  <span className="material-symbols-outlined text-[17px] text-secondary group-hover:rotate-180 transition-transform duration-300">
+                    swap_vert
+                  </span>
+                  <span className="text-[11px] font-bold text-primary group-hover:text-secondary">Tukar Lokasi</span>
+                  <span className="text-[11px] font-bold text-secondary">⇅</span>
+                </button>
               </div>
 
               {/* Stop 1 (Tujuan Pertama) */}
@@ -633,8 +652,7 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           e.preventDefault();
-                          if (filteredDestinations.length > 0) handleSelectLocation(filteredDestinations[0]);
-                          else if (liveSearchResults.length > 0) handleSelectLocation(liveSearchResults[0]);
+                          if (liveSearchResults.length > 0) handleSelectLocation(liveSearchResults[0]);
                         }
                       }}
                       className="w-full bg-transparent font-medium text-on-surface placeholder:text-outline focus:outline-none"
@@ -671,8 +689,7 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
-                            if (filteredDestinations.length > 0) handleSelectLocation(filteredDestinations[0]);
-                            else if (liveSearchResults.length > 0) handleSelectLocation(liveSearchResults[0]);
+                            if (liveSearchResults.length > 0) handleSelectLocation(liveSearchResults[0]);
                           }
                         }}
                         className="w-full bg-transparent font-medium text-on-surface placeholder:text-outline focus:outline-none"
@@ -708,27 +725,6 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
                       <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
                       <span>Mencari lokasi di peta se-Indonesia...</span>
                     </div>
-                  )}
-
-                  {/* Preset Landmark Surabaya */}
-                  {filteredDestinations.length > 0 && (
-                    <>
-                      <span className="text-[10px] font-bold text-on-surface-variant uppercase px-2 block">Landmark Surabaya:</span>
-                      {filteredDestinations.map(item => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => handleSelectLocation(item)}
-                          className="w-full p-2 text-left rounded-lg hover:bg-surface-container flex items-center justify-between text-xs cursor-pointer"
-                        >
-                          <div>
-                            <span className="font-bold text-primary block">{item.name}</span>
-                            <span className="text-[10px] text-on-surface-variant block">{item.address}</span>
-                          </div>
-                          <span className="text-[10px] font-bold text-secondary">{item.distance}</span>
-                        </button>
-                      ))}
-                    </>
                   )}
 
                   {/* Hasil Live Geocoding (Bisa dari Probolinggo, Jakarta, dsb) */}
