@@ -113,7 +113,7 @@ Status DPUPR: Diteruskan ke Tim Pemeliharaan Kota Surabaya`;
           Laporan & Dampak Komunitas
         </h1>
         <p className="font-body-md text-xs sm:text-sm text-on-surface-variant max-w-2xl">
-          Dashboard transparansi publik real-time yang menampilkan rintangan trotoar yang dilaporkan warga, diverifikasi sesama pengguna kursi roda, dan tiket perbaikan resmi yang diteruskan ke DPUPR Kota Surabaya.
+          Dashboard transparansi publik real-time yang menampilkan rintangan trotoar yang dilaporkan warga.
         </p>
       </div>
 

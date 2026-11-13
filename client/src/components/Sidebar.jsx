@@ -75,12 +75,6 @@ export default function Sidebar({
           </button>
         </div>
 
-        {/* Competition Badge */}
-        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-container w-fit shadow-xs">
-          <span className="material-symbols-outlined text-[14px]">verified</span>
-          <span className="font-label-sm uppercase tracking-wider font-bold text-[11px]">LOGICODIX 2026 · Kesehatan Inklusif</span>
-        </div>
-
         {/* Navigation Items */}
         <nav className="flex flex-col gap-1.5 mt-space-sm">
           {navItems.map((item) => {
@@ -92,11 +86,10 @@ export default function Sidebar({
                   onClick={() => handleItemClick(item.id)}
                   aria-label={item.label}
                   aria-current={isActive ? 'page' : undefined}
-                  className={`flex items-center justify-between min-h-[52px] px-4 py-3 rounded-full font-label-md text-label-md transition-all text-left focus:outline focus:outline-[3px] focus:outline-primary ${
-                    isActive
+                  className={`flex items-center justify-between min-h-[52px] px-4 py-3 rounded-full font-label-md text-label-md transition-all text-left focus:outline focus:outline-[3px] focus:outline-primary ${isActive
                       ? 'bg-primary text-on-primary font-bold shadow-[0_4px_12px_rgba(0,55,176,0.25)]'
                       : 'text-on-surface hover:bg-surface-container'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-space-sm">
                     <span className={`material-symbols-outlined text-2xl ${isActive ? 'text-secondary-container' : 'text-primary'}`}>
@@ -117,11 +110,10 @@ export default function Sidebar({
                 onClick={() => handleItemClick(item.id)}
                 aria-label={item.label}
                 aria-current={isActive ? 'page' : undefined}
-                className={`flex items-center gap-space-sm min-h-[52px] px-4 py-3 rounded-full font-label-md text-label-md transition-all text-left focus:outline focus:outline-[3px] focus:outline-primary ${
-                  isActive
+                className={`flex items-center gap-space-sm min-h-[52px] px-4 py-3 rounded-full font-label-md text-label-md transition-all text-left focus:outline focus:outline-[3px] focus:outline-primary ${isActive
                     ? 'bg-primary text-on-primary font-bold shadow-[0_4px_12px_rgba(0,55,176,0.25)]'
                     : 'text-on-surface hover:bg-surface-container'
-                }`}
+                  }`}
               >
                 <span className={`material-symbols-outlined text-2xl ${isActive ? 'text-secondary-container' : 'text-on-surface-variant'}`}>
                   {item.icon}
@@ -139,12 +131,12 @@ export default function Sidebar({
     <>
       {/* Mobile Drawer Only (Desktop Sidebar dinonaktifkan sesuai desain web laptop full-width) */}
       {isMobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex animate-fadeIn">
+        <div className="lg:hidden fixed inset-0 z-[1200] flex animate-fadeIn">
           <div
             className="fixed inset-0 bg-primary/40 backdrop-blur-xs transition-opacity"
             onClick={onCloseMobile}
           ></div>
-          <div className="relative z-10 w-80 max-w-[85vw] h-full shadow-2xl">
+          <div className="relative z-10 w-80 max-w-[85vw] h-full shadow-2xl bg-surface-container-lowest">
             {sidebarContent}
           </div>
         </div>

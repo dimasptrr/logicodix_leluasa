@@ -775,14 +775,14 @@ export default function ReportObstacle({ setActiveTab }) {
             )}
 
             {/* Peta Interaktif Leaflet */}
-            <div className="relative">
+            <div className="relative z-0 isolate rounded-xl overflow-hidden">
               <div
                 ref={mapContainerRef}
                 aria-label="Peta penentuan titik rintangan"
                 className="w-full h-52 sm:h-60 rounded-xl border border-outline-variant/40 overflow-hidden"
               />
               {isGeocoding && (
-                <div className="absolute top-2 right-2 bg-surface-container-lowest/90 backdrop-blur-xs px-2.5 py-1 rounded-full border border-outline-variant/30 text-[10px] font-semibold text-primary flex items-center gap-1 shadow-xs z-[400]">
+                <div className="absolute top-2 right-2 bg-surface-container-lowest/90 backdrop-blur-xs px-2.5 py-1 rounded-full border border-outline-variant/30 text-[10px] font-semibold text-primary flex items-center gap-1 shadow-xs z-10">
                   <span className="material-symbols-outlined text-xs animate-spin" aria-hidden="true">progress_activity</span>
                   <span>Mencari alamat...</span>
                 </div>

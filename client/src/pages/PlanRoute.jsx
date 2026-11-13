@@ -53,6 +53,53 @@ function getStepCoordinate(stepIndex, totalSteps, coordinates, origin, destinati
   return null;
 }
 
+// Hitung arah (bearing 0-360°) dari titik A ke titik B
+function calculateBearing(lat1, lng1, lat2, lng2) {
+  const toRad = (d) => (d * Math.PI) / 180;
+  const φ1 = toRad(lat1);
+  const φ2 = toRad(lat2);
+  const Δλ = toRad(lng2 - lng1);
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+
+// Bulatkan ke 0 / 90 / 180 / 270 (atas / kanan / bawah / kiri)
+function snapToCardinal(bearing) {
+  return (Math.round(bearing / 90) * 90) % 360;
+}
+
+// Arah jalan di titik langkah aktif (sudah dibulatkan per 90°)
+function getStepHeading(stepIndex, totalSteps, coordinates, origin, destination, currentStep) {
+  if (Array.isArray(coordinates) && coordinates.length > 1) {
+    let idx;
+    if (currentStep?.wayPointIndex !== null && currentStep?.wayPointIndex !== undefined
+        && currentStep.wayPointIndex >= 0 && currentStep.wayPointIndex < coordinates.length) {
+      idx = currentStep.wayPointIndex;
+    } else {
+      const ratio = totalSteps > 1 ? stepIndex / (totalSteps - 1) : 0;
+      idx = Math.min(coordinates.length - 1, Math.max(0, Math.round(ratio * (coordinates.length - 1))));
+    }
+
+    const from = coordinates[idx];
+    // Cari titik di depan yang cukup jauh (>5m) supaya arah stabil
+    for (let i = idx + 1; i < coordinates.length; i++) {
+      const to = coordinates[i];
+      if (calculateDistanceInMeters(from[0], from[1], to[0], to[1]) > 5) {
+        return snapToCardinal(calculateBearing(from[0], from[1], to[0], to[1]));
+      }
+    }
+    // Langkah terakhir: pakai arah dari titik sebelumnya
+    const prev = coordinates[Math.max(0, idx - 1)];
+    return snapToCardinal(calculateBearing(prev[0], prev[1], from[0], from[1]));
+  }
+
+  if (origin && destination) {
+    return snapToCardinal(calculateBearing(origin.lat, origin.lng, destination.lat, destination.lng));
+  }
+  return 0;
+}
+
 // Memformat manuver langkah & ikon agar 100% presisi dan sinkron dengan instruksi navigasi
 function formatStepManeuver(st, idx, arr, destName) {
   const isLast = idx === arr.length - 1;
@@ -359,7 +406,7 @@ export default function PlanRoute({ setActiveTab }) {
     setManualOrigin(swappedIntent.origin);
     setRouteIntent(swappedIntent);
     setIsNavigating(false);
-    setCurrentStepIndex(0);
+    setNavStepIndex(0);
 
     if ('vibrate' in navigator) {
       navigator.vibrate([40, 30, 40]);
@@ -844,7 +891,7 @@ export default function PlanRoute({ setActiveTab }) {
     }
   };
 
-  // Update Penanda Panah Petunjuk Langkah Aktif (Dynamic Turn Arrow Marker)
+  // Update Penanda Panah Petunjuk Langkah Aktif (panah simpel yang berputar sesuai arah jalan)
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -858,11 +905,11 @@ export default function PlanRoute({ setActiveTab }) {
     }
 
     const currentStep = effectiveSteps[navStepIndex] || effectiveSteps[0];
-    const coordsB = routeData?.routeB?.coordinates;
+    const routeCoords = routeData?.[activeRouteKey]?.coordinates;
     const stepCoord = getStepCoordinate(
       navStepIndex,
       effectiveSteps.length,
-      coordsB,
+      routeCoords,
       activeOrigin,
       activeDestination,
       currentStep
@@ -870,45 +917,37 @@ export default function PlanRoute({ setActiveTab }) {
 
     if (!stepCoord) return;
 
-    // Pastikan icon panah marker SAMA PERSIS dengan ikon & belokan di HUD atas
-    const iconName = currentStep.icon || 'straight';
-    const isFinish = navStepIndex >= effectiveSteps.length - 1 || iconName === 'check_circle';
+    const isFinish = navStepIndex >= effectiveSteps.length - 1 || currentStep.icon === 'check_circle';
 
-    // Label balon deskriptif sesuai aksi manuver belokan
-    const maneuverLabel = isFinish
-      ? 'Titik Tujuan'
-      : iconName === 'turn_right' ? `Belok Kanan (${currentStep.distance || 'Belokan'})`
-      : iconName === 'turn_left' ? `Belok Kiri (${currentStep.distance || 'Belokan'})`
-      : iconName === 'turn_slight_right' ? `Serong Kanan (${currentStep.distance || 'Belokan'})`
-      : iconName === 'turn_slight_left' ? `Serong Kiri (${currentStep.distance || 'Belokan'})`
-      : iconName === 'turn_sharp_right' ? `Tajam Kanan (${currentStep.distance || 'Belokan'})`
-      : iconName === 'turn_sharp_left' ? `Tajam Kiri (${currentStep.distance || 'Belokan'})`
-      : `Langkah ${navStepIndex + 1} (${currentStep.distance || 'Lurus'})`;
+    // Arah putaran panah: 0 = atas, 90 = kanan, 180 = bawah, 270 = kiri
+    const heading = getStepHeading(
+      navStepIndex,
+      effectiveSteps.length,
+      routeCoords,
+      activeOrigin,
+      activeDestination,
+      currentStep
+    );
 
-    const arrowHtml = `
-      <div class="flex flex-col items-center -translate-x-1/2 -translate-y-full cursor-pointer transition-all duration-500 ease-out">
-        <!-- Label Balon Langkah -->
-        <div class="px-2.5 py-1 rounded-full ${isFinish ? 'bg-secondary' : 'bg-amber-500'} text-white font-extrabold text-[10px] sm:text-[11px] shadow-2xl whitespace-nowrap mb-1 flex items-center gap-1.5 border-2 border-white ring-2 ring-black/10">
-          <span class="w-2 h-2 rounded-full bg-white animate-ping inline-block"></span>
-          <span>${maneuverLabel}</span>
+    const arrowHtml = isFinish
+      ? `
+        <div style="width:40px;height:40px;border-radius:50%;background:#006e2c;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;">
+          <span class="material-symbols-outlined" style="color:#fff;font-size:22px;">flag</span>
         </div>
-        <!-- Lingkaran Panah Berdenyut (Pulse Ring) -->
-        <div class="relative flex items-center justify-center">
-          <div class="absolute -inset-2.5 rounded-full ${isFinish ? 'bg-secondary/40' : 'bg-amber-400/40'} animate-ping"></div>
-          <div class="w-11 h-11 rounded-full ${isFinish ? 'bg-secondary' : 'bg-amber-500'} text-white flex items-center justify-center shadow-2xl ring-4 ring-white border-2 ${isFinish ? 'border-secondary' : 'border-amber-600'} font-black">
-            <span class="material-symbols-outlined text-2xl font-bold">
-              ${isFinish ? 'flag' : iconName}
-            </span>
-          </div>
+      `
+      : `
+        <div style="width:40px;height:40px;transform:rotate(${heading}deg);transition:transform .3s ease;filter:drop-shadow(0 2px 4px rgba(0,0,0,.35));">
+          <svg viewBox="0 0 24 24" width="40" height="40" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2 L20 21 L12 17 L4 21 Z" fill="#1a73e8" stroke="#ffffff" stroke-width="1.8" stroke-linejoin="round"/>
+          </svg>
         </div>
-      </div>
-    `;
+      `;
 
     const stepArrowIcon = L.divIcon({
       className: 'step-turn-arrow-marker',
       html: arrowHtml,
-      iconSize: [0, 0],
-      iconAnchor: [0, 0]
+      iconSize: [40, 40],
+      iconAnchor: [20, 20]
     });
 
     if (stepMarkerRef.current) {
@@ -924,12 +963,12 @@ export default function PlanRoute({ setActiveTab }) {
     stepMarkerRef.current.unbindTooltip();
     stepMarkerRef.current.bindTooltip(
       `<strong>Langkah ${navStepIndex + 1}:</strong> ${currentStep.instruction}`,
-      { direction: 'top', offset: [0, -45], permanent: false }
+      { direction: 'top', offset: [0, -22], permanent: false }
     );
 
     // Geser kamera peta secara halus (smooth pan) memusatkan ke titik panah langkah ini
     map.panTo(stepCoord, { animate: true, duration: 0.6 });
-  }, [isNavigating, navStepIndex, effectiveSteps, routeData, activeOrigin?.lat, activeOrigin?.lng, activeDestination?.lat, activeDestination?.lng]);
+  }, [isNavigating, navStepIndex, effectiveSteps, routeData, activeRouteKey, activeOrigin?.lat, activeOrigin?.lng, activeDestination?.lat, activeDestination?.lng]);
 
   // Verifikasi Pengguna: Jika sudah klik "Saya Sudah Tahu", hentikan getar & suara, dan jangan picu lagi
   const handleAcknowledgeObstacle = (obsId) => {
@@ -1188,8 +1227,8 @@ export default function PlanRoute({ setActiveTab }) {
               onClick={() => {
                 if (mapInstanceRef.current) {
                   const currentStep = effectiveSteps[navStepIndex] || effectiveSteps[0];
-                  const coordsB = routeData?.routeB?.coordinates;
-                  const stepCoord = getStepCoordinate(navStepIndex, effectiveSteps.length, coordsB, activeOrigin, activeDestination, currentStep);
+                  const routeCoords = routeData?.[activeRouteKey]?.coordinates;
+                  const stepCoord = getStepCoordinate(navStepIndex, effectiveSteps.length, routeCoords, activeOrigin, activeDestination, currentStep);
                   if (stepCoord) {
                     mapInstanceRef.current.setView(stepCoord, 17, { animate: true });
                   } else if (coords) {
