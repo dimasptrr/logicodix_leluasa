@@ -13,7 +13,7 @@
 
 | Komponen | Keterangan |
 |---|---|
-| **Nama Tim** | **lagingoding** |
+| **Nama Tim** | **digendong mamat** |
 | **Institusi** | Institut Teknologi Sepuluh Nopember (ITS) |
 | **Kategori Lomba** | Web Application (Minimum Viable Product / MVP) |
 | **Subtema** | **4. Inclusive Health & Well-being** *(dengan irisan ke Subtema 5: Civic Tech)* |
@@ -25,12 +25,12 @@
 
 ## Anggota Tim & Matriks Tanggung Jawab
 
-| Foto / Inisial | Nama Anggota | Peran Utama | Akun GitHub | Cakupan Modul & Tanggung Jawab |
-|:---:|---|---|---|---|
-| 🤖 | **Dimas Muhammad Putra** | **AI & Machine Learning Lead** | [@dimasptrr](https://github.com/dimasptrr) | • Arsitektur Microservice AI (`ai-service/` FastAPI :8000)<br>• Deteksi rintangan trotoar lokal via **YOLOv8** & bobot `yolov8n.pt`<br>• Audit multimodal trotoar & estimasi *clearance* via **Google Gemini 1.5 Flash**<br>• Asisten suara (*Voice Assistant NLU*) & *Weather Traction Analysis* |
-| 🌐 | **Erlinda Annisa** | **Fullstack & Backend Lead** | [@Erlinda20](https://github.com/Erlinda20) | • REST API Server Express (`server/` :5000)<br>• Database **Supabase PostgreSQL + PostGIS** & storage foto rintangan<br>• CRUD Laporan Rintangan warga, sistem *upvote*, dan disposisi DPUPR<br>• Integrasi proxy jembatan client-server-AI |
-| 🎨 | **Maritza Adelia Sucipto** | **UI/UX & Frontend Lead** | [@MaritzaAdelia](https://github.com/maritzaadelia076) | • Antarmuka Pengguna React 19 + Tailwind CSS (`client/` :3000)<br>• Aksesibilitas antarmuka (mode kontras tinggi, navigasi ramah screen reader, shortcut suara `'V'`)<br>• Visualisasi peta interaktif Leaflet, modal interaktif, dan kartu laporan |
-| 🗺️ | **I Gede Bagus Saka Sinatrya** | **Routing Engine & GIS Lead** | [@SakaSinatrya](https://github.com/SakaSinatrya) | • Jaringan pedestrian OpenStreetMap (OSM) & **OpenRouteService (ORS)**<br>• Algoritma *Dynamic Obstacle Avoidance* (spatial buffer polygon 25m)<br>• Konversi geometri GeoJSON ↔ Leaflet & *Accessibility Cost Engine* berstandar **Permen PUPR No. 14/PRT/M/2017** |
+| Nama Anggota | Peran Utama | Akun GitHub | Cakupan Modul & Tanggung Jawab |
+|:---:|---|---|---|
+| **Dimas Muhammad Putra** | **AI & Machine Learning Lead** | [@dimasptrr](https://github.com/dimasptrr) | • Arsitektur Microservice AI (`ai-service/` FastAPI :8000)<br>• Deteksi rintangan trotoar lokal via **YOLOv8** & bobot `yolov8n.pt`<br>• Audit multimodal trotoar & estimasi *clearance* via **Google Gemini 1.5 Flash**<br>• Asisten suara (*Voice Assistant NLU*) & *Weather Traction Analysis* |
+| **Erlinda Annisa** | **Fullstack & Backend Lead** | [@Erlinda20](https://github.com/Erlinda20) | • REST API Server Express (`server/` :5000)<br>• Database **Supabase PostgreSQL + PostGIS** & storage foto rintangan<br>• CRUD Laporan Rintangan warga, sistem *upvote*, dan disposisi DPUPR<br>• Integrasi proxy jembatan client-server-AI |
+| **Maritza Adelia Sucipto** | **UI/UX & Frontend Lead** | [@MaritzaAdelia](https://github.com/maritzaadelia076) | • Antarmuka Pengguna React 19 + Tailwind CSS (`client/` :3000)<br>• Aksesibilitas antarmuka (mode kontras tinggi, navigasi ramah screen reader, shortcut suara `'V'`)<br>• Visualisasi peta interaktif Leaflet, modal interaktif, dan kartu laporan |
+| **I Gede Bagus Saka Sinatrya** | **Routing Engine & GIS Lead** | [@SakaSinatrya](https://github.com/SakaSinatrya) | • Jaringan pedestrian OpenStreetMap (OSM) & **OpenRouteService (ORS)**<br>• Algoritma *Dynamic Obstacle Avoidance* (spatial buffer polygon 25m)<br>• Konversi geometri GeoJSON ↔ Leaflet & *Accessibility Cost Engine* berstandar **Permen PUPR No. 14/PRT/M/2017** |
 
 ---
 
@@ -214,21 +214,21 @@ flowchart TD
 
 #### 2. Alur Perbandingan Rute Aksesibel (*Accessible Route Comparison Flow*)
 1. Pengguna membuka tab **"Plan Route"** dan memilih profil kursi roda (Listrik / Manual / Skuter / Pendamping).
-2. Pengguna menentukan titik awal (contoh: *Balai Pemuda*) dan tujuan (contoh: *RSUD Dr. Soetomo*).
+2. Pengguna menentukan titik awal (contoh: *Balai Kota Surabaya*) dan tujuan (contoh: *Grand City Surabaya*).
 3. Backend menerima request `GET /api/routes/compare`:
    * Backend mengambil daftar rintangan aktif berkategori *impassable* di koridor perjalanan dari database.
    * Algoritma GIS Kaka membentuk zona poligon pembatas (*avoid_polygons* ~25 meter) di sekeliling titik rintangan.
    * Backend memanggil OpenRouteService untuk menghasilkan **Rute A (Pejalan Kaki Biasa)** dan **Rute B (Kursi Roda dengan Poligon Hindaran)**.
 4. Cost Engine menghitung *Safety Score* (0–100) berdasarkan ada/tidaknya rintangan dan kelandaian rampa trotoar sesuai standar Permen PUPR No. 14/2017.
 5. Frontend Leaflet me-render dua garis rute sekaligus:
-   * 🔴 **Garis Merah Putus-putus**: Rute Standar (memotong galian / tidak aksesibel).
-   * 🟢 **Garis Hijau-Cyan Solid**: Rute AI Leluasa (memutar aman via jalur bertrotoar lebar).
+   * **Garis Merah Putus-putus**: Rute Standar (memotong galian / tidak aksesibel).
+   * **Garis Hijau-Cyan Solid**: Rute AI Leluasa (memutar aman via jalur bertrotoar lebar).
 
 #### 3. Alur Intelijen Cuaca & Traksi Ubin (*Weather & Traction Flow*)
 1. Modul cuaca mengambil data presipitasi curah hujan, suhu, dan kelembapan saat ini di Surabaya dari **Open-Meteo API**.
 2. Modul `traction_service.py` menghitung koefisien gesek ubin pemandu (*guiding tiles friction index*).
 3. Jika terdeteksi curah hujan > 1 mm atau kode cuaca gerimis/hujan, sistem menampilkan kartu peringatan:
-   > ⚠️ *"Peringatan: Ubin pemandu licin akibat hujan. Koefisien gesek turun ke level Waspada (45/100). Harap kurangi kecepatan kursi roda elektrik."*
+   > **Peringatan:** *"Ubin pemandu licin akibat hujan. Koefisien gesek turun ke level Waspada (45/100). Harap kurangi kecepatan kursi roda elektrik."*
 
 ---
 
@@ -412,11 +412,13 @@ LELUASA menerapkan prinsip etika dan keamanan data digital sesuai rubrik penilai
 logicodix_leluasa/
 ├── .env.example                               # Template variabel lingkungan multi-service
 ├── .gitignore                                 # Aturan pengabaian file sensitif & dependencies
+├── LICENSE                                    # Lisensi sumber terbuka proyek (MIT License)
 ├── package.json                               # Runner script utama proyek (npm run dev/client/server/ai)
 ├── README.md                                  # Dokumentasi resmi proyek LOGICODIX 2026
-├── foot.json                                  # Data uji GeoJSON rute pejalan kaki standar ORS
-├── wheelchair.json                            # Data uji GeoJSON rute kursi roda standar ORS
-├── wheelchair-avoid.json                      # Data uji GeoJSON rute kursi roda dengan poligon hindaran
+├── vercel.json                                # Konfigurasi deployment terpadu Vercel (SPA + API)
+│
+├── api/                                       # ENTRYPOINT VERCEL SERVERLESS
+│   └── index.js                               # Serverless Express proxy handler untuk Vercel
 │
 ├── ai-service/                                # MICROSERVICE AI (Python / FastAPI :8000)
 │   ├── requirements.txt                       # Dependensi pustaka Python AI
@@ -429,6 +431,7 @@ logicodix_leluasa/
 │   │   ├── models/weights/                    # Penyimpanan bobot model YOLOv8 (yolov8n.pt)
 │   │   ├── schemas/                           # Pydantic data schemas request/response
 │   │   └── services/                          # Logika bisnis: Vision, Voice, Route Eval, Weather
+│   ├── datasets/                              # Panduan & metadata dataset rintangan
 │   └── notebooks/                             # Riset eksperimen pelatihan YOLOv8
 │
 ├── client/                                    # FRONTEND WEB APPLICATION (React 19 + Vite :3000)
@@ -441,7 +444,7 @@ logicodix_leluasa/
 │       ├── main.jsx                           # React DOM root entry point
 │       ├── components/                        # Reusable UI: Header, Sidebar, Nav, Modal Aksesibilitas
 │       ├── pages/                             # Halaman: Dashboard, ExploreMap, PlanRoute, ReportObstacle, dll.
-│       ├── features/routing/                  # GIS & Accessibility Cost Engine Kaka
+│       ├── features/                          # Fitur modular: ai/, dashboard/, routing/
 │       └── services/api.js                    # Client HTTP REST API service
 │
 ├── server/                                    # BACKEND API GATEWAY (Node.js / Express :5000)
@@ -458,12 +461,11 @@ logicodix_leluasa/
 │   └── migrations/
 │       └── 20261109121000_obstacle_reporting.sql  # Skema PostGIS, tabel reports, verifikasi, & RLS
 │
-├── docs/                                      # DOKUMENTASI ARSITEKTUR & TIM
-│   ├── API_CONTRACT.md                        # Spesifikasi kontrak REST API antar-layanan
-│   ├── ARCHITECTURE.md                        # Desain arsitektur modular & diagram sistem
-│   └── TEAM_DIVISION.md                       # Panduan pembagian tugas & sprint workflow
-│
-└── stitch_leluasa_accessible_sidewalk_navigation/  # Aset purwarupa desain UI/UX awal
+└── docs/                                      # DOKUMENTASI ARSITEKTUR & TIM
+    ├── API_CONTRACT.md                        # Spesifikasi kontrak REST API antar-layanan
+    ├── ARCHITECTURE.md                        # Desain arsitektur modular & diagram sistem
+    ├── TEAM_DIVISION.md                       # Panduan pembagian tugas & sprint workflow
+    └── samples/ors/                           # Sampel respons rute ORS (foot.json, wheelchair.json, dll.)
 ```
 
 ---
@@ -488,6 +490,6 @@ Seluruh kode sumber pada proyek **LELUASA** dilisensikan di bawah lisensi **[MIT
 Anda bebas menggunakan, memodifikasi, dan mendistribusikan kode ini untuk tujuan penelitian, kemanusiaan, dan pengembangan teknologi aksesibilitas inklusif.
 
 ```text
-Copyright (c) 2026 Tim lagingoding — LOGICODIX Hackathon 2026
+Copyright (c) 2026 Tim digendong mamat — LOGICODIX Hackathon 2026
 (Dimas Muhammad Putra, Erlinda Annisa, Maritza Adelia Sucipto, I Gede Bagus Saka Sinatrya)
 ```
