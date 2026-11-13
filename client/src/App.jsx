@@ -160,30 +160,32 @@ export default function App() {
         onCloseMobile={() => setIsMobileMenuOpen(false)}
       />
 
-      {/* Main Layout Area (pl-0 on mobile, pl-80 on desktop) */}
-      <div className="pl-0 lg:pl-80 pb-20 lg:pb-0 min-h-screen flex flex-col w-full">
-        {/* Top Responsive Header */}
-        <Header
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          onSearchSubmit={handleSearchSubmit}
-          onOpenVoice={() => setVoiceOpen(true)}
-          onOpenAccessibility={() => setAccessibilityOpen(true)}
-          onOpenNotifications={handleOpenNotifications}
-          onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
-          onNavigateHome={() => handleSetActiveTab('home')}
-          activeTab={activeTab}
-          setActiveTab={handleSetActiveTab}
-          canGoBack={canGoBack}
-          onGoBack={handleGoBack}
-          previousTab={previousTab}
-          wakeWordEnabled={wakeWordEnabled}
-          toggleWakeWord={toggleWakeWord}
-          isWakeWordListening={isWakeWordListening}
-          wakeWordPermissionStatus={wakeWordPermissionStatus}
-          requestWakeWordPermission={requestWakeWordPermission}
-          onMicPermissionDenied={handleMicPermissionDenied}
-        />
+      {/* Main Layout Area (pl-0 on mobile, pl-80 on desktop jika bukan plan-route) */}
+      <div className={`pl-0 ${activeTab === 'plan-route' ? '' : 'lg:pl-80'} pb-20 lg:pb-0 min-h-screen flex flex-col w-full`}>
+        {/* Top Responsive Header (Dihilangkan saat di halaman rute & perbandingan agar fokus ke navigasi) */}
+        {activeTab !== 'plan-route' && (
+          <Header
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            onSearchSubmit={handleSearchSubmit}
+            onOpenVoice={() => setVoiceOpen(true)}
+            onOpenAccessibility={() => setAccessibilityOpen(true)}
+            onOpenNotifications={handleOpenNotifications}
+            onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
+            onNavigateHome={() => handleSetActiveTab('home')}
+            activeTab={activeTab}
+            setActiveTab={handleSetActiveTab}
+            canGoBack={canGoBack}
+            onGoBack={handleGoBack}
+            previousTab={previousTab}
+            wakeWordEnabled={wakeWordEnabled}
+            toggleWakeWord={toggleWakeWord}
+            isWakeWordListening={isWakeWordListening}
+            wakeWordPermissionStatus={wakeWordPermissionStatus}
+            requestWakeWordPermission={requestWakeWordPermission}
+            onMicPermissionDenied={handleMicPermissionDenied}
+          />
+        )}
 
         {/* Global Notification Banner */}
         {notificationToast && (
@@ -203,8 +205,8 @@ export default function App() {
           </div>
         )}
 
-        {/* Content Workspace (pt-16 on mobile, pt-20 on desktop) */}
-        <main className="relative pt-16 sm:pt-20 min-h-[calc(100vh-4rem)] sm:min-h-[calc(100vh-5rem)] bg-surface w-full flex-1">
+        {/* Content Workspace (pt-0 pada plan-route, pt-16/pt-20 pada halaman lain dengan Header) */}
+        <main className={`relative ${activeTab === 'plan-route' ? 'pt-0 min-h-screen' : 'pt-16 sm:pt-20 min-h-[calc(100vh-4rem)] sm:min-h-[calc(100vh-5rem)]'} bg-surface w-full flex-1`}>
           {activeTab === 'home' && (
             <Dashboard
               setActiveTab={handleSetActiveTab}
