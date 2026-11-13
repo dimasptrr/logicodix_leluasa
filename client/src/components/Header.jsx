@@ -256,20 +256,6 @@ export default function Header({
           >
             <span className="material-symbols-outlined text-[22px]" aria-hidden="true">contrast</span>
           </button>
-
-          {/* Notifikasi Sistem / Pembaruan Trotoar */}
-          <button
-            type="button"
-            onClick={onOpenNotifications}
-            aria-label="Buka notifikasi sistem dan info perbaikan DPUPR"
-            className="relative min-h-[38px] min-w-[38px] sm:min-h-[40px] sm:min-w-[40px] flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 cursor-pointer shrink-0"
-            title="2 Pemberitahuan: Perbaikan DPUPR & Info Cuaca"
-          >
-            <span className="material-symbols-outlined text-[20px] sm:text-[22px]" aria-hidden="true">notifications</span>
-            <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-error text-white text-[10px] font-extrabold flex items-center justify-center shadow-xs">
-              2
-            </span>
-          </button>
         </div>
 
         {/* 5. CTA Tunggal: Lapor Hambatan Baru (Hanya tampil di layar sedang sm ke atas agar mobile tetap bersih) */}
