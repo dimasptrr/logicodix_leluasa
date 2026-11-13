@@ -101,18 +101,18 @@ export default function Profile({ setActiveTab }) {
         prev.map((r) =>
           String(r.id) === String(reportId)
             ? {
-                ...r,
-                status: 'resolved',
-                completedDate: 'Hari ini, Baru saja',
-                durationHours: '24 Jam Pengerjaan Tuntas',
-                agency: 'DSDABM Kota Surabaya · Satgas UPTD Pemeliharaan Trotoar',
-                teamLeader: 'Tim Reaksi Cepat Surabaya',
-                pointsAwarded: 100,
-                workSummary: 'Perbaikan fisik trotoar telah diselesaikan tuntas oleh satgas DPUPR / DSDABM di lokasi, aksesibilitas telah dipulihkan.',
-                accessibilityImpact: 'Jalur trotoar kini 100% mulus, aman, dan dapat dilintasi kursi roda maupun tongkat tunanetra.',
-                afterImage: 'https://images.unsplash.com/photo-1517649763962-0c623266ddc0?auto=format&fit=crop&w=600&q=80',
-                afterCaption: 'Kondisi Sesudah: Selesai diperbaiki tuntas oleh satgas DPUPR Surabaya.'
-              }
+              ...r,
+              status: 'resolved',
+              completedDate: 'Hari ini, Baru saja',
+              durationHours: '24 Jam Pengerjaan Tuntas',
+              agency: 'DSDABM Kota Surabaya · Satgas UPTD Pemeliharaan Trotoar',
+              teamLeader: 'Tim Reaksi Cepat Surabaya',
+              pointsAwarded: 100,
+              workSummary: 'Perbaikan fisik trotoar telah diselesaikan tuntas oleh satgas DPUPR / DSDABM di lokasi, aksesibilitas telah dipulihkan.',
+              accessibilityImpact: 'Jalur trotoar kini 100% mulus, aman, dan dapat dilintasi kursi roda maupun tongkat tunanetra.',
+              afterImage: 'https://images.unsplash.com/photo-1517649763962-0c623266ddc0?auto=format&fit=crop&w=600&q=80',
+              afterCaption: 'Kondisi Sesudah: Selesai diperbaiki tuntas oleh satgas DPUPR Surabaya.'
+            }
             : r
         )
       );
@@ -244,18 +244,10 @@ export default function Profile({ setActiveTab }) {
             <div className="flex flex-col gap-1.5">
               <button
                 type="button"
-<<<<<<< HEAD
-                onClick={handleGoToCatalog}
-                className="px-4 py-2 rounded-xl bg-amber-400 text-slate-900 font-extrabold text-xs shadow-md hover:bg-amber-300 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                title="Buka dan scroll ke Katalog Tiket Bus Surabaya"
-              >
-                <span className="material-symbols-outlined text-base">directions_bus</span>
-=======
                 onClick={() => setSubTab('catalog')}
                 className="px-3.5 py-1.5 rounded-lg bg-amber-400 text-slate-900 font-bold text-xs shadow-xs hover:bg-amber-300 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1"
               >
                 <span className="material-symbols-outlined text-sm">redeem</span>
->>>>>>> origin/main
                 <span>Tukar Tiket Bus</span>
               </button>
               <button
@@ -358,11 +350,10 @@ export default function Profile({ setActiveTab }) {
         <button
           type="button"
           onClick={() => setSubTab('catalog')}
-          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
-            activeTab === 'catalog'
+          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${activeTab === 'catalog'
               ? 'bg-primary text-white shadow-xs'
               : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
-          }`}
+            }`}
         >
           <span className="material-symbols-outlined text-base">directions_bus</span>
           <span>Katalog Tiket Bus ({REWARD_CATALOG.length})</span>
@@ -371,11 +362,10 @@ export default function Profile({ setActiveTab }) {
         <button
           type="button"
           onClick={() => setSubTab('vouchers')}
-          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
-            activeTab === 'vouchers'
+          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${activeTab === 'vouchers'
               ? 'bg-primary text-white shadow-xs'
               : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
-          }`}
+            }`}
         >
           <span className="material-symbols-outlined text-base">confirmation_number</span>
           <span>Tiket Aktif</span>
@@ -384,11 +374,10 @@ export default function Profile({ setActiveTab }) {
         <button
           type="button"
           onClick={() => setSubTab('my-reports')}
-          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
-            activeTab === 'my-reports'
+          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${activeTab === 'my-reports'
               ? 'bg-primary text-white shadow-xs'
               : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
-          }`}
+            }`}
         >
           <span className="material-symbols-outlined text-base">build_circle</span>
           <span>Laporan Saya &amp; Hasil DPUPR</span>
@@ -400,11 +389,10 @@ export default function Profile({ setActiveTab }) {
         <button
           type="button"
           onClick={() => setSubTab('history')}
-          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
-            activeTab === 'history'
+          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${activeTab === 'history'
               ? 'bg-primary text-white shadow-xs'
               : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
-          }`}
+            }`}
         >
           <span className="material-symbols-outlined text-base">history</span>
           <span>Riwayat Poin</span>
@@ -468,7 +456,7 @@ export default function Profile({ setActiveTab }) {
                       }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                    
+
                     {/* Badge Kategori */}
                     <span className={`absolute top-3 left-3 px-3 py-1 rounded-full text-[11px] font-extrabold shadow-sm ${item.badgeColor}`}>
                       {item.badge}
@@ -510,11 +498,10 @@ export default function Profile({ setActiveTab }) {
                         type="button"
                         onClick={() => handleOpenRedeemModal(item)}
                         disabled={!canAfford}
-                        className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer ${
-                          canAfford
+                        className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer ${canAfford
                             ? 'bg-primary hover:bg-primary-container text-on-primary active:scale-95'
                             : 'bg-surface-container text-outline cursor-not-allowed'
-                        }`}
+                          }`}
                       >
                         <span className="material-symbols-outlined text-base">redeem</span>
                         <span>{canAfford ? `Tukar ${item.pointsCost} Poin` : `Poin Kurang (${profile.points}/${item.pointsCost})`}</span>
@@ -634,7 +621,7 @@ export default function Profile({ setActiveTab }) {
                 Pantau proses pengerjaan satgas dinas secara real-time. Setiap laporan selesai memberi Anda bonus +100 s.d +150 Poin!
               </p>
             </div>
-            
+
             <div className="flex items-center gap-2 self-start sm:self-auto">
               <button
                 type="button"
@@ -660,22 +647,20 @@ export default function Profile({ setActiveTab }) {
             <button
               type="button"
               onClick={() => setReportFilter('all')}
-              className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
-                reportFilter === 'all'
+              className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${reportFilter === 'all'
                   ? 'bg-primary text-white shadow-xs'
                   : 'text-on-surface-variant hover:text-on-surface'
-              }`}
+                }`}
             >
               Semua Laporan ({reports.length})
             </button>
             <button
               type="button"
               onClick={() => setReportFilter('resolved')}
-              className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1 ${
-                reportFilter === 'resolved'
+              className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1 ${reportFilter === 'resolved'
                   ? 'bg-emerald-600 text-white shadow-xs'
                   : 'text-on-surface-variant hover:text-on-surface'
-              }`}
+                }`}
             >
               <span className="material-symbols-outlined text-xs">task_alt</span>
               <span>Selesai Diperbaiki ({resolvedDpuprCount})</span>
@@ -683,11 +668,10 @@ export default function Profile({ setActiveTab }) {
             <button
               type="button"
               onClick={() => setReportFilter('in_progress')}
-              className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1 ${
-                reportFilter === 'in_progress'
+              className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1 ${reportFilter === 'in_progress'
                   ? 'bg-amber-500 text-slate-900 shadow-xs'
                   : 'text-on-surface-variant hover:text-on-surface'
-              }`}
+                }`}
             >
               <span className="material-symbols-outlined text-xs">pending</span>
               <span>Sedang Diproses ({inProgressCount})</span>
@@ -708,16 +692,14 @@ export default function Profile({ setActiveTab }) {
                 return (
                   <div
                     key={report.id}
-                    className={`p-4 sm:p-5 rounded-3xl bg-surface-container-lowest border-2 shadow-xs flex flex-col gap-4 transition-all ${
-                      isResolved ? 'border-emerald-500/40 ring-1 ring-emerald-500/20' : 'border-amber-500/40'
-                    }`}
+                    className={`p-4 sm:p-5 rounded-3xl bg-surface-container-lowest border-2 shadow-xs flex flex-col gap-4 transition-all ${isResolved ? 'border-emerald-500/40 ring-1 ring-emerald-500/20' : 'border-amber-500/40'
+                      }`}
                   >
                     {/* Header Kartu Laporan */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-outline-variant/20">
                       <div className="flex items-center gap-2.5">
-                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
-                          isResolved ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300' : 'bg-amber-500/20 text-amber-800 dark:text-amber-200'
-                        }`}>
+                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${isResolved ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300' : 'bg-amber-500/20 text-amber-800 dark:text-amber-200'
+                          }`}>
                           <span className="material-symbols-outlined text-xl">
                             {isResolved ? 'task_alt' : 'construction'}
                           </span>
@@ -887,9 +869,8 @@ export default function Profile({ setActiveTab }) {
               {history.map((item) => (
                 <div key={item.id} className="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-surface-container-low transition-colors">
                   <div className="flex items-center gap-3.5">
-                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
-                      item.type === 'earned' ? 'bg-emerald-500/15 text-emerald-600' : 'bg-primary/10 text-primary'
-                    }`}>
+                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${item.type === 'earned' ? 'bg-emerald-500/15 text-emerald-600' : 'bg-primary/10 text-primary'
+                      }`}>
                       <span className="material-symbols-outlined text-xl">
                         {item.type === 'earned' ? 'add_circle' : 'redeem'}
                       </span>
@@ -906,9 +887,8 @@ export default function Profile({ setActiveTab }) {
                     </div>
                   </div>
 
-                  <span className={`text-sm sm:text-base font-extrabold shrink-0 ${
-                    item.type === 'earned' ? 'text-emerald-600' : 'text-primary'
-                  }`}>
+                  <span className={`text-sm sm:text-base font-extrabold shrink-0 ${item.type === 'earned' ? 'text-emerald-600' : 'text-primary'
+                    }`}>
                     {item.points > 0 ? `+${item.points}` : item.points} Poin
                   </span>
                 </div>

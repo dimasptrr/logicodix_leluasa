@@ -106,10 +106,10 @@ export default function Header({
 
   // Link navigasi atas untuk laptop/desktop (seluruh halaman dapat diakses dari navbar atas)
   const navLinks = [
-    { id: 'home',                 label: 'Dashboard' },
-    { id: 'explore-map',          label: 'Peta Navigasi' },
-    { id: 'plan-route',           label: 'Rute & Perbandingan' },
-    { id: 'reports-impact',       label: 'Riwayat Komunitas' },
+    { id: 'home', label: 'Dashboard' },
+    { id: 'explore-map', label: 'Peta Navigasi' },
+    { id: 'plan-route', label: 'Rute & Perbandingan' },
+    { id: 'reports-impact', label: 'Riwayat Komunitas' },
     { id: 'weather-intelligence', label: 'Intelijen Cuaca' },
   ];
 
@@ -123,11 +123,10 @@ export default function Header({
         disabled={!isBackEnabled}
         aria-label={isBackEnabled ? `Kembali ke ${previousTabLabel || 'halaman sebelumnya'}` : 'Kembali ke halaman sebelumnya'}
         title={isBackEnabled ? `Kembali ke ${previousTabLabel || 'halaman sebelumnya'}` : 'Tidak ada halaman sebelumnya'}
-        className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-200 outline-none shrink-0 ${
-          isBackEnabled
+        className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-200 outline-none shrink-0 ${isBackEnabled
             ? 'bg-surface-container hover:bg-primary hover:text-white text-primary shadow-xs cursor-pointer active:scale-90 ring-1 ring-outline-variant/40'
             : 'opacity-30 text-on-surface-variant cursor-not-allowed bg-surface-container/50'
-        }`}
+          }`}
       >
         <span className="material-symbols-outlined text-[20px] sm:text-[22px]" aria-hidden="true">
           arrow_back
@@ -176,11 +175,10 @@ export default function Header({
               key={link.id}
               type="button"
               onClick={() => navigate(link.id)}
-              className={`h-full px-4 text-sm font-semibold transition-all duration-200 whitespace-nowrap outline-none relative border-b-2 cursor-pointer ${
-                isActive
+              className={`h-full px-4 text-sm font-semibold transition-all duration-200 whitespace-nowrap outline-none relative border-b-2 cursor-pointer ${isActive
                   ? 'text-primary border-primary font-bold'
                   : 'text-on-surface-variant border-transparent hover:text-on-surface hover:border-primary/30'
-              }`}
+                }`}
               aria-current={isActive ? 'page' : undefined}
             >
               {link.label}
@@ -208,34 +206,32 @@ export default function Header({
               }
               onOpenVoice();
             }}
-            className={`flex items-center gap-1 sm:gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-full text-xs font-bold transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 cursor-pointer shrink-0 ${
-              wakeWordPermissionStatus === 'denied'
+            className={`flex items-center gap-1 sm:gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-full text-xs font-bold transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 cursor-pointer shrink-0 ${wakeWordPermissionStatus === 'denied'
                 ? 'bg-error/15 text-error border border-error/30 hover:bg-error/25'
                 : wakeWordPermissionStatus === 'prompt'
-                ? 'bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/40 hover:bg-amber-500/25'
-                : isWakeWordListening
-                ? 'bg-secondary/15 text-secondary border border-secondary/30 hover:bg-secondary/25'
-                : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
-            }`}
+                  ? 'bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/40 hover:bg-amber-500/25'
+                  : isWakeWordListening
+                    ? 'bg-secondary/15 text-secondary border border-secondary/30 hover:bg-secondary/25'
+                    : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+              }`}
             title={
               wakeWordPermissionStatus === 'denied'
                 ? 'Izin mikrofon terblokir. Klik untuk info membuka blokir.'
                 : wakeWordPermissionStatus === 'prompt'
-                ? 'Klik di sini untuk mengaktifkan izin mikrofon "Hai LUMI"'
-                : 'Asisten Suara LUMI aktif. Katakan "Hai LUMI" kapan saja atau klik tombol ini'
+                  ? 'Klik di sini untuk mengaktifkan izin mikrofon "Hai LUMI"'
+                  : 'Asisten Suara LUMI aktif. Katakan "Hai LUMI" kapan saja atau klik tombol ini'
             }
             aria-label="Status Wake Word Asisten Suara LUMI"
           >
             <span
-              className={`w-2 h-2 rounded-full shrink-0 ${
-                wakeWordPermissionStatus === 'denied'
+              className={`w-2 h-2 rounded-full shrink-0 ${wakeWordPermissionStatus === 'denied'
                   ? 'bg-error'
                   : wakeWordPermissionStatus === 'prompt'
-                  ? 'bg-amber-500 animate-ping'
-                  : isWakeWordListening
-                  ? 'bg-secondary animate-pulse'
-                  : 'bg-outline'
-              }`}
+                    ? 'bg-amber-500 animate-ping'
+                    : isWakeWordListening
+                      ? 'bg-secondary animate-pulse'
+                      : 'bg-outline'
+                }`}
             />
             <span className="material-symbols-outlined text-[17px] shrink-0">
               {wakeWordPermissionStatus === 'denied' ? 'mic_off' : 'mic'}
@@ -244,8 +240,8 @@ export default function Header({
               {wakeWordPermissionStatus === 'denied'
                 ? 'Mic Terblokir'
                 : wakeWordPermissionStatus === 'prompt'
-                ? 'Aktifkan "Hai LUMI"'
-                : '"Hai LUMI"'}
+                  ? 'Aktifkan "Hai LUMI"'
+                  : '"Hai LUMI"'}
             </span>
           </button>
 
@@ -253,16 +249,13 @@ export default function Header({
           <button
             aria-label={isHighContrast ? 'Nonaktifkan Mode Kontras Tinggi' : 'Aktifkan Mode Kontras Tinggi'}
             onClick={handleToggleHighContrast}
-            className={`hidden md:flex min-h-[40px] min-w-[40px] items-center justify-center rounded-full transition-all duration-200 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 shrink-0 ${
-              isHighContrast ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container'
-            }`}
+            className={`hidden md:flex min-h-[40px] min-w-[40px] items-center justify-center rounded-full transition-all duration-200 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 shrink-0 ${isHighContrast ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container'
+              }`}
             type="button"
             title="Klik untuk Kontras Tinggi Nyata"
           >
             <span className="material-symbols-outlined text-[22px]" aria-hidden="true">contrast</span>
           </button>
-<<<<<<< HEAD
-=======
 
           {/* Notifikasi Sistem / Pembaruan Trotoar */}
           <button
@@ -277,7 +270,6 @@ export default function Header({
               2
             </span>
           </button>
->>>>>>> origin/main
         </div>
 
         {/* 5. CTA Tunggal: Lapor Hambatan Baru (Hanya tampil di layar sedang sm ke atas agar mobile tetap bersih) */}
@@ -297,11 +289,10 @@ export default function Header({
           onClick={() => navigate('profile')}
           aria-label={`Buka Profil dan Reward Warga. Anda memiliki ${profile?.points?.toLocaleString('id-ID') || 0} Poin`}
           title={`Profil: ${profile?.name || 'Warga Leluasa'} · Klik untuk Tukar Poin Reward Tiket`}
-          className={`flex items-center gap-1.5 sm:gap-2 pl-2 sm:pl-2.5 pr-1 py-1 rounded-full border transition-all duration-200 outline-none cursor-pointer group shrink-0 ${
-            resolvedActiveTab === 'profile'
+          className={`flex items-center gap-1.5 sm:gap-2 pl-2 sm:pl-2.5 pr-1 py-1 rounded-full border transition-all duration-200 outline-none cursor-pointer group shrink-0 ${resolvedActiveTab === 'profile'
               ? 'bg-amber-400/20 border-amber-400 text-amber-900 dark:text-amber-200 ring-2 ring-amber-400/40 shadow-xs'
               : 'bg-surface-container hover:bg-amber-500/10 border-outline-variant/40 text-on-surface'
-          }`}
+            }`}
         >
           <div className="flex items-center gap-1 shrink-0">
             <span className="material-symbols-outlined text-amber-500 text-[18px] group-hover:scale-110 transition-transform">stars</span>
