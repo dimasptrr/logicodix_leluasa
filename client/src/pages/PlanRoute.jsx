@@ -1087,7 +1087,7 @@ export default function PlanRoute({ setActiveTab }) {
   // =========================================================================
   if (!hasDestination) {
     return (
-      <div className="min-h-[calc(100vh-5rem)] w-full flex items-center justify-center p-4 sm:p-6 animate-fadeIn">
+      <div className="min-h-screen w-full flex items-center justify-center p-4 sm:p-6 animate-fadeIn">
         <div className="w-full max-w-md bg-surface-container-lowest rounded-3xl p-8 sm:p-10 border border-outline-variant/30 shadow-lg flex flex-col items-center text-center gap-6">
           <div className="w-20 h-20 rounded-full bg-primary/10 text-primary flex items-center justify-center shadow-inner">
             <span className="material-symbols-outlined text-4xl" style={{ fontVariationSettings: "'FILL' 1" }}>
@@ -1124,7 +1124,7 @@ export default function PlanRoute({ setActiveTab }) {
     const currentStep = effectiveSteps[navStepIndex] || effectiveSteps[0];
 
     return (
-      <div className="relative w-full max-w-xl h-[calc(100vh-4rem)] sm:h-[calc(100vh-5rem)] mx-auto overflow-hidden flex flex-col justify-between bg-surface-container-low shadow-2xl rounded-3xl animate-fadeIn p-4 sm:p-5">
+      <div className="relative w-full max-w-xl h-[100dvh] sm:h-[96vh] sm:my-auto mx-auto overflow-hidden flex flex-col justify-between bg-surface-container-low shadow-2xl rounded-none sm:rounded-3xl animate-fadeIn p-4 sm:p-5">
         
         {/* PETA LEAFLET LATAR BELAKANG NAVIGASI AKTIF SURABAYA */}
         <div
@@ -1177,9 +1177,21 @@ export default function PlanRoute({ setActiveTab }) {
 
         {/* TOP HUD CARD: PANDUAN ARAH SEKARANG */}
         <div className="relative z-10 w-full bg-surface-container-lowest/95 backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-xl border-l-[8px] border-primary flex items-center justify-between gap-3 border border-outline-variant/20">
-          <div className="flex items-center gap-3.5">
-            <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center text-on-primary shadow-md shrink-0">
-              <span className="material-symbols-outlined text-[32px]">
+          <div className="flex items-center gap-2.5 sm:gap-3.5">
+            <button
+              type="button"
+              onClick={() => {
+                if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+                setIsNavigating(false);
+              }}
+              className="w-10 h-10 min-w-[40px] rounded-full bg-surface-container hover:bg-surface-container-high text-primary flex items-center justify-center transition-all shadow-xs cursor-pointer shrink-0"
+              title="Keluar dari panduan navigasi"
+              aria-label="Kembali ke pilihan rute"
+            >
+              <span className="material-symbols-outlined text-xl">arrow_back</span>
+            </button>
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-primary flex items-center justify-center text-on-primary shadow-md shrink-0">
+              <span className="material-symbols-outlined text-[28px] sm:text-[32px]">
                 {currentStep.icon || 'turn_right'}
               </span>
             </div>
@@ -1187,7 +1199,7 @@ export default function PlanRoute({ setActiveTab }) {
               <span className="text-[11px] uppercase tracking-wider text-primary font-bold block">
                 Langkah {navStepIndex + 1} dari {effectiveSteps.length}
               </span>
-              <span className="font-headline-sm text-base sm:text-lg text-on-surface font-extrabold leading-tight block">
+              <span className="font-headline-sm text-sm sm:text-lg text-on-surface font-extrabold leading-tight block">
                 {currentStep.instruction}
               </span>
               <span className="text-xs text-on-surface-variant font-medium mt-0.5 block">
@@ -1339,11 +1351,11 @@ export default function PlanRoute({ setActiveTab }) {
   // VIEW B: PERBANDINGAN RUTE (Surabaya 100% Riil)
   // =========================================================================
   return (
-    <div className="px-3 sm:px-space-md lg:px-space-xl py-3 sm:py-space-md flex flex-col gap-4 max-w-[1520px] mx-auto w-full animate-fadeIn pb-8">
+    <div className="px-3 sm:px-space-md lg:px-space-xl pt-4 sm:pt-6 py-3 sm:py-space-md flex flex-col gap-4 max-w-[1520px] mx-auto w-full animate-fadeIn pb-8">
       
       {/* Toast Notifikasi */}
       {shareToast && (
-        <div role="status" aria-live="polite" className="fixed top-20 left-1/2 -translate-x-1/2 z-50 p-3 rounded-xl bg-secondary text-on-secondary font-label-sm text-xs font-semibold shadow-xl flex items-center gap-2 animate-fadeIn">
+        <div role="status" aria-live="polite" className="fixed top-6 left-1/2 -translate-x-1/2 z-50 p-3 rounded-xl bg-secondary text-on-secondary font-label-sm text-xs font-semibold shadow-xl flex items-center gap-2 animate-fadeIn">
           <span className="material-symbols-outlined text-base">check_circle</span>
           <span>{shareToast}</span>
         </div>
@@ -1351,14 +1363,25 @@ export default function PlanRoute({ setActiveTab }) {
 
       {/* HEADER SPATIAL & SELECTOR TUJUAN SURABAYA */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-1">
-        <div>
-          <span className="text-label-md uppercase tracking-wider text-primary font-bold text-xs">
-            Rute &amp; Perbandingan Aksesibilitas
-          </span>
-          <h1 className="font-headline-lg-mobile text-xl sm:text-2xl text-on-surface font-extrabold tracking-tight">
-            {destInfo.title}
-          </h1>
-          <p className="text-xs text-on-surface-variant font-medium mt-0.5">{destInfo.subtitle}</p>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setActiveTab('home')}
+            className="w-10 h-10 rounded-full bg-surface-container hover:bg-primary hover:text-white text-primary flex items-center justify-center transition-all shadow-xs cursor-pointer shrink-0 ring-1 ring-outline-variant/30"
+            title="Kembali ke Beranda"
+            aria-label="Kembali ke Beranda"
+          >
+            <span className="material-symbols-outlined text-xl">arrow_back</span>
+          </button>
+          <div>
+            <span className="text-label-md uppercase tracking-wider text-primary font-bold text-xs">
+              Rute &amp; Perbandingan Aksesibilitas
+            </span>
+            <h1 className="font-headline-lg-mobile text-xl sm:text-2xl text-on-surface font-extrabold tracking-tight">
+              {destInfo.title}
+            </h1>
+            <p className="text-xs text-on-surface-variant font-medium mt-0.5">{destInfo.subtitle}</p>
+          </div>
         </div>
 
         {/* Destination Badge & Action */}
