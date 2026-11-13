@@ -3,6 +3,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Pastikan container Leaflet selalu terisolasi dalam stacking context lokal */
+.leaflet-container {
+  isolation: isolate;
+}
+
 @layer base {
   html, body {
     margin: 0;
