@@ -10,7 +10,7 @@ const app = express();
 
 // Middleware dasar
 app.use(cors({
-  origin: '*', // Memungkinkan akses dari frontend local Vite (:3000 & :5173)
+  origin: true, // Izinkan akses dari localhost maupun domain Vercel production
   credentials: true
 }));
 app.use(express.json({ limit: '2.2mb' }));
@@ -110,52 +110,14 @@ app.get('/api/obstacles', async (req, res) => {
     status: 'success',
     data: [
       ...supabaseReports,
-      ...dynamicReports,
-      {
-        id: 'obs-01',
-        title: 'Galian Pipa Utilitas Jl. Pemuda',
-        name: 'Galian Pipa Utilitas Jl. Pemuda',
-        location: 'Jl. Pemuda No. 34, Embong Kaliasin',
-        location_text: 'Jl. Pemuda No. 34, Embong Kaliasin',
-        category: 'construction',
-        severity: 'impassable',
-        status: 'active',
-        lat: -7.264741,
-        lng: 112.743022,
-        latitude: -7.264741,
-        longitude: 112.743022,
-        coordinates: { lat: -7.264741, lng: 112.743022 },
-        clearance_cm: 0,
-        upvotes: 18,
-        reported_at: '2026-11-09T08:30:00Z',
-        created_at: '2026-11-09T08:30:00Z',
-        image_url: 'https://images.unsplash.com/photo-1584467735871-8e85353a8413?w=600'
-      },
-      {
-        id: 'obs-02',
-        title: 'Bollard Terlalu Sempit (Lebar 55 cm)',
-        name: 'Bollard Terlalu Sempit (Lebar 55 cm)',
-        location: 'Trotoar Depan Taman Apsari',
-        location_text: 'Trotoar Depan Taman Apsari',
-        category: 'narrow_bollard',
-        severity: 'difficult',
-        status: 'active',
-        lat: -7.264599,
-        lng: 112.742813,
-        latitude: -7.264599,
-        longitude: 112.742813,
-        coordinates: { lat: -7.264599, lng: 112.742813 },
-        clearance_cm: 55,
-        upvotes: 7,
-        reported_at: '2026-11-08T14:15:00Z',
-        created_at: '2026-11-08T14:15:00Z',
-        image_url: 'https://images.unsplash.com/photo-1590674899484-d5640e854abe?w=600'
-      }
+      ...dynamicReports
     ]
   });
 });
 
 app.get('/api/weather', async (req, res) => {
+  const lat = req.query.lat || -7.2575;
+  const lng = req.query.lng || 112.7521;
   let condition = 'Cerah Berawan';
   let temperature = 30;
   let humidity = 70;
@@ -164,10 +126,8 @@ app.get('/api/weather', async (req, res) => {
   let isLive = false;
 
   try {
-    const lat = req.query.lat || -7.2575;
-    const lng = req.query.lng || 112.7521;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
     const omRes = await fetch(
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code&timezone=Asia%2FJakarta`,
       { signal: controller.signal }
@@ -243,10 +203,11 @@ app.get('/api/stats', (req, res) => {
   res.json({
     status: 'success',
     data: {
-      totalSafeRoutes: 124,
-      activeObstacles: 8,
-      resolvedObstacles: 42,
-      accessibleSidewalkCoverageKm: 34.6
+      sidewalkKmMapped: 4.8,
+      obstaclesReported: 3,
+      communityVerified: 3,
+      totalSafeRoutes: 3,
+      accessibleSidewalkCoverageKm: 4.8
     }
   });
 });

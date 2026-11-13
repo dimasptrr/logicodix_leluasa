@@ -786,21 +786,6 @@ export default function Dashboard({ setActiveTab, onOpenVoice }) {
                 </div>
               )}
 
-              {/* Rekomendasi Cepat (Pills) */}
-              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1">
-                <span className="text-[10px] font-bold text-on-surface-variant shrink-0">Cepat:</span>
-                {SURABAYA_DESTINATIONS.slice(0, 3).map(dest => (
-                  <button
-                    key={dest.id}
-                    type="button"
-                    onClick={() => handleSelectLocation(dest)}
-                    className="px-2.5 py-1 rounded-full bg-surface-container hover:bg-primary hover:text-white text-[11px] font-bold text-on-surface transition-all whitespace-nowrap shrink-0 cursor-pointer"
-                  >
-                    {dest.name.split(' ')[0]} {dest.name.split(' ')[1] || ''}
-                  </button>
-                ))}
-              </div>
-
               {/* Tombol Terapkan Rute */}
               {stop1 && !hasSelectedDestination && (
                 <button

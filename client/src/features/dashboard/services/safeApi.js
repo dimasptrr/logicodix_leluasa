@@ -35,12 +35,14 @@ function activateFallback() {
   }
 }
 
-// const SUPABASE_REST_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL)
-//   ? `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/laporan_leluasa`
-//   : 'https://ifqkpxeydmznkwakzygn.supabase.co/rest/v1/laporan_leluasa';
-// const SUPABASE_KEY = (typeof import.meta !== 'undefined' && (import.meta.env?.VITE_SUPABASE_KEY || import.meta.env?.VITE_SUPABASE_ANON_KEY)) || '';
+const SUPABASE_REST_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL)
+  ? `${import.meta.env.VITE_SUPABASE_URL.replace(/\/$/, '')}/rest/v1/laporan_leluasa`
+  : null;
+const SUPABASE_KEY = (typeof import.meta !== 'undefined' && (import.meta.env?.VITE_SUPABASE_ANON_KEY || import.meta.env?.VITE_SUPABASE_KEY))
+  || null;
 
 async function fetchFromSupabaseDirectly() {
+  if (!SUPABASE_REST_URL || !SUPABASE_KEY) return [];
   try {
     const res = await fetch(`${SUPABASE_REST_URL}?select=*&order=created_at.desc`, {
       headers: {
@@ -57,7 +59,7 @@ async function fetchFromSupabaseDirectly() {
       location: `Titik GPS (${r.latitude?.toFixed(6)}, ${r.longitude?.toFixed(6)})`,
       location_text: `Titik GPS (${r.latitude?.toFixed(6)}, ${r.longitude?.toFixed(6)})`,
       category: r.obstacle_type,
-      severity: r.severity || 'difficult',
+      severity: r.severity === 'caution' ? 'difficult' : (r.severity || 'difficult'),
       status: r.verification_status || 'active',
       lat: r.latitude,
       lng: r.longitude,
@@ -66,8 +68,10 @@ async function fetchFromSupabaseDirectly() {
       coordinates: { lat: r.latitude, lng: r.longitude },
       clearance: r.gap_width === 'less_80' ? 65 : r.gap_width === '80_120' ? 95 : 120,
       clearance_cm: r.gap_width === 'less_80' ? 65 : r.gap_width === '80_120' ? 95 : 120,
+      clearanceLabel: r.gap_width === 'less_80' ? '< 80 cm' : r.gap_width === '80_120' ? '80 - 120 cm' : '> 120 cm',
       upvotes: 1,
       confirmedCount: 1,
+      reporter: 'Warga Pelapor',
       reported_at: r.created_at,
       created_at: r.created_at,
       reportedTime: r.created_at,
@@ -95,10 +99,9 @@ export async function fetchObstacles(filters = {}) {
     } catch (_) { }
 
     const existingIds = new Set(realSupabaseData.map(r => String(r.id)));
-    const merged = [
-      ...realSupabaseData,
-      ...inMemoryObstacles.filter(o => !existingIds.has(String(o.id)))
-    ];
+    const merged = realSupabaseData.length > 0
+      ? realSupabaseData
+      : inMemoryObstacles;
 
     let data = [...merged];
 
@@ -166,6 +169,10 @@ export async function createObstacle(obstacleData) {
         verification_status: 'pending',
         weather_condition: obstacleData.notes ? String(obstacleData.notes).slice(0, 100) : 'Rintangan trotoar dilaporkan oleh warga.'
       };
+
+      if (!SUPABASE_REST_URL || !SUPABASE_KEY) {
+        throw new Error('Supabase client credentials not set');
+      }
 
       const resSup = await fetch(SUPABASE_REST_URL, {
         method: 'POST',
@@ -259,6 +266,120 @@ export async function resolveObstacle(id) {
   }
 }
 
+export async function updateObstacle(id, updateData) {
+  try {
+    const res = await realApi.updateObstacle(id, updateData);
+    if (res?.data) {
+      const idx = inMemoryObstacles.findIndex(o => String(o.id) === String(id));
+      if (idx !== -1) {
+        inMemoryObstacles[idx] = { ...inMemoryObstacles[idx], ...res.data };
+      }
+    }
+    return res;
+  } catch (err) {
+    // Jika backend offline, update langsung ke Supabase
+    let updatedData = { id, ...updateData };
+    if (SUPABASE_REST_URL && SUPABASE_KEY) {
+      try {
+        const patchPayload = {};
+        if (updateData.lat != null && updateData.lng != null) {
+          patchPayload.latitude = Number(updateData.lat);
+          patchPayload.longitude = Number(updateData.lng);
+        }
+        if (updateData.title || updateData.category) {
+          patchPayload.obstacle_type = updateData.category || updateData.title;
+        }
+        if (updateData.severity) {
+          patchPayload.severity = updateData.severity === 'passable' ? 'caution' : updateData.severity;
+        }
+        if (updateData.gap_width) {
+          patchPayload.gap_width = updateData.gap_width;
+        }
+        if (updateData.notes != null) {
+          patchPayload.weather_condition = String(updateData.notes).slice(0, 150);
+        }
+
+        const res = await fetch(`${SUPABASE_REST_URL}?id=eq.${id}`, {
+          method: 'PATCH',
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=representation'
+          },
+          body: JSON.stringify(patchPayload)
+        });
+        if (res.ok) {
+          const rows = await res.json().catch(() => []);
+          if (rows.length > 0) {
+            const r = rows[0];
+            updatedData = {
+              id: String(r.id),
+              title: r.obstacle_type,
+              name: r.obstacle_type,
+              category: r.obstacle_type,
+              severity: r.severity === 'caution' ? 'difficult' : (r.severity || 'difficult'),
+              status: r.verification_status || 'active',
+              lat: r.latitude,
+              lng: r.longitude,
+              latitude: r.latitude,
+              longitude: r.longitude,
+              coordinates: { lat: r.latitude, lng: r.longitude },
+              location: `Titik GPS (${r.latitude?.toFixed(6)}, ${r.longitude?.toFixed(6)})`,
+              location_text: `Titik GPS (${r.latitude?.toFixed(6)}, ${r.longitude?.toFixed(6)})`,
+              photo_url: r.photo_url,
+              image_url: r.photo_url,
+              notes: r.weather_condition
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('[safeApi] Direct Supabase update error:', e.message);
+      }
+    }
+
+    const idx = inMemoryObstacles.findIndex(o => String(o.id) === String(id));
+    if (idx !== -1) {
+      inMemoryObstacles[idx] = { ...inMemoryObstacles[idx], ...updatedData };
+    }
+
+    return {
+      status: 'success',
+      success: true,
+      data: updatedData
+    };
+  }
+}
+
+export async function deleteObstacle(id) {
+  try {
+    const res = await realApi.deleteObstacle(id);
+    inMemoryObstacles = inMemoryObstacles.filter(o => String(o.id) !== String(id));
+    return res;
+  } catch (err) {
+    // Jika backend offline, hapus langsung dari database Supabase
+    if (SUPABASE_REST_URL && SUPABASE_KEY) {
+      try {
+        await fetch(`${SUPABASE_REST_URL}?id=eq.${id}`, {
+          method: 'DELETE',
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`
+          }
+        });
+      } catch (e) {
+        console.warn('[safeApi] Direct Supabase delete error:', e.message);
+      }
+    }
+    inMemoryObstacles = inMemoryObstacles.filter(o => String(o.id) !== String(id));
+    return {
+      status: 'success',
+      success: true,
+      message: `Laporan #${id} berhasil dihapus dari database.`
+    };
+  }
+}
+
 export async function dispatchDpupr(id) {
   try {
     const res = await realApi.dispatchDpupr(id);
@@ -310,12 +431,83 @@ export async function planRoute(data) {
   }
 }
 
-export async function fetchWeather() {
+export async function fetchWeather(lat = null, lng = null) {
   try {
-    const res = await realApi.fetchWeather();
+    const res = await realApi.fetchWeather(lat, lng);
     return res;
   } catch (err) {
     activateFallback();
+    // Live weather direct fallback dari Open-Meteo API (sesuai koordinat GPS pengguna)
+    try {
+      const targetLat = lat ?? -7.2575;
+      const targetLng = lng ?? 112.7521;
+      const omRes = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${targetLat}&longitude=${targetLng}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code&timezone=Asia%2FJakarta`
+      );
+      if (omRes.ok) {
+        const omData = await omRes.json();
+        const cur = omData.current;
+        const temperature = Math.round(cur.temperature_2m);
+        const humidity = Math.round(cur.relative_humidity_2m);
+        const precip = cur.precipitation || 0;
+        const code = cur.weather_code || 0;
+
+        let condition = 'Cerah';
+        let rainProbability = 10;
+        let conditionIcon = 'wb_sunny';
+
+        if (code >= 80 || precip > 5) {
+          condition = 'Hujan Deras';
+          rainProbability = 90;
+          conditionIcon = 'thunderstorm';
+        } else if (code >= 61 || precip > 1) {
+          condition = 'Hujan';
+          rainProbability = 80;
+          conditionIcon = 'rainy';
+        } else if (code >= 51 || precip > 0) {
+          condition = 'Gerimis Ringan';
+          rainProbability = 50;
+          conditionIcon = 'grain';
+        } else if (code >= 1 && code <= 3) {
+          condition = 'Cerah Berawan';
+          rainProbability = 20;
+          conditionIcon = 'partly_cloudy_day';
+        }
+
+        const isRainy = rainProbability >= 50;
+        const tractionIndex = isRainy ? 45 : 88;
+        const tractionStatus = isRainy ? 'caution' : 'safe';
+        const tractionLabel = isRainy ? 'Traksi Berkurang (Ubin Basah Licin)' : 'Traksi Sangat Baik (Ubin Kering)';
+        const alertMessage = isRainy ? 'Waspada Permukaan Trotoar Basah' : 'Waktu Bepergian Optimal';
+        const advisoryText = isRainy
+          ? `Kelembapan ${humidity}% dan potensi hujan dapat membuat ubin trotoar keramik dekoratif menjadi licin. Kursi roda disarankan melaju di bawah 4 km/jam.`
+          : `Kondisi cuaca ${condition.toLowerCase()} dengan suhu ${temperature}°C. Permukaan trotoar kering dan memiliki daya cengkeram optimal untuk mobilitas mandiri kursi roda.`;
+
+        return {
+          success: true,
+          isLive: true,
+          data: {
+            temperature,
+            condition,
+            conditionIcon,
+            precipitationProb: rainProbability,
+            precipitationMm: precip,
+            humidity,
+            isLive: true,
+            provider: 'Open-Meteo Weather API (Real-time)',
+            alertMessage,
+            surfaceFrictionIndex: tractionIndex / 100,
+            tractionRiskLevel: tractionStatus,
+            tractionScore: tractionIndex,
+            tractionLabel,
+            advisory: advisoryText
+          }
+        };
+      }
+    } catch (eLive) {
+      console.warn('[safeApi] Direct Open-Meteo fetch failed:', eLive);
+    }
+
     return {
       success: true,
       isMock: true,
@@ -335,7 +527,8 @@ export async function fetchStats() {
       isMock: true,
       data: {
         ...mockStats,
-        obstaclesReported: inMemoryObstacles.length + 380
+        obstaclesReported: inMemoryObstacles.length,
+        communityVerified: inMemoryObstacles.length
       }
     };
   }

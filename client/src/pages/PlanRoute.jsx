@@ -1,7 +1,24 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import L from 'leaflet';
-import { fetchRouteComparison } from '../features/dashboard/services/safeApi.js';
+import { fetchRouteComparison, fetchObstacles } from '../features/dashboard/services/safeApi.js';
 import useGeolocation from '../features/dashboard/hooks/useGeolocation.js';
+
+// Hitung jarak Haversine dalam satuan meter
+function calculateDistanceInMeters(lat1, lon1, lat2, lon2) {
+  if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return Infinity;
+  const R = 6371e3;
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+}
 
 // Hitung koordinat presisi titik langkah aktif di sepanjang garis rute
 function getStepCoordinate(stepIndex, totalSteps, coordinates, origin, destination, currentStep) {
@@ -119,7 +136,23 @@ function formatStepManeuver(st, idx, arr, destName) {
 
 export default function PlanRoute({ setActiveTab }) {
   const [routeData, setRouteData] = useState(null);
-  const [selectedDest, setSelectedDest] = useState(null);
+  const [routeIntent, setRouteIntent] = useState(() => {
+    if (typeof window !== 'undefined' && window.__leluasaRouteIntent) {
+      return window.__leluasaRouteIntent;
+    }
+    return null;
+  });
+  const [selectedDest, setSelectedDest] = useState(() => {
+    if (typeof window !== 'undefined') {
+      if (window.__leluasaRouteIntent?.destination) {
+        return window.__leluasaRouteIntent.destination?.id || 'custom';
+      }
+      if (window.__leluasaTargetRoute) {
+        return window.__leluasaTargetRoute;
+      }
+    }
+    return null;
+  });
   const [selectedProfile, setSelectedProfile] = useState('electric');
   const [activeRouteKey, setActiveRouteKey] = useState('routeB'); // 'routeB' (Rekomendasi AI) | 'routeA' (Alternatif)
   const [activeFilters, setActiveFilters] = useState({
@@ -136,9 +169,22 @@ export default function PlanRoute({ setActiveTab }) {
   const [hapticActive, setHapticActive] = useState(true);
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
   const [routeError, setRouteError] = useState(null);
-  const [routeIntent, setRouteIntent] = useState(null);
-  const [routeIntentReady, setRouteIntentReady] = useState(false);
-  const [manualOrigin, setManualOrigin] = useState(null);
+  const [activeObstacles, setActiveObstacles] = useState([]);
+  const [proximityAlert, setProximityAlert] = useState(null);
+  const [acknowledgedObstacleIds, setAcknowledgedObstacleIds] = useState(() => new Set());
+  const warnedObstacleIdsRef = useRef(new Set());
+  const [routeIntentReady, setRouteIntentReady] = useState(() => {
+    if (typeof window !== 'undefined' && (window.__leluasaRouteIntent || window.__leluasaTargetRoute)) {
+      return true;
+    }
+    return false;
+  });
+  const [manualOrigin, setManualOrigin] = useState(() => {
+    if (typeof window !== 'undefined' && window.__leluasaRouteIntent?.origin) {
+      return window.__leluasaRouteIntent.origin;
+    }
+    return null;
+  });
   const { coords, accuracy, timestamp, status: gpsStatus, error: gpsError, loading: gpsLoading, refreshLocation, startTracking, stopTracking, isTracking } = useGeolocation();
   const [offRouteDistance, setOffRouteDistance] = useState(null);
   const [isOffRoute, setIsOffRoute] = useState(false);
@@ -157,23 +203,31 @@ export default function PlanRoute({ setActiveTab }) {
 
   // Periksa apakah ada target rute yang dikirim dari Asisten Suara atau Dashboard
   useEffect(() => {
-    if (window.__leluasaRouteIntent) {
-      const intent = window.__leluasaRouteIntent;
+    const handleRouteIntent = (intent) => {
+      if (!intent) return;
       setRouteIntent(intent);
+      if (intent.origin) {
+        setManualOrigin(intent.origin);
+      }
+      if (intent.activeRouteKey) {
+        setActiveRouteKey(intent.activeRouteKey);
+      } else if (intent.preferGuidingBlock || intent.autoPlayVoice) {
+        setActiveRouteKey('routeB');
+      }
       if (intent.autoPlayVoice) {
         shouldAutoPlayVoiceRef.current = true;
         hasAutoPlayedVoiceRef.current = false;
+        setIsNavigating(true);
       } else {
         shouldAutoPlayVoiceRef.current = false;
         hasAutoPlayedVoiceRef.current = true;
+        setIsNavigating(false);
       }
-      const destName = (intent.destination?.name || '').toLowerCase();
-      const destId = (intent.destination?.id || '').toLowerCase();
-      if (destName.includes('grand city') || destId === 'balaikota-grandcity') {
-        setSelectedDest('balaikota-grandcity');
-      } else {
-        setSelectedDest(intent.destination?.id || 'custom');
-      }
+      setSelectedDest(intent.destination?.id || 'custom');
+    };
+
+    if (window.__leluasaRouteIntent) {
+      handleRouteIntent(window.__leluasaRouteIntent);
       window.__leluasaRouteIntent = null;
     }
     setRouteIntentReady(true);
@@ -188,94 +242,63 @@ export default function PlanRoute({ setActiveTab }) {
         setSelectedDest(e.detail.routeKey);
       }
     };
+    const handleRouteIntentEvent = (e) => {
+      if (e.detail) {
+        handleRouteIntent(e.detail);
+      }
+    };
     window.addEventListener('leluasa:select-route', handleRouteEvent);
-    return () => window.removeEventListener('leluasa:select-route', handleRouteEvent);
+    window.addEventListener('leluasa:route-intent', handleRouteIntentEvent);
+    return () => {
+      window.removeEventListener('leluasa:select-route', handleRouteEvent);
+      window.removeEventListener('leluasa:route-intent', handleRouteIntentEvent);
+    };
   }, []);
 
   // Data Rute Surabaya 100% Riil
-  const destinations = {
-    'balaikota-grandcity': {
-      title: 'Tujuan: Grand City Surabaya',
-      subtitle: 'Balai Kota Surabaya ke Grand City Surabaya',
-      origin: 'Balai Kota Surabaya, Jl. Taman Surya',
-      destination: 'Grand City Surabaya',
-      baseMinutes: 22,
-      routeBDuration: '22 mnt',
-      routeBDistance: '1.68 km',
-      routeBDescription: 'Jalur guiding block dan rampa halus, 100% ramah disabilitas',
-      routeADuration: '18 mnt',
-      routeADistance: '1.45 km',
-      routeADescription: 'Jalur pejalan kaki standar umum',
-      turnInstruction: 'Lurus ke arah timur menuju Grand City Surabaya',
-      startCoord: [-7.2628, 112.7530],
-      endCoord: [-7.2726, 112.7527],
-      steps: [
-        { instruction: 'Mulai dari Balai Kota Surabaya arah Jl. Taman Surya', detail: 'Gunakan ubin pemandu di trotoar sisi selatan', distance: '150 m', icon: 'straight' },
-        { instruction: 'Lurus menyusuri Jl. Yos Sudarso menuju selatan', detail: 'Trotoar lebar 2.4m dengan ubin kuning bertekstur', distance: '460 m', icon: 'straight' },
-        { instruction: 'Belok kiri ke Jl. Kusuma Bangsa', detail: 'Rampa landai tersedia di tikungan', distance: '380 m', icon: 'turn_left' },
-        { instruction: 'Tiba di Grand City Surabaya', detail: 'Pintu masuk aksesibel tersedia di sisi barat', distance: '690 m', icon: 'check_circle' }
-      ]
-    }
-  };
-
   const hasDestination = Boolean(selectedDest || routeIntent?.destination);
-  const isCustomDest = selectedDest === 'custom' || Boolean(routeIntent?.destination && !['balaikota-grandcity'].includes(selectedDest));
-  const presetDestInfo = (selectedDest && destinations[selectedDest]) ? destinations[selectedDest] : (destinations['balaikota-grandcity'] || {});
 
-  const activeOrigin = isCustomDest
-    ? (manualOrigin || routeIntent?.origin || (coords ? {
-        lat: coords.lat,
-        lng: coords.lng,
-        accuracy: coords.accuracy,
-        name: 'Lokasi GPS',
-        source: 'gps'
-      } : {
-        lat: presetDestInfo.startCoord ? presetDestInfo.startCoord[0] : -7.2628,
-        lng: presetDestInfo.startCoord ? presetDestInfo.startCoord[1] : 112.7530,
-        name: presetDestInfo.origin || 'Balai Kota Surabaya',
-        source: 'preset'
-      }))
-    : {
-        lat: presetDestInfo.startCoord ? presetDestInfo.startCoord[0] : -7.2628,
-        lng: presetDestInfo.startCoord ? presetDestInfo.startCoord[1] : 112.7530,
-        name: presetDestInfo.origin || 'Balai Kota Surabaya',
-        source: 'preset'
-      };
-
-  const destInfo = (isCustomDest && routeIntent?.destination)
-    ? {
-      ...presetDestInfo,
-      title: `Tujuan: ${routeIntent.destination.name}`,
-      subtitle: `${activeOrigin?.name || 'Lokasi Saya'} ke ${routeIntent.destination.name}`,
-      origin: activeOrigin?.name || 'Lokasi Saya',
-      destination: routeIntent.destination.name,
-      startCoord: [activeOrigin.lat, activeOrigin.lng],
-      endCoord: [routeIntent.destination.lat, routeIntent.destination.lng],
-      baseMinutes: routeData?.routeB?.durationSeconds ? Math.max(1, Math.round(routeData.routeB.durationSeconds / 60)) : 10,
-      routeBDuration: routeData?.routeB?.duration || '10 mnt',
-      routeBDistance: routeData?.routeB?.distance || '800m',
-      routeBDescription: 'Jalur aksesibilitas ramah kursi roda dihitung oleh OpenRouteService AI',
-      routeADuration: routeData?.routeA?.duration || '12 mnt',
-      routeADistance: routeData?.routeA?.distance || '850m',
-      routeADescription: 'Jalur pejalan kaki standar umum',
-      turnInstruction: `Arahkan navigasi menuju ${routeIntent.destination.name}`,
-      steps: [
-        { instruction: `Mulai perjalanan dari ${activeOrigin?.name || 'lokasi awal'}`, detail: 'Ikuti trotoar pemandu terdekat', distance: '100 m', icon: 'straight' },
-        { instruction: `Menuju ${routeIntent.destination.name}`, detail: 'Trotoar aksesibel', distance: '500 m', icon: 'turn_right' },
-        { instruction: `Tiba di ${routeIntent.destination.name}`, detail: 'Tujuan tercapai', distance: '50 m', icon: 'check_circle' }
-      ]
-    }
-    : presetDestInfo;
-
-  const activeDestination = (isCustomDest && routeIntent?.destination) ? {
-    lat: routeIntent.destination.lat,
-    lng: routeIntent.destination.lng,
+  const activeDestination = routeIntent?.destination ? {
+    lat: Number(routeIntent.destination.lat),
+    lng: Number(routeIntent.destination.lng),
     name: routeIntent.destination.name
-  } : (presetDestInfo.endCoord ? {
-    lat: presetDestInfo.endCoord[0],
-    lng: presetDestInfo.endCoord[1],
-    name: presetDestInfo.destination
-  } : null);
+  } : null;
+
+  const activeOrigin = manualOrigin || routeIntent?.origin || (coords ? {
+    lat: coords.lat,
+    lng: coords.lng,
+    accuracy: coords.accuracy,
+    name: 'Lokasi GPS',
+    source: 'gps'
+  } : {
+    lat: -7.2575,
+    lng: 112.7521,
+    name: 'Lokasi Saya',
+    source: 'default'
+  });
+
+  const destinationName = activeDestination?.name || 'Tujuan Perjalanan';
+  const destInfo = {
+    title: `Tujuan: ${destinationName}`,
+    subtitle: `${activeOrigin?.name || 'Lokasi Saya'} ke ${destinationName}`,
+    origin: activeOrigin?.name || 'Lokasi Saya',
+    destination: destinationName,
+    startCoord: [activeOrigin.lat, activeOrigin.lng],
+    endCoord: activeDestination ? [activeDestination.lat, activeDestination.lng] : [-7.2575, 112.7521],
+    baseMinutes: routeData?.routeB?.durationSeconds ? Math.max(1, Math.round(routeData.routeB.durationSeconds / 60)) : 10,
+    routeBDuration: routeData?.routeB?.duration || '10 mnt',
+    routeBDistance: routeData?.routeB?.distance || '800m',
+    routeBDescription: 'Jalur aksesibilitas ramah kursi roda dihitung oleh OpenRouteService AI',
+    routeADuration: routeData?.routeA?.duration || '12 mnt',
+    routeADistance: routeData?.routeA?.distance || '850m',
+    routeADescription: 'Jalur pejalan kaki standar umum',
+    turnInstruction: `Arahkan navigasi menuju ${destinationName}`,
+    steps: [
+      { instruction: `Mulai perjalanan dari ${activeOrigin?.name || 'lokasi awal'}`, detail: 'Ikuti trotoar pemandu terdekat', distance: '100 m', icon: 'straight' },
+      { instruction: `Menuju ${destinationName}`, detail: 'Trotoar aksesibel', distance: '500 m', icon: 'turn_right' },
+      { instruction: `Tiba di ${destinationName}`, detail: 'Tujuan tercapai', distance: '50 m', icon: 'check_circle' }
+    ]
+  };
 
   const effectiveSteps = (routeData?.[activeRouteKey]?.steps?.length > 0)
     ? routeData[activeRouteKey].steps.map((st, idx, arr) => {
@@ -337,6 +360,9 @@ export default function PlanRoute({ setActiveTab }) {
         destinationName: activeDestination.name
       });
       setRouteData(response.data);
+      if (Array.isArray(response.data?.activeObstacles)) {
+        setActiveObstacles(response.data.activeObstacles);
+      }
     } catch (error) {
       setRouteData(null);
       setRouteError(error.message || 'Gagal menghitung rute. Periksa koneksi atau layanan routing.');
@@ -344,6 +370,53 @@ export default function PlanRoute({ setActiveTab }) {
       setIsLoadingRoute(false);
     }
   };
+
+  // Muat data rintangan riil dari database Supabase / API backend
+  useEffect(() => {
+    fetchObstacles()
+      .then((res) => {
+        if (Array.isArray(res?.data) && res.data.length > 0) {
+          setActiveObstacles((prev) => {
+            const existingIds = new Set(prev.map((o) => String(o.id)));
+            const merged = [...prev];
+            res.data.forEach((o) => {
+              if (!existingIds.has(String(o.id))) {
+                merged.push(o);
+              }
+            });
+            return merged;
+          });
+        }
+      })
+      .catch((err) => console.warn('Gagal memuat rintangan untuk peta rute:', err));
+  }, []);
+
+  // Saring rintangan yang berada dalam koridor rute terpilih (radius 120m dari polyline)
+  const routeObstacles = useMemo(() => {
+    const coords = routeData?.[activeRouteKey]?.coordinates;
+    if (!activeObstacles || activeObstacles.length === 0) return [];
+    if (!Array.isArray(coords) || coords.length === 0) {
+      if (activeOrigin && activeDestination) {
+        return activeObstacles.filter((obs) => {
+          const dOrig = calculateDistanceInMeters(obs.lat, obs.lng, activeOrigin.lat, activeOrigin.lng);
+          const dDest = calculateDistanceInMeters(obs.lat, obs.lng, activeDestination.lat, activeDestination.lng);
+          return dOrig < 2500 || dDest < 2500;
+        });
+      }
+      return activeObstacles;
+    }
+
+    return activeObstacles.filter((obs) => {
+      for (let i = 0; i < coords.length; i++) {
+        const pt = coords[i];
+        const ptLat = Array.isArray(pt) ? pt[0] : (typeof pt === 'string' ? parseFloat(pt.split(' ')[0]) : pt.lat);
+        const ptLng = Array.isArray(pt) ? pt[1] : (typeof pt === 'string' ? parseFloat(pt.split(' ')[1]) : pt.lng);
+        const dist = calculateDistanceInMeters(obs.lat, obs.lng, ptLat, ptLng);
+        if (dist <= 120) return true;
+      }
+      return false;
+    });
+  }, [activeObstacles, routeData, activeRouteKey, activeOrigin, activeDestination]);
 
   useEffect(() => {
     loadRoute();
@@ -388,7 +461,24 @@ export default function PlanRoute({ setActiveTab }) {
   useEffect(() => {
     if (!hasDestination) return;
     if (!mapContainerRef.current) return;
-    if (mapInstanceRef.current) return;
+
+    if (mapInstanceRef.current) {
+      if (mapInstanceRef.current.getContainer() === mapContainerRef.current) {
+        mapInstanceRef.current.invalidateSize();
+        return;
+      }
+      try {
+        if (stepMarkerRef.current) {
+          stepMarkerRef.current.remove();
+          stepMarkerRef.current = null;
+        }
+        mapInstanceRef.current.remove();
+      } catch (e) {
+        // Safe catch if previous map container unmounted
+      }
+      mapInstanceRef.current = null;
+      routeLayersRef.current = null;
+    }
 
     const map = L.map(mapContainerRef.current, {
       center: activeOrigin ? [activeOrigin.lat, activeOrigin.lng] : [-7.2575, 112.7521],
@@ -406,14 +496,21 @@ export default function PlanRoute({ setActiveTab }) {
     mapInstanceRef.current = map;
 
     // Pastikan ukuran peta disinkronkan setelah render DOM selesai
-    const timer = setTimeout(() => {
+    const timer1 = setTimeout(() => {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.invalidateSize();
       }
-    }, 150);
+    }, 100);
+
+    const timer2 = setTimeout(() => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+      }
+    }, 350);
 
     return () => {
-      clearTimeout(timer);
+      clearTimeout(timer1);
+      clearTimeout(timer2);
       try {
         if (stepMarkerRef.current) {
           stepMarkerRef.current.remove();
@@ -426,7 +523,7 @@ export default function PlanRoute({ setActiveTab }) {
       mapInstanceRef.current = null;
       routeLayersRef.current = null;
     };
-  }, [isNavigating]);
+  }, [isNavigating, hasDestination, selectedDest, routeIntentReady]);
 
   // Update rendering garis rute Leaflet
   useEffect(() => {
@@ -525,32 +622,70 @@ export default function PlanRoute({ setActiveTab }) {
       allPoints.push([activeOrigin.lat, activeOrigin.lng]);
     }
 
-    const endIcon = L.divIcon({
-      className: 'route-end-marker',
-      html: `
-        <div class="flex flex-col items-center -translate-x-1/2 -translate-y-full cursor-pointer hover:scale-110 transition-transform">
-          <div class="px-2.5 py-0.5 rounded-full bg-secondary text-white font-bold text-[10px] shadow-lg whitespace-nowrap mb-1">
-            ${destInfo.destination.split('(')[0]}
+    if (activeDestination) {
+      const endIcon = L.divIcon({
+        className: 'route-end-marker',
+        html: `
+          <div class="flex flex-col items-center -translate-x-1/2 -translate-y-full cursor-pointer hover:scale-110 transition-transform">
+            <div class="px-2.5 py-0.5 rounded-full bg-secondary text-white font-bold text-[10px] shadow-lg whitespace-nowrap mb-1">
+              ${destInfo.destination.split('(')[0]}
+            </div>
+            <div class="w-8 h-8 rounded-full bg-secondary text-white flex items-center justify-center shadow-md ring-2 ring-white">
+              <span class="material-symbols-outlined text-sm font-bold">flag</span>
+            </div>
           </div>
-          <div class="w-8 h-8 rounded-full bg-secondary text-white flex items-center justify-center shadow-md ring-2 ring-white">
-            <span class="material-symbols-outlined text-sm font-bold">flag</span>
-          </div>
-        </div>
-      `,
-      iconSize: [0, 0],
-      iconAnchor: [0, 0]
-    });
-    L.marker([activeDestination.lat, activeDestination.lng], { icon: endIcon }).addTo(layerGroup);
-    allPoints.push([activeDestination.lat, activeDestination.lng]);
+        `,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0]
+      });
+      L.marker([activeDestination.lat, activeDestination.lng], { icon: endIcon }).addTo(layerGroup);
+      allPoints.push([activeDestination.lat, activeDestination.lng]);
+    }
 
-    if (allPoints.length > 0) {
+    // 4. Render Penanda Rintangan di Peta (Obstacle Markers)
+    routeObstacles.forEach((obs) => {
+      const isAcknowledged = acknowledgedObstacleIds.has(String(obs.id));
+      const obstacleIcon = L.divIcon({
+        className: 'route-obstacle-marker',
+        html: `
+          <div class="flex flex-col items-center -translate-x-1/2 -translate-y-full cursor-pointer hover:scale-110 transition-transform">
+            <div class="px-2 py-0.5 rounded-full ${isAcknowledged ? 'bg-secondary text-white' : 'bg-error text-white animate-pulse'} font-extrabold text-[9px] shadow-md whitespace-nowrap mb-0.5 flex items-center gap-1">
+              ${isAcknowledged ? '<span class="material-symbols-outlined text-[10px]">check</span>' : '<span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>'}
+              <span>${obs.title || obs.name || 'Hambatan'}</span>
+            </div>
+            <div class="w-7 h-7 rounded-full ${isAcknowledged ? 'bg-secondary' : 'bg-error'} text-white flex items-center justify-center shadow-lg ring-2 ring-white">
+              <span class="material-symbols-outlined text-sm font-bold">${isAcknowledged ? 'check_circle' : 'warning'}</span>
+            </div>
+          </div>
+        `,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0]
+      });
+
+      const obsMarker = L.marker([obs.lat, obs.lng], { icon: obstacleIcon }).addTo(layerGroup);
+      obsMarker.bindPopup(`
+        <div style="font-family: system-ui, sans-serif; font-size: 12px; min-width: 190px; padding: 2px;">
+          <div style="display: flex; align-items: center; gap: 4px; font-weight: bold; color: ${isAcknowledged ? '#006e2c' : '#ba1a1a'};">
+            <span>⚠️ ${obs.title || obs.name}</span>
+          </div>
+          <p style="margin: 4px 0; color: #555; font-size: 11px;">${obs.location || 'Hambatan trotoar di sepanjang rute'}</p>
+          ${obs.clearance ? `<div style="font-size: 10px; font-weight: bold; color: #ba1a1a; margin-bottom: 4px;">Lebar Celah: ${obs.clearance} cm</div>` : ''}
+          ${obs.image_url || obs.photo_url ? `<img src="${obs.image_url || obs.photo_url}" style="width: 100%; height: 90px; object-fit: cover; border-radius: 8px; margin-top: 4px;" alt="Foto Hambatan" />` : ''}
+          ${isAcknowledged ? '<div style="margin-top: 6px; font-size: 10px; color: #006e2c; font-weight: bold;">✓ Telah diverifikasi / Anda sudah tahu</div>' : ''}
+        </div>
+      `);
+      allPoints.push([obs.lat, obs.lng]);
+    });
+
+    if (allPoints.length > 0 && mapInstanceRef.current) {
       const bounds = L.latLngBounds(allPoints);
       mapInstanceRef.current.fitBounds(bounds, {
         padding: isNavigating ? [130, 35] : [45, 45],
         maxZoom: 17
       });
+      mapInstanceRef.current.invalidateSize();
     }
-  }, [routeData, activeRouteKey, isNavigating, selectedDest, effectiveRouteBDuration, activeOrigin?.lat, activeOrigin?.lng, activeDestination.lat, activeDestination.lng]);
+  }, [routeData, activeRouteKey, isNavigating, selectedDest, effectiveRouteBDuration, activeOrigin?.lat, activeOrigin?.lng, activeDestination?.lat, activeDestination?.lng, routeObstacles, acknowledgedObstacleIds]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -764,6 +899,105 @@ export default function PlanRoute({ setActiveTab }) {
     map.panTo(stepCoord, { animate: true, duration: 0.6 });
   }, [isNavigating, navStepIndex, effectiveSteps, routeData, activeOrigin?.lat, activeOrigin?.lng, activeDestination?.lat, activeDestination?.lng]);
 
+  // Verifikasi Pengguna: Jika sudah klik "Saya Sudah Tahu", hentikan getar & suara, dan jangan picu lagi
+  const handleAcknowledgeObstacle = (obsId) => {
+    if (!obsId) return;
+    const idStr = String(obsId);
+
+    // 1. Hentikan getaran dan suara seketika
+    if ('vibrate' in navigator) navigator.vibrate(0);
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+
+    // 2. Tandai rintangan ini telah di-verifikasi oleh pengguna (tidak akan muncul lagi)
+    setAcknowledgedObstacleIds((prev) => new Set([...prev, idStr]));
+    setProximityAlert(null);
+
+    // 3. Ucapkan konfirmasi singkat
+    if ('speechSynthesis' in window) {
+      const utter = new SpeechSynthesisUtterance('Peringatan dikonfirmasi. Melanjutkan panduan rute.');
+      utter.lang = 'id-ID';
+      utter.rate = 1.1;
+      window.speechSynthesis.speak(utter);
+    }
+  };
+
+  // Deteksi Kedekatan Real-Time 10 Meter Sebelum Hambatan Saat Navigasi Aktif
+  useEffect(() => {
+    if (!isNavigating) {
+      setProximityAlert(null);
+      return;
+    }
+
+    let currentLat = null;
+    let currentLng = null;
+
+    if (coords?.lat && coords?.lng) {
+      currentLat = coords.lat;
+      currentLng = coords.lng;
+    } else {
+      const stepCoord = getStepCoordinate(
+        navStepIndex,
+        effectiveSteps.length,
+        routeData?.[activeRouteKey]?.coordinates,
+        activeOrigin,
+        activeDestination,
+        effectiveSteps[navStepIndex]
+      );
+      if (Array.isArray(stepCoord) && stepCoord.length === 2) {
+        currentLat = stepCoord[0];
+        currentLng = stepCoord[1];
+      }
+    }
+
+    if (currentLat == null || currentLng == null) return;
+
+    let closestAlert = null;
+    let minDistance = Infinity;
+
+    for (const obs of routeObstacles) {
+      const obsIdStr = String(obs.id);
+      // Jika user sudah verifikasi / sudah tahu, abaikan (jangan pernah muncul lagi)
+      if (acknowledgedObstacleIds.has(obsIdStr)) continue;
+
+      const distMeters = calculateDistanceInMeters(currentLat, currentLng, obs.lat, obs.lng);
+      // Zona deteksi peringatan 10m (toleransi radius <= 15 meter)
+      if (distMeters <= 15 && distMeters < minDistance) {
+        minDistance = distMeters;
+        closestAlert = {
+          obstacle: obs,
+          distanceMeters: Math.max(1, Math.round(distMeters))
+        };
+      }
+    }
+
+    if (closestAlert) {
+      const obsId = String(closestAlert.obstacle.id);
+      setProximityAlert(closestAlert);
+
+      // Trigger getar dan suara sekali saat pertama kali memasuki radius 10 meter
+      if (!warnedObstacleIdsRef.current.has(obsId)) {
+        warnedObstacleIdsRef.current.add(obsId);
+
+        // Getaran HP berpola bahaya (300ms getar, 150ms jeda, 300ms getar, 150ms jeda, 400ms getar)
+        if ('vibrate' in navigator && hapticActive) {
+          navigator.vibrate([300, 150, 300, 150, 400]);
+        }
+
+        // Suara peringatan otomatis TTS
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const warningText = `Peringatan! Sekitar sepuluh meter di depan Anda terdapat hambatan ${closestAlert.obstacle.title || closestAlert.obstacle.name}. Harap berhati-hati dan bersiap menghindar.`;
+          const utterance = new SpeechSynthesisUtterance(warningText);
+          utterance.lang = 'id-ID';
+          utterance.rate = 1.0;
+          window.speechSynthesis.speak(utterance);
+        }
+      }
+    } else {
+      setProximityAlert(null);
+    }
+  }, [isNavigating, coords?.lat, coords?.lng, navStepIndex, effectiveSteps, routeData, activeRouteKey, routeObstacles, acknowledgedObstacleIds, hapticActive]);
+
   const handleShare = () => {
     if (navigator.share) {
       navigator.share({
@@ -826,6 +1060,49 @@ export default function PlanRoute({ setActiveTab }) {
           ref={mapContainerRef}
           className="absolute inset-0 w-full h-full z-0 cursor-grab active:cursor-grabbing"
         />
+
+        {/* ================= MODAL / BANNER PERINGATAN RINTANGAN 10 METER ================= */}
+        {proximityAlert && (
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="absolute top-4 left-3 right-3 sm:left-5 sm:right-5 z-40 animate-bounce-short shadow-2xl"
+          >
+            <div className="bg-error text-on-error p-4 sm:p-5 rounded-2xl border-2 border-white/60 shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 backdrop-blur-md">
+              <div className="flex items-start sm:items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-white text-error flex items-center justify-center font-bold shrink-0 shadow-md animate-pulse">
+                  <span className="material-symbols-outlined text-2xl" aria-hidden="true">warning</span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] font-black uppercase tracking-wider bg-white/25 px-2.5 py-0.5 rounded-full text-white">
+                      ⚠️ Peringatan Hambatan 10m
+                    </span>
+                    <span className="text-xs font-bold text-white/90">
+                      Jarak: ±{proximityAlert.distanceMeters} meter di depan
+                    </span>
+                  </div>
+                  <h3 className="text-sm sm:text-base font-extrabold mt-1 text-white">
+                    Ada Hambatan: {proximityAlert.obstacle.title || proximityAlert.obstacle.name}
+                  </h3>
+                  <p className="text-xs text-white/90 mt-0.5">
+                    {proximityAlert.obstacle.location || 'Trotoar terhalang di depan Anda. Kurangi laju kecepatan dan bersiap berpindah jalur.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* TOMBOL VERIFIKASI / SAYA SUDAH TAHU */}
+              <button
+                type="button"
+                onClick={() => handleAcknowledgeObstacle(proximityAlert.obstacle.id)}
+                className="w-full sm:w-auto px-5 py-3 rounded-xl bg-white text-error hover:bg-white/90 active:scale-95 font-extrabold text-xs sm:text-sm shadow-lg flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap transition-transform"
+              >
+                <span className="material-symbols-outlined text-base">check_circle</span>
+                <span>Saya Sudah Tahu &amp; Mengerti</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* TOP HUD CARD: PANDUAN ARAH SEKARANG */}
         <div className="relative z-10 w-full bg-surface-container-lowest/95 backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-xl border-l-[8px] border-primary flex items-center justify-between gap-3 border border-outline-variant/20">
@@ -1013,40 +1290,16 @@ export default function PlanRoute({ setActiveTab }) {
           <p className="text-xs text-on-surface-variant font-medium mt-0.5">{destInfo.subtitle}</p>
         </div>
 
-        {/* Destination Selector Pill Switcher */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <div className="flex items-center bg-surface-container p-1 rounded-full border border-outline-variant/30 text-xs font-bold shadow-xs">
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedDest('balaikota-grandcity');
-                setRouteIntent(null);
-                setNavStepIndex(0);
-              }}
-              className={`px-3 py-1.5 rounded-full transition-all flex items-center gap-1 cursor-pointer ${
-                selectedDest === 'balaikota-grandcity' ? 'bg-primary text-white shadow-xs' : 'text-on-surface-variant hover:text-on-surface'
-              }`}
-            >
-              <span>Balai Kota ke Grand City</span>
-            </button>
-
-            {routeIntent?.destination && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedDest('custom');
-                  setNavStepIndex(0);
-                }}
-                className={`px-3 py-1.5 rounded-full transition-all flex items-center gap-1 cursor-pointer ${
-                  selectedDest === 'custom' ? 'bg-secondary text-white shadow-xs' : 'text-on-surface-variant hover:text-on-surface'
-                }`}
-                title={routeIntent.destination.name}
-              >
-                <span className="material-symbols-outlined text-xs">my_location</span>
-                <span className="truncate max-w-[120px]">{routeIntent.destination.name}</span>
-              </button>
-            )}
-          </div>
+        {/* Destination Badge & Action */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {activeDestination && (
+            <div className="flex items-center gap-1.5 bg-primary/10 text-primary px-3.5 py-1.5 rounded-full border border-primary/20 text-xs font-bold shadow-xs">
+              <span className="material-symbols-outlined text-sm text-secondary" style={{ fontVariationSettings: "'FILL' 1" }}>
+                near_me
+              </span>
+              <span className="truncate max-w-[200px]">{activeDestination.name}</span>
+            </div>
+          )}
 
           {/* Tombol Pintas Buat Rute Riil dari Lokasi GPS User */}
           <button
@@ -1056,15 +1309,8 @@ export default function PlanRoute({ setActiveTab }) {
             title="Cari dan buat rute baru dari lokasi GPS Anda di Beranda"
           >
             <span className="material-symbols-outlined text-sm">add_location_alt</span>
-            <span>+ Buat Rute dari Lokasi Saya</span>
+            <span>+ Ganti Rute / Destinasi</span>
           </button>
-
-          {isCustomDest && (
-            <span className="px-2.5 py-1 rounded-full bg-secondary/15 text-secondary border border-secondary/30 text-xs font-bold flex items-center gap-1 shrink-0">
-              <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
-              <span>GPS Riil Aktif</span>
-            </span>
-          )}
         </div>
       </div>
 
@@ -1109,6 +1355,13 @@ export default function PlanRoute({ setActiveTab }) {
               {activeRouteKey === 'routeB' ? 'Jalur Rekomendasi AI' : 'Jalur Alternatif'}
             </span>
           </div>
+
+          {routeObstacles.length > 0 && (
+            <div className="absolute top-3 right-3 bg-surface-container-lowest/95 backdrop-blur-sm px-3 py-1.5 rounded-full border border-error/50 shadow-sm flex items-center gap-1.5 text-error z-10">
+              <span className="material-symbols-outlined text-sm font-bold">warning</span>
+              <span className="text-[11px] font-bold">{routeObstacles.length} Hambatan Terdeteksi</span>
+            </div>
+          )}
 
           <div className="absolute bottom-3 right-3 bg-surface-container-lowest/95 px-3 py-1.5 rounded-full border border-outline-variant shadow-sm flex items-center gap-1.5 text-on-surface-variant z-10">
             <span className="material-symbols-outlined text-sm text-secondary">verified</span>

@@ -47,6 +47,30 @@ export async function resolveObstacle(id) {
   return res.json();
 }
 
+export async function updateObstacle(id, updateData) {
+  const res = await fetch(`${API_BASE}/obstacles/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updateData)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.message || 'Gagal memperbarui laporan.');
+  }
+  return res.json();
+}
+
+export async function deleteObstacle(id) {
+  const res = await fetch(`${API_BASE}/obstacles/${id}`, {
+    method: 'DELETE'
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.message || 'Gagal menghapus laporan.');
+  }
+  return res.json();
+}
+
 export async function dispatchDpupr(id) {
   const res = await fetch(`${API_BASE}/obstacles/${id}/dispatch-dpupr`, {
     method: 'POST'
@@ -72,8 +96,14 @@ export async function planRoute(data) {
   return res.json();
 }
 
-export async function fetchWeather() {
-  const res = await fetch(`${API_BASE}/weather`);
+export async function fetchWeather(lat = null, lng = null) {
+  const query = new URLSearchParams();
+  if (lat != null && lng != null) {
+    query.append('lat', lat);
+    query.append('lng', lng);
+  }
+  const qStr = query.toString();
+  const res = await fetch(`${API_BASE}/weather${qStr ? `?${qStr}` : ''}`);
   if (!res.ok) throw new Error('Failed to fetch weather');
   return res.json();
 }

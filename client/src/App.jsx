@@ -10,6 +10,7 @@ import ReportsImpact from './pages/ReportsImpact.jsx';
 import WeatherIntelligence from './pages/WeatherIntelligence.jsx';
 import AccessibilityModal from './components/AccessibilityModal.jsx';
 import VoiceAssistantModal from './components/VoiceAssistantModal.jsx';
+import useWakeWord from './features/dashboard/hooks/useWakeWord.js';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
@@ -17,8 +18,31 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [accessibilityOpen, setAccessibilityOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [autoStartListening, setAutoStartListening] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [notificationToast, setNotificationToast] = useState('');
+
+  // Voice Wake Word ("Hai LUMI" / "Halo LUMI") di latar belakang
+  const {
+    enabled: wakeWordEnabled,
+    toggleEnabled: toggleWakeWord,
+    isListening: isWakeWordListening,
+    permissionStatus: wakeWordPermissionStatus,
+    requestPermission: requestWakeWordPermission
+  } = useWakeWord({
+    isModalOpen: voiceOpen,
+    onWakeWordDetected: () => {
+      setAutoStartListening(true);
+      setVoiceOpen(true);
+    }
+  });
+
+  const handleMicPermissionDenied = () => {
+    setNotificationToast(
+      'Izin mikrofon belum aktif atau terblokir di browser. Klik ikon gembok di sebelah kiri alamat web (URL), ubah Mikrofon menjadi "Izinkan", lalu refresh halaman.'
+    );
+    setTimeout(() => setNotificationToast(''), 9000);
+  };
 
   const [preferences, setPreferences] = useState({
     profile: 'electric',
@@ -153,6 +177,12 @@ export default function App() {
           canGoBack={canGoBack}
           onGoBack={handleGoBack}
           previousTab={previousTab}
+          wakeWordEnabled={wakeWordEnabled}
+          toggleWakeWord={toggleWakeWord}
+          isWakeWordListening={isWakeWordListening}
+          wakeWordPermissionStatus={wakeWordPermissionStatus}
+          requestWakeWordPermission={requestWakeWordPermission}
+          onMicPermissionDenied={handleMicPermissionDenied}
         />
 
         {/* Global Notification Banner */}
@@ -230,10 +260,15 @@ export default function App() {
 
       <VoiceAssistantModal
         isOpen={voiceOpen}
-        onClose={() => setVoiceOpen(false)}
+        autoStartListening={autoStartListening}
+        onClose={() => {
+          setVoiceOpen(false);
+          setAutoStartListening(false);
+        }}
         onNavigateTab={(tab) => {
           handleSetActiveTab(tab);
           setVoiceOpen(false);
+          setAutoStartListening(false);
         }}
       />
     </div>

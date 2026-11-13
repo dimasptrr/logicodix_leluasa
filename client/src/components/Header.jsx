@@ -14,10 +14,15 @@ export default function Header({
   setActiveTab,
   canGoBack,
   onGoBack,
-  previousTab
+  previousTab,
+  wakeWordEnabled = true,
+  toggleWakeWord,
+  isWakeWordListening = false,
+  wakeWordPermissionStatus = 'prompt',
+  requestWakeWordPermission,
+  onMicPermissionDenied
 }) {
   const [currentTab, setCurrentTab] = useState(activeTab || 'home');
-  const [unreadCount, setUnreadCount] = useState(2);
   const [isHighContrast, setIsHighContrast] = useState(false);
 
   const TAB_LABELS = {
@@ -178,13 +183,68 @@ export default function Header({
       {/* Right Action Group */}
       <div className="flex items-center gap-1 sm:gap-2 ml-auto shrink-0">
 
-        {/* Icon controls: contrast, text-size, notifications (1 fitur untuk 1 tombol unik) */}
-        <div className="hidden md:flex items-center">
+        {/* Icon controls: contrast, wake word mic, notifications */}
+        <div className="flex items-center gap-1.5">
+          {/* Tombol Panggil AI & Status Wake Word */}
+          <button
+            type="button"
+            onClick={async () => {
+              // Jika izin mikrofon belum aktif atau pernah ditolak, minta izin langsung ke browser
+              if (wakeWordPermissionStatus !== 'granted' && requestWakeWordPermission) {
+                const ok = await requestWakeWordPermission();
+                if (!ok) {
+                  if (onMicPermissionDenied) onMicPermissionDenied();
+                  return;
+                }
+              }
+              onOpenVoice();
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 cursor-pointer ${
+              wakeWordPermissionStatus === 'denied'
+                ? 'bg-error/15 text-error border border-error/30 hover:bg-error/25'
+                : wakeWordPermissionStatus === 'prompt'
+                ? 'bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/40 hover:bg-amber-500/25'
+                : isWakeWordListening
+                ? 'bg-secondary/15 text-secondary border border-secondary/30 hover:bg-secondary/25'
+                : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+            }`}
+            title={
+              wakeWordPermissionStatus === 'denied'
+                ? 'Izin mikrofon terblokir. Klik untuk info membuka blokir.'
+                : wakeWordPermissionStatus === 'prompt'
+                ? 'Klik di sini untuk mengaktifkan izin mikrofon "Hai LUMI"'
+                : 'Asisten Suara LUMI aktif. Katakan "Hai LUMI" kapan saja atau klik tombol ini'
+            }
+            aria-label="Status Wake Word Asisten Suara LUMI"
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                wakeWordPermissionStatus === 'denied'
+                  ? 'bg-error'
+                  : wakeWordPermissionStatus === 'prompt'
+                  ? 'bg-amber-500 animate-ping'
+                  : isWakeWordListening
+                  ? 'bg-secondary animate-pulse'
+                  : 'bg-outline'
+              }`}
+            />
+            <span className="material-symbols-outlined text-[17px]">
+              {wakeWordPermissionStatus === 'denied' ? 'mic_off' : 'mic'}
+            </span>
+            <span className="hidden sm:inline">
+              {wakeWordPermissionStatus === 'denied'
+                ? 'Mic Terblokir'
+                : wakeWordPermissionStatus === 'prompt'
+                ? 'Aktifkan "Hai LUMI"'
+                : '"Hai LUMI"'}
+            </span>
+          </button>
+
           {/* 1. Toggle Kontras Tinggi Langsung */}
           <button
             aria-label={isHighContrast ? 'Nonaktifkan Mode Kontras Tinggi' : 'Aktifkan Mode Kontras Tinggi'}
             onClick={handleToggleHighContrast}
-            className={`min-h-[40px] min-w-[40px] flex items-center justify-center rounded-full transition-all duration-200 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
+            className={`hidden md:flex min-h-[40px] min-w-[40px] items-center justify-center rounded-full transition-all duration-200 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
               isHighContrast ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container'
             }`}
             type="button"
@@ -192,30 +252,7 @@ export default function Header({
           >
             <span className="material-symbols-outlined text-[22px]" aria-hidden="true">contrast</span>
           </button>
-
-          {/* 2. Panel Notifikasi Sistem */}
-          <button
-            aria-label={`Pemberitahuan${unreadCount > 0 ? `, ${unreadCount} belum dibaca` : ''}`}
-            onClick={() => {
-              setUnreadCount(0);
-              if (onOpenNotifications) onOpenNotifications();
-            }}
-            className="relative min-h-[40px] min-w-[40px] flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-all duration-200 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-            type="button"
-            title="Pemberitahuan Sistem"
-          >
-            <span className="material-symbols-outlined text-[22px]" aria-hidden="true">notifications</span>
-            {unreadCount > 0 && (
-              <span
-                className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center rounded-full bg-error text-white font-bold text-[9px]"
-                aria-hidden="true"
-              >
-                {unreadCount}
-              </span>
-            )}
-          </button>
         </div>
-
 
         {/* 5. CTA Tunggal: Lapor Hambatan Baru */}
         <button

@@ -258,3 +258,174 @@ export async function createObstacle(req, res) {
     return res.status(502).json({ status: 'error', message: 'Laporan tidak dapat disimpan saat ini.' });
   }
 }
+
+export async function deleteObstacle(req, res) {
+  const { id } = req.params;
+  if (!id) {
+    return res.status(400).json({ status: 'error', message: 'ID laporan wajib diisi.' });
+  }
+
+  let photoPathToDelete = null;
+
+  // 1. Hapus dari tabel Supabase 'laporan_leluasa'
+  if (config.supabaseUrl && config.supabaseServiceRoleKey) {
+    try {
+      // Ambil photo_url terlebih dahulu untuk membersihkan file storage
+      const getResp = await fetch(`${config.supabaseUrl.replace(/\/$/, '')}/rest/v1/laporan_leluasa?id=eq.${id}&select=*`, {
+        headers: supabaseHeaders()
+      });
+      if (getResp.ok) {
+        const rows = await getResp.json().catch(() => []);
+        if (rows.length > 0 && rows[0].photo_url) {
+          const match = rows[0].photo_url.match(/obstacle-photos\/(.+)$/);
+          if (match) photoPathToDelete = decodeURIComponent(match[1]);
+        }
+      }
+
+      const delResp = await fetch(`${config.supabaseUrl.replace(/\/$/, '')}/rest/v1/laporan_leluasa?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: supabaseHeaders({ Prefer: 'return=representation' })
+      });
+      if (delResp.ok) {
+        console.log(`[Obstacle] Laporan ID ${id} berhasil dihapus dari tabel Supabase.`);
+      }
+
+      // Hapus file foto dari Supabase Storage jika ada
+      if (photoPathToDelete) {
+        const delPhotoUrl = `${config.supabaseUrl.replace(/\/$/, '')}/storage/v1/object/${PHOTO_BUCKET}/${encodeURIComponent(photoPathToDelete)}`;
+        await fetch(delPhotoUrl, {
+          method: 'DELETE',
+          headers: supabaseHeaders()
+        }).catch(() => {});
+      }
+    } catch (err) {
+      console.warn('[Obstacle] Supabase delete error:', err.message);
+    }
+  }
+
+  // 2. Hapus juga dari inMemoryReports jika ada
+  const memIndex = inMemoryReports.findIndex(r => String(r.id) === String(id));
+  if (memIndex !== -1) {
+    inMemoryReports.splice(memIndex, 1);
+  }
+
+  return res.json({
+    status: 'success',
+    message: `Laporan #${id} berhasil dihapus dari database.`,
+    id
+  });
+}
+
+export async function updateObstacle(req, res) {
+  const { id } = req.params;
+  if (!id) {
+    return res.status(400).json({ status: 'error', message: 'ID laporan wajib diisi.' });
+  }
+
+  const {
+    title,
+    category,
+    severity,
+    gap_width,
+    clearance_cm,
+    notes,
+    lat,
+    lng,
+    latitude,
+    longitude,
+    location_text
+  } = req.body || {};
+
+  const targetLat = Number(lat ?? latitude);
+  const targetLng = Number(lng ?? longitude);
+  const hasCoords = Number.isFinite(targetLat) && Number.isFinite(targetLng);
+
+  let updatedRow = null;
+
+  // 1. Update ke Supabase 'laporan_leluasa'
+  if (config.supabaseUrl && config.supabaseServiceRoleKey) {
+    try {
+      const updatePayload = {};
+      if (hasCoords) {
+        updatePayload.latitude = targetLat;
+        updatePayload.longitude = targetLng;
+      }
+      if (category || title) {
+        updatePayload.obstacle_type = String(category || title).trim();
+      }
+      if (severity) {
+        updatePayload.severity = severity === 'passable' ? 'caution' : severity;
+      }
+      if (gap_width) {
+        updatePayload.gap_width = gap_width;
+      } else if (clearance_cm != null) {
+        updatePayload.gap_width = clearance_cm < 80 ? 'less_80' : clearance_cm <= 120 ? '80_120' : 'more_120';
+      }
+      if (notes != null) {
+        updatePayload.weather_condition = String(notes).slice(0, 150);
+      }
+
+      const patchResp = await fetch(`${config.supabaseUrl.replace(/\/$/, '')}/rest/v1/laporan_leluasa?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: supabaseHeaders({
+          'Content-Type': 'application/json',
+          Prefer: 'return=representation'
+        }),
+        body: JSON.stringify(updatePayload)
+      });
+
+      if (patchResp.ok) {
+        const rows = await patchResp.json().catch(() => []);
+        if (rows.length > 0) {
+          const r = rows[0];
+          updatedRow = {
+            id: String(r.id),
+            title: r.obstacle_type,
+            name: r.obstacle_type,
+            category: r.obstacle_type,
+            severity: r.severity === 'caution' ? 'difficult' : (r.severity || 'difficult'),
+            status: r.verification_status || 'active',
+            lat: r.latitude,
+            lng: r.longitude,
+            latitude: r.latitude,
+            longitude: r.longitude,
+            coordinates: { lat: r.latitude, lng: r.longitude },
+            location: location_text || `Titik GPS (${r.latitude?.toFixed(6)}, ${r.longitude?.toFixed(6)})`,
+            location_text: location_text || `Titik GPS (${r.latitude?.toFixed(6)}, ${r.longitude?.toFixed(6)})`,
+            clearance: r.gap_width === 'less_80' ? 65 : r.gap_width === '80_120' ? 95 : 120,
+            clearance_cm: r.gap_width === 'less_80' ? 65 : r.gap_width === '80_120' ? 95 : 120,
+            clearanceLabel: r.gap_width === 'less_80' ? '< 80 cm' : r.gap_width === '80_120' ? '80 - 120 cm' : '> 120 cm',
+            photo_url: r.photo_url,
+            image_url: r.photo_url,
+            reported_at: r.created_at,
+            created_at: r.created_at,
+            notes: r.weather_condition
+          };
+          console.log(`[Obstacle] Laporan ID ${id} berhasil diupdate di database Supabase.`);
+        }
+      }
+    } catch (err) {
+      console.warn('[Obstacle] Supabase update warning:', err.message);
+    }
+  }
+
+  // 2. Update in-memory array jika ada
+  const memIndex = inMemoryReports.findIndex(r => String(r.id) === String(id));
+  if (memIndex !== -1) {
+    inMemoryReports[memIndex] = {
+      ...inMemoryReports[memIndex],
+      ...(hasCoords ? { coordinates: { lat: targetLat, lng: targetLng }, lat: targetLat, lng: targetLng } : {}),
+      ...(title ? { title, name: title } : {}),
+      ...(category ? { category } : {}),
+      ...(severity ? { severity } : {}),
+      ...(notes != null ? { notes } : {})
+    };
+    if (!updatedRow) updatedRow = inMemoryReports[memIndex];
+  }
+
+  return res.json({
+    status: 'success',
+    message: `Laporan #${id} berhasil diperbarui di database.`,
+    data: updatedRow || { id, ...req.body }
+  });
+}

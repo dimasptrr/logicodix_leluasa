@@ -213,10 +213,9 @@ export const mockWeather = {
 };
 
 export const mockStats = {
-  sidewalkKmMapped: 1420,
-  obstaclesReported: 384,
-  communityVerified: 291,
-  dpuprRepaired: 148
+  sidewalkKmMapped: 4.8,
+  obstaclesReported: 3,
+  communityVerified: 3
 };
 
 export const mockPlaces = [

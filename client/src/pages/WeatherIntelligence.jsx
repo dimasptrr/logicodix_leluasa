@@ -185,16 +185,6 @@ export default function WeatherIntelligence({ setActiveTab }) {
               );
             })()}
           </div>
-
-          <div className="pt-4 sm:pt-space-lg flex gap-space-sm">
-            <button
-              onClick={() => setActiveTab('plan-route')}
-              className="w-full min-h-[48px] rounded-xl bg-primary text-on-primary font-label-md text-xs font-bold shadow-md hover:bg-primary-container transition-all flex items-center justify-center gap-2"
-            >
-              <span className="material-symbols-outlined text-lg text-secondary-container">umbrella</span>
-              <span>Hitung Rute Aman Bebas Hujan</span>
-            </button>
-          </div>
         </div>
       </div>
     </div>

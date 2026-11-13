@@ -73,7 +73,12 @@ function cleanDestString(str) {
   return s.trim();
 }
 
-export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) {
+export default function VoiceAssistantModal({
+  isOpen,
+  onClose,
+  onNavigateTab,
+  autoStartListening = false
+}) {
   const { coords } = useGeolocation();
   const [inputText, setInputText] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -146,89 +151,22 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
     setIsListening(val);
   };
 
-  // Inisialisasi Speech Recognition (Web Speech API)
+  // Periksa dukungan Speech Recognition di browser
   useEffect(() => {
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRec) {
       setMicSupported(false);
-      return;
     }
 
-    const rec = new SpeechRec();
-    rec.continuous = false;
-    rec.interimResults = true; // tampilkan teks live saat user bicara
-    rec.lang = 'id-ID';
-    rec.maxAlternatives = 1;
-
-    let finalTranscript = '';
-
-    rec.onstart = () => {
-      finalTranscript = '';
-      setListening(true);
-    };
-
-    rec.onresult = (event) => {
-      let interim = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const t = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          finalTranscript += t;
-        } else {
-          interim += t;
-        }
-      }
-      // Tampilkan teks sementara di kolom input
-      setInputText((finalTranscript + interim).trim());
-    };
-
-    rec.onerror = (event) => {
-      console.warn('Speech recognition error:', event.error);
-      setListening(false);
-      switch (event.error) {
-        case 'not-allowed':
-        case 'service-not-allowed':
-          showMicError('Izin mikrofon ditolak. Klik ikon gembok di address bar, izinkan Mikrofon, lalu coba lagi.', 7000);
-          break;
-        case 'audio-capture':
-          showMicError('Mikrofon tidak ditemukan. Pastikan perangkat mikrofon terpasang dan tidak dipakai aplikasi lain.', 7000);
-          break;
-        case 'no-speech':
-          showMicError('Suara tidak terdengar. Coba bicara lebih dekat ke mikrofon.');
-          break;
-        case 'network':
-          showMicError('Pengenalan suara butuh koneksi internet. Periksa koneksi Anda.');
-          break;
-        case 'aborted':
-          break; // dihentikan manual, bukan error
-        default:
-          showMicError('Suara tidak terdengar jelas. Silakan coba tekan mikrofon lagi.');
-      }
-    };
-
-    rec.onend = () => {
-      setListening(false);
-      // Kirim otomatis hasil ucapan final
-      const spoken = finalTranscript.trim();
-      finalTranscript = '';
-      if (spoken && handleSendMessageRef.current) {
-        handleSendMessageRef.current(spoken);
-      }
-    };
-
-    recognitionRef.current = rec;
-
     return () => {
-      // Cleanup: matikan mic saat komponen di-unmount
-      rec.onresult = null;
-      rec.onerror = null;
-      rec.onend = null;
-      rec.onstart = null;
-      try {
-        rec.abort();
-      } catch (e) {
-        // ignore
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch (e) {
+          // ignore
+        }
+        recognitionRef.current = null;
       }
-      recognitionRef.current = null;
     };
   }, []);
 
@@ -268,7 +206,15 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
     }
   }, [messages, isOpen]);
 
-  if (!isOpen) return null;
+  // Auto-start listening jika modal dibuka melalui Wake Word ("Hai LUMI")
+  useEffect(() => {
+    if (isOpen && autoStartListening) {
+      const timer = setTimeout(() => {
+        startListening();
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, autoStartListening]);
 
   // Toggle Microphone
   const toggleListening = () => {
@@ -280,9 +226,10 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
     }
   };
 
-  // Minta izin mikrofon secara eksplisit, lalu mulai merekam
+  // Minta izin mikrofon secara eksplisit, lalu mulai merekam dengan instance fresh
   const startListening = async () => {
-    if (!recognitionRef.current) {
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRec) {
       showMicError('Browser Anda belum mendukung input suara. Gunakan Chrome atau Edge, atau ketik pertanyaan Anda.', 6000);
       return;
     }
@@ -295,16 +242,15 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
 
     stopSpeaking();
 
-    // Langkah 1: minta izin mikrofon (memunculkan popup izin browser)
+    // Langkah 1: minta izin mikrofon (memunculkan popup izin browser jika belum diizinkan)
     if (navigator.mediaDevices?.getUserMedia) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // Izin didapat, tutup stream karena SpeechRecognition membuka mic sendiri
         stream.getTracks().forEach((track) => track.stop());
       } catch (err) {
         console.warn('Izin mikrofon gagal:', err);
         if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
-          showMicError('Izin mikrofon ditolak. Klik ikon gembok di address bar, izinkan Mikrofon, lalu coba lagi.', 7000);
+          showMicError('Izin mikrofon ditolak. Klik ikon gembok di sebelah kiri URL, izinkan Mikrofon, lalu coba lagi.', 7000);
         } else if (err.name === 'NotFoundError' || err.name === 'OverconstrainedError') {
           showMicError('Mikrofon tidak ditemukan di perangkat ini.', 6000);
         } else if (err.name === 'NotReadableError') {
@@ -316,12 +262,79 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
       }
     }
 
-    // Langkah 2: mulai pengenalan suara
+    // Hentikan instance sebelumnya jika ada
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch (_) {}
+      recognitionRef.current = null;
+    }
+
+    // Langkah 2: buat instance BARU agar tidak melempar InvalidStateError di Chrome
     try {
+      const rec = new SpeechRec();
+      rec.continuous = false;
+      rec.interimResults = true;
+      rec.lang = 'id-ID';
+      rec.maxAlternatives = 1;
+
+      let finalTranscript = '';
+
+      rec.onstart = () => {
+        finalTranscript = '';
+        setListening(true);
+      };
+
+      rec.onresult = (event) => {
+        let interim = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const t = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += t;
+          } else {
+            interim += t;
+          }
+        }
+        setInputText((finalTranscript + interim).trim());
+      };
+
+      rec.onerror = (event) => {
+        console.warn('Speech recognition error:', event.error);
+        setListening(false);
+        switch (event.error) {
+          case 'not-allowed':
+          case 'service-not-allowed':
+            showMicError('Izin mikrofon ditolak. Klik ikon gembok di address bar, izinkan Mikrofon, lalu coba lagi.', 7000);
+            break;
+          case 'audio-capture':
+            showMicError('Mikrofon tidak ditemukan. Pastikan perangkat mikrofon terpasang.', 7000);
+            break;
+          case 'no-speech':
+            showMicError('Suara tidak terdengar. Coba bicara lebih dekat ke mikrofon.');
+            break;
+          case 'network':
+            showMicError('Pengenalan suara butuh koneksi internet. Periksa koneksi Anda.');
+            break;
+          case 'aborted':
+            break;
+          default:
+            showMicError('Suara tidak terdengar jelas. Silakan coba tekan mikrofon lagi.');
+        }
+      };
+
+      rec.onend = () => {
+        setListening(false);
+        const spoken = finalTranscript.trim();
+        finalTranscript = '';
+        if (spoken && handleSendMessageRef.current) {
+          handleSendMessageRef.current(spoken);
+        }
+      };
+
+      recognitionRef.current = rec;
       setInputText('');
-      recognitionRef.current.start();
+      rec.start();
     } catch (err) {
-      // InvalidStateError jika sudah berjalan
       console.warn('Gagal memulai pengenalan suara:', err);
       setListening(false);
     }
@@ -566,6 +579,8 @@ export default function VoiceAssistantModal({ isOpen, onClose, onNavigateTab }) 
     'Sentra Kuliner Pemuda',
     'Kondisi Cuaca Hari Ini'
   ];
+
+  if (!isOpen) return null;
 
   return (
     <div

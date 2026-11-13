@@ -5,7 +5,7 @@ import {
   haversineDistance
 } from './orsService.js';
 
-// Data rintangan aktif default di koridor Jl. Pemuda (sesuai pengujian di docs/samples/ors/wheelchair-avoid.json)
+// Data rintangan aktif di koridor utama pedestrian Surabaya (Jl. Pemuda & Balai Kota - Grand City)
 const ACTIVE_OBSTACLES = [
   {
     id: 'obs-surabaya-01',
@@ -15,6 +15,28 @@ const ACTIVE_OBSTACLES = [
     severity: 'impassable',
     clearanceCm: 0,
     bufferMeters: 25
+  },
+  {
+    id: '5',
+    name: 'Bollard / Pembatas Sempit',
+    title: 'Bollard / Pembatas Sempit',
+    lat: -7.261510,
+    lng: 112.749027,
+    severity: 'difficult',
+    clearanceCm: 95,
+    bufferMeters: 15,
+    location: 'Jl. Ketabang Kali - Grand City'
+  },
+  {
+    id: '4',
+    name: 'Paving Rusak & Undakan',
+    title: 'Paving Rusak & Undakan',
+    lat: -7.261020,
+    lng: 112.748147,
+    severity: 'difficult',
+    clearanceCm: 95,
+    bufferMeters: 15,
+    location: 'Jl. Walikota Mustajab'
   }
 ];
 
@@ -61,13 +83,44 @@ export async function compareRoutes(req, res) {
     const end = [parseFloat(destLng), parseFloat(destLat)];
     const coordinates = [start, end];
 
-    // 1. Buat avoid_polygons dari rintangan aktif jika berada dekat rute (< 10 km)
+    // 1. Ambil rintangan aktif dari database Supabase (jika tersedia) dan gabungkan dengan preset
+    let allObstacles = [...ACTIVE_OBSTACLES];
+    try {
+      const supabaseUrl = process.env.SUPABASE_URL;
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+      if (supabaseUrl && supabaseKey) {
+        const resObs = await fetch(`${supabaseUrl}/rest/v1/laporan_leluasa?select=*`, {
+          headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }
+        });
+        if (resObs.ok) {
+          const rows = await resObs.json();
+          const dbObs = rows.map(r => ({
+            id: String(r.id),
+            name: r.obstacle_type || 'Rintangan Trotoar',
+            title: r.obstacle_type || 'Rintangan Trotoar',
+            lat: Number(r.latitude),
+            lng: Number(r.longitude),
+            severity: r.severity || 'difficult',
+            clearanceCm: r.gap_width === 'less_80' ? 65 : 95,
+            bufferMeters: 15,
+            location: `Titik GPS (${Number(r.latitude).toFixed(4)}, ${Number(r.longitude).toFixed(4)})`,
+            photo_url: r.photo_url
+          }));
+          const existingIds = new Set(dbObs.map(o => String(o.id)));
+          allObstacles = [...dbObs, ...ACTIVE_OBSTACLES.filter(o => !existingIds.has(String(o.id)))];
+        }
+      }
+    } catch (eObs) {
+      console.warn('[RoutingController] Supabase obstacle fetch warning:', eObs.message);
+    }
+
+    // Buat avoid_polygons dari rintangan aktif jika berada dekat rute (< 10 km)
     const polygonCoordinates = [];
-    for (const obs of ACTIVE_OBSTACLES) {
+    for (const obs of allObstacles) {
       const distToStart = haversineDistance(obs.lat, obs.lng, originLat, originLng);
       const distToEnd = haversineDistance(obs.lat, obs.lng, destLat, destLng);
       if (distToStart < 10000 || distToEnd < 10000) {
-        polygonCoordinates.push(...createObstacleAvoidPolygon(obs.lat, obs.lng, obs.bufferMeters));
+        polygonCoordinates.push(...createObstacleAvoidPolygon(obs.lat, obs.lng, obs.bufferMeters || 15));
       }
     }
 
@@ -196,7 +249,7 @@ export async function compareRoutes(req, res) {
         comparisonSummary: 'Rute Leluasa berhasil mengarahkan pengguna kursi roda memutar menjauhi galian Jl. Pemuda dengan jaminan 100% rampa trotoar.',
         routeA: formattedRouteA,
         routeB: formattedRouteB,
-        activeObstacles: ACTIVE_OBSTACLES
+        activeObstacles: allObstacles
       }
     });
   } catch (error) {
