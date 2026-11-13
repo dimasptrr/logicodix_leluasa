@@ -229,15 +229,17 @@ app.use((err, req, res, next) => {
   res.status(500).json({ status: 'error', message: err.message });
 });
 
-// Jalankan Server jika dipanggil langsung
-const PORT = config.port || 5000;
-app.listen(PORT, () => {
-  console.log(`====================================================`);
-  console.log(`🚀 LELUASA Backend Server running on port ${PORT}`);
-  console.log(`📍 Routing Engine ORS Endpoint: http://localhost:${PORT}/api/routes/compare`);
-  console.log(`🔑 ORS API Key Status: ${config.orsApiKey ? 'LOADED (Active)' : 'NOT CONFIGURED'}`);
-  console.log(`====================================================`);
-});
+// Jalankan Server jika dipanggil langsung (di luar lingkungan serverless Vercel)
+if (!process.env.VERCEL) {
+  const PORT = config.port || 5000;
+  app.listen(PORT, () => {
+    console.log(`====================================================`);
+    console.log(`🚀 LELUASA Backend Server running on port ${PORT}`);
+    console.log(`📍 Routing Engine ORS Endpoint: http://localhost:${PORT}/api/routes/compare`);
+    console.log(`🔑 ORS API Key Status: ${config.orsApiKey ? 'LOADED (Active)' : 'NOT CONFIGURED'}`);
+    console.log(`====================================================`);
+  });
+}
 
 export default app;
 
