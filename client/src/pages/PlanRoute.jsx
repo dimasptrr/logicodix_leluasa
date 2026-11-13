@@ -721,9 +721,23 @@ export default function PlanRoute({ setActiveTab }) {
       allPoints.push([activeDestination.lat, activeDestination.lng]);
     }
 
-    // 4. Render Penanda Rintangan di Peta (Obstacle Markers)
+    // 4. Render Penanda Rintangan di Peta (Obstacle Markers + Zona Bahaya 10m)
     routeObstacles.forEach((obs) => {
       const isAcknowledged = acknowledgedObstacleIds.has(String(obs.id));
+
+      // Lingkaran Geofencing Radius 10-12 Meter Riil di Peta
+      L.circle([obs.lat, obs.lng], {
+        radius: 12,
+        color: isAcknowledged ? '#006e2c' : '#ba1a1a',
+        fillColor: isAcknowledged ? '#22c55e' : '#ff4d4f',
+        fillOpacity: isAcknowledged ? 0.15 : 0.28,
+        weight: 2,
+        dashArray: isAcknowledged ? undefined : '5, 5',
+      }).addTo(layerGroup).bindTooltip(`⚠️ Zona Deteksi 10m: ${obs.title || obs.name}`, {
+        permanent: false,
+        direction: 'top'
+      });
+
       const obstacleIcon = L.divIcon({
         className: 'route-obstacle-marker',
         html: `
@@ -1002,22 +1016,28 @@ export default function PlanRoute({ setActiveTab }) {
     let currentLat = null;
     let currentLng = null;
 
+    const stepCoord = getStepCoordinate(
+      navStepIndex,
+      effectiveSteps.length,
+      routeData?.[activeRouteKey]?.coordinates,
+      activeOrigin,
+      activeDestination,
+      effectiveSteps[navStepIndex]
+    );
+
+    // Jika sedang demo navigasi langkah demi langkah di dalam ruangan, utamakan koordinat langkah navigasi jika GPS fisik jauh (> 500m dari rute)
     if (coords?.lat && coords?.lng) {
-      currentLat = coords.lat;
-      currentLng = coords.lng;
-    } else {
-      const stepCoord = getStepCoordinate(
-        navStepIndex,
-        effectiveSteps.length,
-        routeData?.[activeRouteKey]?.coordinates,
-        activeOrigin,
-        activeDestination,
-        effectiveSteps[navStepIndex]
-      );
-      if (Array.isArray(stepCoord) && stepCoord.length === 2) {
+      const distFromStart = activeOrigin ? calculateDistanceInMeters(coords.lat, coords.lng, activeOrigin.lat, activeOrigin.lng) : 0;
+      if (distFromStart > 500 && Array.isArray(stepCoord) && stepCoord.length === 2) {
         currentLat = stepCoord[0];
         currentLng = stepCoord[1];
+      } else {
+        currentLat = coords.lat;
+        currentLng = coords.lng;
       }
+    } else if (Array.isArray(stepCoord) && stepCoord.length === 2) {
+      currentLat = stepCoord[0];
+      currentLng = stepCoord[1];
     }
 
     if (currentLat == null || currentLng == null) return;
@@ -1079,6 +1099,55 @@ export default function PlanRoute({ setActiveTab }) {
     } else {
       setShareToast('Tautan rute aksesibel Surabaya berhasil disalin!');
       setTimeout(() => setShareToast(''), 3500);
+    }
+  };
+
+  // Trigger Simulasi / Pengujian Peringatan 10 Meter Khusus Demo & Penjurian Hackathon
+  const handleTrigger10mDemo = () => {
+    const targetObs = routeObstacles[0] || {
+      id: '5',
+      title: 'Bollard / Pembatas',
+      name: 'Bollard / Pembatas',
+      location: 'Titik GPS (-7.261510, 112.749027), Surabaya',
+      category: 'Bollard / Pembatas',
+      clearance: 95,
+      lat: -7.2615101642629,
+      lng: 112.749027013779
+    };
+
+    const obsId = String(targetObs.id);
+    // Reset status acknowledged agar juri & presenter dapat menguji berkali-kali saat demo
+    setAcknowledgedObstacleIds((prev) => {
+      const next = new Set(prev);
+      next.delete(obsId);
+      return next;
+    });
+    warnedObstacleIdsRef.current.delete(obsId);
+
+    // Pusatkan kamera Leaflet ke titik hambatan & zona 10m dengan zoom presisi
+    if (mapInstanceRef.current && targetObs.lat && targetObs.lng) {
+      mapInstanceRef.current.setView([targetObs.lat, targetObs.lng], 18, { animate: true });
+    }
+
+    // Picu banner bahaya merah 10m
+    setProximityAlert({
+      obstacle: targetObs,
+      distanceMeters: 10
+    });
+
+    // Picu getaran haptic bahaya (300ms, jeda 150ms, 300ms)
+    if ('vibrate' in navigator && hapticActive) {
+      navigator.vibrate([300, 150, 300, 150, 400]);
+    }
+
+    // Picu panduan suara AI LUMI otomatis
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const warningText = `Peringatan! Sekitar sepuluh meter di depan Anda terdapat hambatan ${targetObs.title || targetObs.name}. Harap berhati-hati dan bersiap menghindar.`;
+      const utterance = new SpeechSynthesisUtterance(warningText);
+      utterance.lang = 'id-ID';
+      utterance.rate = 1.0;
+      window.speechSynthesis.speak(utterance);
     }
   };
 
@@ -1226,11 +1295,24 @@ export default function PlanRoute({ setActiveTab }) {
           </button>
         </div>
 
-        {/* STATUS GUIDING BLOCK & HAPTIC + TOMBOL PUSATKAN */}
-        <div className="relative z-10 flex items-center justify-between my-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-tertiary-fixed/95 backdrop-blur-md rounded-full text-on-tertiary-fixed shadow-md border border-amber-300">
-            <span className="material-symbols-outlined text-base text-tertiary font-bold">texture</span>
-            <span className="text-xs font-bold">Jalur Ubin Pemandu Aktif</span>
+        {/* STATUS GUIDING BLOCK & HAPTIC + TOMBOL UJI DEMO 10M + TOMBOL PUSATKAN */}
+        <div className="relative z-10 flex items-center justify-between my-2 gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-tertiary-fixed/95 backdrop-blur-md rounded-full text-on-tertiary-fixed shadow-md border border-amber-300">
+              <span className="material-symbols-outlined text-base text-tertiary font-bold">texture</span>
+              <span className="text-xs font-bold">Jalur Ubin Pemandu Aktif</span>
+            </div>
+
+            {/* Tombol Khusus Demo Video & Penjurian: Uji Peringatan 10m */}
+            <button
+              type="button"
+              onClick={handleTrigger10mDemo}
+              className="px-3 py-1.5 rounded-full bg-error text-white font-extrabold text-xs shadow-md flex items-center gap-1.5 hover:bg-error/90 active:scale-95 transition-all cursor-pointer ring-2 ring-white/80 animate-pulse"
+              title="Simulasikan peringatan sensor 10 meter sebelum rintangan untuk rekaman video demo & presentasi juri"
+            >
+              <span className="material-symbols-outlined text-sm font-bold">warning</span>
+              <span>Uji Demo 10m</span>
+            </button>
           </div>
 
           <div className="flex items-center gap-2">
