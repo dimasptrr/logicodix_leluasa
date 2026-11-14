@@ -18,7 +18,7 @@
 | **Kategori Lomba** | Web Application (Minimum Viable Product / MVP) |
 | **Subtema** | **4. Inclusive Health & Well-being** *(dengan irisan ke Subtema 5: Civic Tech)* |
 | **Repositori GitHub** | [https://github.com/dimasptrr/logicodix_leluasa](https://github.com/dimasptrr/logicodix_leluasa) |
-| **Tautan Aplikasi (Deploy)** | [https://leluasa.vercel.app](https://leluasa.vercel.app) *(dan dapat dijalankan lokal di `http://localhost:3000`)* |
+| **Tautan Aplikasi (Deploy)** | [https://leluasa.vercel.app](https://logicodix-leluasa.vercel.app/) *(dan dapat dijalankan lokal di `http://localhost:3000`)* |
 | **Video Demonstrasi (YouTube)** | [Tautan Video Demo Resmi LELUASA (3–5 Menit)](https://youtu.be/leluasa-demo-logicodix2026) |
 
 ---
