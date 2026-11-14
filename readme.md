@@ -75,37 +75,52 @@ LELUASA berkompetisi pada **Subtema 4: Inclusive Health & Well-being**:
 ## 3. Solusi dan Target Pengguna
 
 ### Solusi yang Ditawarkan
-LELUASA adalah ekosistem navigasi pedestrian cerdas yang mengintegrasikan:
-1. **Peta Partisipatif Hambatan Trotoar (*Barrier Map*):** Visualisasi titik rintangan aktif di Surabaya dengan indikator keparahan (*impassable*, *difficult*, *caution*).
-2. **Mesin Perutean Aksesibel Dinamis (*Accessible Routing Engine*):** Membandingkan Rute Standar pejalan kaki vs Rute Rekomendasi Leluasa yang otomatis memutar menghindari poligon rintangan via OpenRouteService & OpenStreetMap.
-3. **Inspeksi AI Hybrid (*Computer Vision & Multimodal Reasoning*):** Model lokal YOLOv8 mendeteksi objek fisik penghambat secara instan, diperkuat oleh Google Gemini 1.5 Flash untuk estimasi sisa lebar lajur (*clearance width*) dan saran navigasi.
-4. **Intelijen Cuaca & Traksi Ubin (*Weather Intelligence*):** Mengkalkulasi indeks slip/licin ubin trotoar secara *real-time* berbasis data presipitasi Open-Meteo.
-5. **Asisten Navigasi Suara (*Voice Assistant*):** Memungkinkan operasional navigasi *hands-free* bagi pengguna dengan keterbatasan motorik anggota gerak atas.
+LELUASA adalah ekosistem navigasi pedestrian cerdas dan inklusif yang mengintegrasikan:
+1. **Peta Partisipatif Hambatan Trotoar (*Barrier Map*):** Visualisasi sebaran rintangan fisik trotoar aktif di Surabaya dengan indikator tingkat keparahan (*impassable*, *difficult*, *caution*), foto bukti lapangan, dan koordinat GPS presisi.
+2. **Mesin Perutean Aksesibel Dinamis (*Accessible Routing Engine*):** Mengomparasikan Rute Standar pejalan kaki vs Rute Rekomendasi Leluasa yang otomatis memutar menghindari poligon rintangan via OpenRouteService (ORS) dan graf pejalan kaki OpenStreetMap (OSM).
+3. **HUD Panduan Navigasi & Peringatan Zona 10 Meter (*Haptic & Audio Alarm*):** Panduan navigasi belokan demi belokan (*turn-by-turn HUD*) dengan alarm suara otomatis dan simulasi getaran haptik (*Web Vibration API*) ketika pengguna berada dalam radius 10 meter dari rintangan berbahaya.
+4. **Inspeksi AI Hybrid (*Computer Vision & Multimodal Reasoning*):** Model lokal YOLOv8 mendeteksi bounding box objek fisik secara instan (< 150 ms), diperkuat oleh Google Gemini 1.5 Flash untuk estimasi sisa celah trotoar (*clearance width in cm*) dan saran keselamatan berstandar Permen PUPR No. 14/2017.
+5. **Asisten Navigasi Suara Cerdas "LUMI" (*Hands-Free Wake Word & NLU*):** Pengguna dapat mengoperasikan aplikasi tanpa menyentuh layar menggunakan *wake word* latar belakang **"Hai LUMI"** / **"Halo LUMI"** atau shortcut keyboard `'V'`, dengan pemahaman maksud percakapan berbasis Gemini NLU.
+6. **Intelijen Cuaca & Traksi Ubin (*Weather & Traction Intelligence*):** Menghitung koefisien gesek ubin pemandu (*pavement friction index*) secara dinamis menggunakan telemetri curah hujan Open-Meteo, serta otomatis menambahkan *rain safety buffer minutes* pada estimasi waktu tempuh.
+7. **Gamifikasi & Insentif Warga (*Civic Transit Rewards*):** Warga pelapor dan pemverifikasi trotoar memperoleh poin kontributor yang dapat ditukarkan langsung dengan tiket transportasi umum ramah disabilitas Kota Surabaya (**Feeder WiraWiri Suroboyo** dan **Suroboyo Bus** berarmada *low-floor* rampa lipat).
+8. **Portal Transparansi Perbaikan DPUPR (*Before & After Impact Tracking*):** Pelacakan status perbaikan infrastruktur oleh Dinas Pekerjaan Umum dan Penataan Ruang (DPUPR) Kota Surabaya dengan galeri komparasi foto Sebelum vs Sesudah perbaikan.
 
 ### Profil Target Pengguna
-* **Pengguna Kursi Roda Mandiri:** Pengguna kursi roda manual maupun elektrik yang membutuhkan kepastian rute tanpa undakan dan hambatan.
-* **Pendamping Disabilitas & Lansia (*Caregivers*):** Pendamping yang mendorong kursi roda atau kereta bayi (*stroller*) dan memerlukan rute dengan kelandaian rampa yang aman (< 8%).
-* **Warga Peduli Aksesibilitas (Relawan Komunitas):** Masyarakat umum yang berkontribusi aktif memotret dan memverifikasi kondisi trotoar kota.
-* **Pemerintah Kota & Dinas Terkait (DPUPR & Dishub Surabaya):** Pemangku kebijakan yang memerlukan data audit spasial trotoar berbasis laporan masyarakat yang terverifikasi.
+* **Pengguna Kursi Roda Mandiri:** Pengguna kursi roda manual maupun elektrik yang memerlukan kepastian trotoar datar, keberadaan rampa landai, dan bebas dari undakan tinggi atau galian terbuka.
+* **Pendamping Disabilitas & Lansia (*Caregivers*):** Pendamping yang mendorong kursi roda atau kereta bayi (*stroller*) dan membutuhkan rute dengan kelandaian aman (< 6%–8%).
+* **Warga Peduli Aksesibilitas (Relawan Komunitas):** Masyarakat umum yang berkontribusi memotret, memvalidasi, dan mengawasi fasilitas pejalan kaki kota melalui insentif tiket transportasi.
+* **Pemerintah Kota & Instansi Terkait (DPUPR & Dishub Surabaya):** Pemangku kebijakan yang menerima rekap spasial audit trotoar siap tindak lanjut untuk pemeliharaan fasilitas pedestrian.
 
 ---
 
 ## 4. Fitur Utama & Status Implementasi
 
-Seluruh fitur di bawah ini **telah diimplementasikan dan dapat diuji secara langsung** pada prototipe aplikasi:
+Seluruh fitur di bawah ini **telah diimplementasikan penuh dan dapat diuji secara langsung** pada prototipe aplikasi:
 
 | Modul / Fitur | Deskripsi Fungsionalitas | Status | Penanggung Jawab |
 |---|---|:---:|---|
-| **Barrier Map (Peta Hambatan)** | Peta interaktif Leaflet menampilkan sebaran rintangan trotoar di Surabaya, lengkap dengan filter status, kategori, dan tingkat keparahan (*severity*). |  **Berjalan Penuh** | Caca & Erlinda |
-| **Accessible Route Comparison** | Menghitung dan membandingkan **Rute A (Standar)** vs **Rute B (Leluasa)** dari titik awal ke tujuan, menyajikan skor keselamatan (Safety Score 0–100), jarak, durasi, dan rincian belokan. |  **Berjalan Penuh** | Kaka |
-| **Dynamic Obstacle Avoidance** | Menghitung zona poligon pembatas (*avoid_polygons* ~25m) di sekitar titik rintangan aktif sehingga rute kursi roda otomatis memutar mencari rampa aman. |  **Berjalan Penuh** | Kaka |
-| **Community Obstacle Reporting** | Formulir pelaporan rintangan oleh warga: unggah foto dari kamera/galeri, penentuan koordinat GPS, input lebar celah, dan deskripsi lokasi. |  **Berjalan Penuh** | Erlinda & Caca |
-| **AI Vision Detector (Hybrid)** | Analisis foto rintangan otomatis: inferensi fisik instan via **YOLOv8** lokal dan audit kontekstual trotoar via **Google Gemini 1.5 Flash** (bounding box, clearance, severity). |  **Berjalan Penuh** | Dimas |
-| **Verifikasi Komunitas (Upvote)** | Pengguna lain dapat mengonfirmasi keberadaan rintangan (*"Masih Ada"* vs *"Sudah Diperbaiki"*). Otomatis mengubah status laporan menjadi *Resolved* jika diverifikasi tuntas. |  **Berjalan Penuh** | Erlinda |
-| **Weather & Traction Intelligence** | Analisis kondisi cuaca Surabaya real-time via **Open-Meteo API**: menghitung risiko licin pada ubin pemandu (*traction friction index*) dan peringatan slip saat hujan. |  **Berjalan Penuh** | Dimas & Erlinda |
-| **Voice Navigation Assistant** | Asisten navigasi suara: perintah suara untuk memulai navigasi, pengecekan rute, dan *voice feedback* dalam Bahasa Indonesia via Web Speech API. |  **Berjalan Penuh** | Dimas & Caca |
-| **Geocoding & Reverse Geocoding** | Pencarian nama tempat/alamat dan snapping koordinat trotoar Surabaya menggunakan ekosistem **Photon Komoot** dan **OSM Nominatim**. |  **Berjalan Penuh** | Kaka |
-| **Disposisi Laporan DPUPR** | Fitur rekap dan penandaan laporan rintangan infrastruktur untuk diteruskan ke Dinas Pekerjaan Umum dan Penataan Ruang. |  **Berjalan Penuh** | Erlinda |
+| **Barrier Map (Peta Hambatan Navigasi)** | Peta interaktif Leaflet menampilkan sebaran rintangan trotoar Surabaya secara real-time, filter keparahan (*impassable*, *difficult*, *caution*), dan drawer inspeksi detail. | **Berjalan Penuh** | Caca & Erlinda |
+| **Accessible Route Comparison** | Komparasi berdampingan **Rute A (Standar)** vs **Rute B (Leluasa)** dari titik awal ke destinasi, jarak, durasi, dan daftar instruksi belokan. | **Berjalan Penuh** | Kaka |
+| **Turn-by-Turn HUD & Peringatan 10m** | Mode panduan navigasi aktif dengan kartu HUD arah belokan, sintesis suara panduan jalan, dan modal peringatan rintangan otomatis + getaran haptik zona 10 meter. | **Berjalan Penuh** | Caca & Kaka |
+| **Dynamic Obstacle Avoidance** | Algoritma pembentukan zona poligon pembatas spasial (*avoid_polygons* buffer ~25 meter) di sekeliling titik rintangan aktif sehingga graf rute kursi roda otomatis memutar mencari rampa aman. | **Berjalan Penuh** | Kaka |
+| **Community Obstacle Reporting** | Formulir pelaporan ramah warga dengan 2 mode pilihan: *Sedang di Lokasi* (auto-GPS) dan *Tidak di Lokasi* (pencarian alamat/pin peta), unggah foto kamera/galeri, dan estimasi celah. | **Berjalan Penuh** | Erlinda & Caca |
+| **AI Vision Detector (Hybrid YOLO + Gemini)** | Analisis foto trotoar ganda: inferensi bounding box fisik instan via **YOLOv8** lokal (< 150 ms) dan audit kontekstual trotoar via **Google Gemini 1.5 Flash** (clearance cm & advisory). | **Berjalan Penuh** | Dimas |
+| **Asisten Suara "LUMI" (Wake Word & NLU)** | Asisten suara hands-free dengan deteksi kata pemicu latar belakang **"Hai LUMI"**, Web Audio chime, shortcut `'V'`, ekstraksi niat NLU (4 intent), dan navigasi otomatis antartab. | **Berjalan Penuh** | Dimas & Caca |
+| **Weather & Traction Intelligence** | Analisis kondisi cuaca Surabaya real-time via **Open-Meteo API**: menghitung indeks gesek ubin (*traction friction*), batas kecepatan ban kursi roda, dan penyesuaian waktu hujan (+mnt). | **Berjalan Penuh** | Dimas & Erlinda |
+| **Gamifikasi & Reward Tiket Bus Warga** | Saldo poin kontributor warga, badge tingkat keterlibatan (*Level 4 Kontributor Emas*), dan katalog penukaran tiket **Feeder WiraWiri** (100 poin) & **Suroboyo Bus All-Day** (150 poin). | **Berjalan Penuh** | Caca & Erlinda |
+| **Portal Riwayat Komunitas & DPUPR** | Rekap status disposisi perbaikan trotoar dengan showcase komparasi foto *Sebelum vs Sesudah* (*Before & After*) pengerjaan teknis oleh DPUPR Kota Surabaya. | **Berjalan Penuh** | Erlinda & Caca |
+| **Verifikasi Komunitas (Crowd-Upvote)** | Pengguna lain dapat mengonfirmasi kondisi rintangan (*"Masih Ada"* vs *"Sudah Diperbaiki"*). Status laporan otomatis bertransisi menjadi *Resolved* jika telah terverifikasi. | **Berjalan Penuh** | Erlinda |
+| **Geocoding & Reverse Geocoding** | Pencarian nama tempat/alamat dan snapping koordinat trotoar menggunakan ekosistem **Photon Komoot** dan **OSM Nominatim** dengan opsi putar balik rute (*Swap Direction* ⇅). | **Berjalan Penuh** | Kaka |
+
+### Struktur 7 Menu Navigasi Utama Aplikasi
+Aplikasi LELUASA memiliki arsitektur navigasi yang bersih dan konsisten yang dapat diakses melalui bilah navigasi atas (*Header*) maupun laci navigasi samping (*Sidebar*):
+1. **Dashboard (`home`):** Pusat kendali rute cepat, pencarian multi-stop, visualisasi kartografi taktil Surabaya, telemetri cuaca mikro, dan ringkasan status perjalanan aktif.
+2. **Peta Navigasi (`explore-map`):** Peta interaktif Leaflet layar penuh untuk menjelajahi sebaran rintangan trotoar, melihat foto bukti lapangan, serta melakukan upvote verifikasi warga.
+3. **Rute & Perbandingan (`plan-route`):** Kalkulator komparasi rute pejalan kaki standar vs rute kursi roda ramah aksesibilitas, visualisasi 2 garis rute (merah vs hijau-cyan), estimasi cuaca, dan tombol aktivasi panduan navigasi langkah demi langkah.
+4. **Lapor Hambatan (`report-obstacle`):** Formulir partisipasi publik untuk melaporkan rintangan trotoar dengan pemindaian AI Vision instan, opsi GPS otomatis atau pin manual, dan reward poin kontributor.
+5. **Riwayat Komunitas (`reports-impact`):** Portal transparansi sipil yang menampilkan linimasa laporan warga, statistik penanganan trotoar, dan galeri perbaikan infrastruktur oleh DPUPR Surabaya (foto Sebelum vs Sesudah).
+6. **Intelijen Cuaca (`weather-intelligence`):** Pusat telemetri cuaca cerdas Surabaya berbasis Open-Meteo, mencakup indeks kelicinan ubin pemandu, risiko selip ban, batas kecepatan aman berkendara, dan rekomendasi jalur alternatif beratap.
+7. **Profil & Reward Warga (`profile`):** Halaman profil kontributor sipil, pelacakan saldo poin reward, status lencana pahlawan trotoar, dan katalog voucher tiket transportasi umum ramah disabilitas (WiraWiri Suroboyo & Suroboyo Bus).
 
 ---
 
@@ -226,9 +241,34 @@ flowchart TD
 
 #### 3. Alur Intelijen Cuaca & Traksi Ubin (*Weather & Traction Flow*)
 1. Modul cuaca mengambil data presipitasi curah hujan, suhu, dan kelembapan saat ini di Surabaya dari **Open-Meteo API**.
-2. Modul `traction_service.py` menghitung koefisien gesek ubin pemandu (*guiding tiles friction index*).
-3. Jika terdeteksi curah hujan > 1 mm atau kode cuaca gerimis/hujan, sistem menampilkan kartu peringatan:
-   > **Peringatan:** *"Ubin pemandu licin akibat hujan. Koefisien gesek turun ke level Waspada (45/100). Harap kurangi kecepatan kursi roda elektrik."*
+2. Modul `traction_service.py` menghitung koefisien gesek ubin pemandu (*guiding tiles friction index*) berdasarkan material trotoar (keramik, paving, beton, aspal).
+3. Jika terdeteksi curah hujan > 1 mm atau kelembapan tinggi, sistem mengalkulasi *rain safety buffer* (+2 hingga +5 menit) pada rute dan menyajikan peringatan batas kecepatan aman:
+   > **Peringatan:** *"Ubin pemandu licin akibat hujan. Koefisien gesek turun ke level Waspada (45/100). Harap kurangi kecepatan kursi roda elektrik ke maks 4 km/jam."*
+
+#### 4. Alur Asisten Suara Interaktif "LUMI" (*Voice Assistant & NLU Flow*)
+1. Pengguna memanggil asisten dengan *wake word* latar belakang **"Hai LUMI"** / **"Halo LUMI"**, menekan shortcut keyboard `'V'`, atau mengeklik ikon mikrofon.
+2. Web Speech API mengonversi ucapan suara menjadi teks Bahasa Indonesia.
+3. Teks dikirim ke endpoint `POST /api/v1/voice-assistant/chat` di microservice AI:
+   * **Google Gemini 1.5 Flash** (didukung fallback regex) memetakan teks ke salah satu dari 5 *intent*: `NAVIGATE_TO`, `REPORT_OBSTACLE`, `CHECK_WEATHER`, `TOGGLE_ACCESSIBILITY`, atau `GENERAL_CHAT`.
+   * Sistem mengekstrak entitas tujuan (misal: *"RSUD Dr. Soetomo"*) dan menghasilkan balasan verbal yang ringkas, empatik, dan solutif.
+4. Frontend mengeksekusi instruksi: otomatis berpindah ke tab tujuan (`suggested_tab`), memicu pencarian rute, dan membacakan balasan suara menggunakan *SpeechSynthesis*.
+
+#### 5. Alur Panduan Navigasi Belokan Demi Belokan & Alarm Zona 10m (*Active Navigation & Haptic HUD Flow*)
+1. Dari halaman perbandingan rute, pengguna menekan tombol **"Mulai Panduan Navigasi"**.
+2. Antarmuka bertransisi ke mode navigasi aktif: menampilkan kartu HUD arah belokan (*turn instruction*), panah navigasi besar, jarak belokan berikutnya, dan pembacaan suara langkah perjalanan (*Audio Wayfinding*).
+3. Posisi GPS dipantau terhadap koordinat titik rintangan aktif di sepanjang rute perjalanan.
+4. Ketika jarak pengguna mendekati **<= 10 meter** dari rintangan trotoar berstatus *impassable* atau *difficult*, sistem otomatis memicu:
+   * **Banner / Modal Peringatan Bahaya:** Menampilkan jenis rintangan dan jarak sisa.
+   * **Peringatan Suara LUMI:** *"Perhatian! 10 meter di depan terdapat rintangan trotoar. Harap melambat atau bersiap memutar."*
+   * **Getaran Haptik Perangkat:** Pola getaran taktil (*Web Vibration API pattern: `[200, 100, 200, 100, 300]`*) untuk memperingatkan pengguna tunarungu atau kondisi jalan bising.
+
+#### 6. Alur Gamifikasi & Insentif Tiket Warga (*Civic Rewards & DPUPR Flow*)
+1. Setiap laporan rintangan trotoar yang dikirimkan warga otomatis memberikan **+100 Poin Kontribusi**, dan setiap konfirmasi verifikasi komunitas memberikan **+25 Poin**.
+2. Poin terakumulasi secara real-time pada profil warga dengan tingkatan kontributor (*Level 4 Kontributor Emas — Pahlawan Trotoar Surabaya*).
+3. Warga dapat menukarkan saldo poin dengan voucher tiket transportasi umum Kota Surabaya yang terverifikasi ramah kursi roda:
+   * **Tiket Feeder WiraWiri Suroboyo (100 Poin):** Armada *low-floor* dengan rampa aksesibel kursi roda.
+   * **Tiket Suroboyo Bus All-Day Pass (150 Poin):** Tiket terusan 1 hari penuh ramah disabilitas.
+4. Seluruh laporan warga diagregasikan ke modul disposisi DPUPR dan disajikan secara transparan di tab **Riwayat Komunitas** lengkap dengan komparasi foto Sebelum vs Sesudah perbaikan fisik.
 
 ---
 
@@ -361,21 +401,59 @@ Seluruh konfigurasi kredensial disimpan melalui environment variable. File `.env
 
 ## 9. Dokumentasi Penggunaan Kecerdasan Buatan (AI)
 
-Sesuai ketentuan integritas dan etika lomba **LOGICODIX 2026**, berikut adalah rincian transparan mengenai pemanfaatan AI pada proyek LELUASA:
+Sesuai ketentuan integritas, transparansi ilmiah, dan etika kompetisi **LOGICODIX 2026**, berikut adalah rincian transparan mengenai pemanfaatan Kecerdasan Buatan (*Artificial Intelligence*) pada sistem LELUASA:
 
-| Fitur Aplikasi | Model / Layanan AI | Jenis & Bobot Model | Fungsi Utama & Cara Kerja |
+### Matriks Pemanfaatan Model & Layanan AI
+
+| Modul / Fitur Aplikasi | Model / Layanan AI | Jenis & Bobot Model | Fungsi Utama, Masukan (Input), & Keluaran (Output) |
 |---|---|---|---|
-| **Deteksi Objek Fisik Rintangan** | **Ultralytics YOLOv8** | Model lokal (`yolov8n.pt` ~6.2 MB) | Menemukan posisi koordinat bounding box rintangan trotoar (bollard, galian, undakan, kendaraan parkir, lubang jalan) secara lokal berlatensi rendah (< 150 ms). |
-| **Audit Multimodal Trotoar** | **Google Gemini 1.5 Flash** | Cloud Multimodal Vision LLM | Menganalisis konteks keseluruhan trotoar dari foto, memperkirakan sisa lebar trotoar yang bisa dilalui (*clearance cm*), dan memberikan advis keselamatan berstandar Permen PUPR 14/2017. |
-| **Asisten Navigasi Suara** | **NLU Rule-based + Gemini** | Pemrosesan Bahasa Alami | Mengekstrak niat pengguna (*intent parsing*) dari input suara (misal: *"Cari rute aman ke RSUD Soetomo"*, *"Ada galian di depan"*), dan menghasilkan respon suara sintetis ramah difabel. |
-| **Evaluasi Keamanan Rute** | **Accessibility Cost Engine** | Multi-criteria Scoring Model | Menghitung penalti kelandaian rampa trotoar dan rintangan aktif untuk menentukan *Safety Score* (0–100) dan label kelayakan rute kursi roda. |
-| **Prediksi Friksi Ubin Cuaca** | **Weather Traction Analyzer** | Heuristic Physics Formulation | Menghubungkan curah hujan real-time dengan koefisien gesek permukaan ubin (*pavement friction coefficient*) untuk mencegah roda kursi roda tergelincir (*anti-slip advisory*). |
-| **Asisten Penulisan Kode** | **AI Coding Assistants** | LLM Code Generation | Digunakan selama masa *Hacking Week* untuk mempercepat pembuatan boilerplate, validasi skema, dan refactoring. **Seluruh logika, rancangan arsitektur, dan integrasi ditinjau, diuji, dan dipertanggungjawabkan secara mandiri oleh tim pengembang.** |
+| **Deteksi Fisik Rintangan Trotoar** | **Ultralytics YOLOv8** | Model lokal (`yolov8n.pt` ~6.2 MB) | **Input:** Gambar trotoar (Base64/JPEG).<br>**Fungsi:** Menemukan koordinat bounding box objek fisik penghambat (bollard, galian, undakan, kendaraan parkir liar, lubang jalan) secara lokal berlatensi sangat rendah (< 150 ms).<br>**Output:** Bounding box normalisasi `[x_min, y_min, x_max, y_max]`, confidence score, dan kelas deteksi. |
+| **Audit Multimodal Trotoar & Clearance** | **Google Gemini 1.5 Flash** | Cloud Multimodal Vision LLM | **Input:** Foto trotoar + Prompt audit standar Permen PUPR 14/2017.<br>**Fungsi:** Menganalisis konteks keseluruhan trotoar, mengestimasi sisa lebar lajur yang bisa dilalui kursi roda (*clearance width in cm*), menentukan tingkat keparahan (*impassable / difficult / caution*), dan memberikan advis keselamatan.<br>**Output:** JSON terstruktur berisi ringkasan audit, sisa celah cm, dan rekomendasi navigasi. |
+| **Asisten Suara Interaktif "LUMI"** | **Gemini 1.5 Flash + NLU Rule Engine** | Pemrosesan Bahasa Alami (*NLU*) | **Input:** Transkripsi teks suara pengguna Bahasa Indonesia santai/formal.<br>**Fungsi:** Mengklasifikasikan maksud (*intent parsing*) ke dalam 5 kategori (`NAVIGATE_TO`, `REPORT_OBSTACLE`, `CHECK_WEATHER`, `TOGGLE_ACCESSIBILITY`, `GENERAL_CHAT`), mengekstrak entitas tujuan, dan menghasilkan balasan verbal empatik yang ramah pembaca layar.<br>**Output:** JSON intent, nama destinasi, suggested tab frontend, dan teks suara balasan. |
+| **Prediksi Friksi Ubin & Licin Cuaca** | **Weather Traction Analyzer** | Heuristic Physics Formulation | **Input:** Data presipitasi curah hujan (mm), kode cuaca WMO, kelembapan, dan jenis permukaan ubin dari Open-Meteo API.<br>**Fungsi:** Menghitung koefisien gesek dinamis ubin (*pavement friction coefficient*), risiko slip ban kursi roda, batas kecepatan aman (km/jam), dan penyesuaian waktu hujan (*rain buffer minutes*).<br>**Output:** Skor traksi 0–100, level risiko (*critical/high/safe*), dan advis berkendara. |
+| **Evaluasi Keamanan Rute Spasial** | **Accessibility Cost Engine** | Multi-Criteria Scoring Model | **Input:** Geometri rute OpenRouteService + daftar rintangan aktif di koridor perjalanan.<br>**Fungsi:** Mengalkulasi penalti rintangan dan kelandaian rampa trotoar untuk menentukan *Safety Score* (0–100) dan label kelayakan aksesibilitas rute sesuai Permen PUPR No. 14/2017.<br>**Output:** Safety Score 0–100, label kelayakan (*Sangat Aksesibel* vs *Tinggi Risiko*), dan rasionalisasi teknis. |
+| **Asisten Penulisan Kode Pengembangan** | **AI Coding Assistants** | LLM Code Generation | Digunakan selama masa *Hacking Week* untuk akselerasi boilerplate skema Pydantic, refactoring CSS responsive, dan penulisan dokumentasi teknis. **Seluruh logika bisnis, algoritma routing, dan integrasi diuji serta dipertanggungjawabkan 100% oleh tim pengembang.** |
 
-### Transparansi, Koreksi Pengguna, dan Batasan AI
-1. **Bukan Keputusan Mutlak (*Human-in-the-Loop*):** Hasil deteksi AI (bounding box, nama rintangan, dan tingkat keparahan) disajikan ke pengguna sebagai rekomendasi awal. Pengguna yang melapor memiliki kendali penuh untuk mengedit jenis rintangan, menggeser titik lokasi GPS, atau mengoreksi estimasi lebar celah sebelum laporan dikirim.
-2. **Skor Kepercayaan (*Confidence Score*):** Setiap inferensi AI menyertakan persentase kepercayaan (misal: *Bollard Sempit — 94% Confidence*).
-3. **Mekanisme Fallback Tanpa AI:** Apabila jaringan internet terputus atau kuota API Gemini habis, sistem secara otomatis beralih ke deteksi model lokal YOLOv8 dan algoritma penalti deterministik offline sehingga fungsi utama navigasi **tidak pernah berhenti berfungsi**.
+---
+
+### Spesifikasi Microservice AI (`ai-service/` FastAPI :8000)
+
+Layanan kecerdasan buatan diisolasi dalam microservice mandiri berbasis Python FastAPI yang menyajikan 4 endpoint REST API:
+
+1. **`POST /api/v1/vision/detect` — Deteksi Rintangan Hybrid:**
+   * Menerima payload foto trotoar (Base64 string).
+   * Menjalankan inferensi YOLOv8 lokal terlebih dahulu untuk kecepatan.
+   * Bila API key Gemini terkonfigurasi, sistem memanggil Gemini 1.5 Flash untuk memperkaya deteksi dengan estimasi lebar celah (*clearance cm*) dan rekomendasi audit.
+   * Mengembalikan respons terpadu dengan latensi rata-rata 120–800 ms.
+
+2. **`POST /api/v1/voice-assistant/chat` — Pemrosesan Bahasa Alami (NLU) LUMI:**
+   * Menerima transkripsi teks suara pengguna (contoh: *"LUMI, carikan rute aman ke RSUD Dr Soetomo"*).
+   * Mengekstrak 5 intent utama:
+     - `NAVIGATE_TO`: Mencari rute perjalanan ke destinasi tertentu → otomatis mengarahkan ke tab `plan-route`.
+     - `REPORT_OBSTACLE`: Melaporkan jalan rusak atau rintangan → otomatis mengarahkan ke tab `report-obstacle`.
+     - `CHECK_WEATHER`: Mengecek kelicinan trotoar dan kondisi hujan → otomatis mengarahkan ke tab `weather-intelligence`.
+     - `TOGGLE_ACCESSIBILITY`: Menyesuaikan preferensi kontras atau ukuran sentuh.
+     - `GENERAL_CHAT`: Tanya jawab panduan mobilitas ramah disabilitas.
+   * Mengembalikan teks balasan lisan yang ringkas (maksimal 2–3 kalimat) yang langsung disuarakan melalui Web Speech API.
+
+3. **`POST /api/v1/weather-intelligence/analyze` — Analisis Traksi & Kelicinan:**
+   * Menerima telemetri cuaca dan jenis material trotoar (`ceramic_tile`, `pavers`, `concrete`, `asphalt`).
+   * Menghitung koefisien gesek: ubin keramik basah terdiskon hingga -0.35 saat curah hujan > 4 mm.
+   * Menghasilkan batas kecepatan aman kursi roda elektrik (misal: 2.5 km/jam saat kondisi kritis).
+
+4. **`POST /api/v1/route-recommendation/evaluate` — Evaluasi Rute Sesuai Standar PUPR:**
+   * Menerima kandidat rute pejalan kaki beserta koordinat rintangan aktif di sekitarnya.
+   * Menghitung penalti: setiap rintangan berkategori *impassable* memberi penalti -50 poin dan memicu label *Tinggi Risiko*.
+
+---
+
+### Transparansi, Koreksi Pengguna, dan Prinsip Human-in-the-Loop
+
+1. **Bukan Keputusan Mutlak (*Human-in-the-Loop*):** Seluruh hasil deteksi AI (koordinat bounding box, nama rintangan, estimasi celah trotoar, dan tingkat keparahan) disajikan kepada pelapor sebagai *rekomendasi awal*. Pengguna memiliki hak dan kendali penuh untuk mengoreksi jenis rintangan, menggeser titik pin lokasi GPS, atau mengubah angka lebar celah sebelum laporan dikirim ke basis data publik.
+2. **Skor Kepercayaan (*Confidence Score*):** Setiap inferensi AI menyertakan persentase kepercayaan yang dapat diverifikasi (misal: *Bollard Terlalu Rapat — 95% Confidence*).
+3. **Mekanisme Fallback Multi-Tingkat (*Graceful Degradation*):** 
+   * Jika sambungan internet terputus atau kuota token Gemini habis, sistem secara otomatis beralih ke deteksi model lokal YOLOv8 dan engine NLU berbasis pola ekspresi reguler (*regex*).
+   * Jika microservice AI mati, backend Express dan frontend Vite memiliki dataset simulasi offline (`foot.json`, `wheelchair.json`, `wheelchair-avoid.json`) sehingga fitur navigasi inti **tidak pernah berhenti berfungsi**.
 
 ---
 
@@ -442,9 +520,20 @@ logicodix_leluasa/
 │   └── src/
 │       ├── App.jsx                            # Layout utama & pengatur navigasi tab
 │       ├── main.jsx                           # React DOM root entry point
-│       ├── components/                        # Reusable UI: Header, Sidebar, Nav, Modal Aksesibilitas
-│       ├── pages/                             # Halaman: Dashboard, ExploreMap, PlanRoute, ReportObstacle, dll.
-│       ├── features/                          # Fitur modular: ai/, dashboard/, routing/
+│       ├── components/                        # Header, Sidebar, MobileBottomNav, AccessibilityModal, VoiceAssistantModal
+│       ├── pages/                             # 7 Halaman Utama Aplikasi:
+│       │   ├── Dashboard.jsx                  # Hub Kontrol Rute, Multi-stop & Live Geocoding
+│       │   ├── ExploreMap.jsx                 # Peta Navigasi, Sebaran Rintangan & Drawer Detail
+│       │   ├── PlanRoute.jsx                  # Komparasi Rute A vs B, Safety Score & Turn-by-Turn HUD
+│       │   ├── ReportObstacle.jsx             # Formulir Pelaporan Warga + AI Vision Hybrid
+│       │   ├── ReportsImpact.jsx              # Riwayat Komunitas & Transparansi Perbaikan DPUPR
+│       │   ├── WeatherIntelligence.jsx        # Telemetri Cuaca, Traksi Ubin & Batas Kecepatan
+│       │   └── Profile.jsx                    # Profil Kontributor, Poin Reward & Tiket Bus Kota
+│       ├── features/                          # Modul Fitur Modular:
+│       │   ├── ai/                            # Jembatan inferensi AI Vision & NLU
+│       │   ├── dashboard/                     # useWakeWord ("Hai LUMI") & haptik
+│       │   ├── rewards/                       # rewardService (Poin & Katalog Tiket Bus)
+│       │   └── routing/                       # costEngine (Kalkulasi Skor Standar PUPR)
 │       └── services/api.js                    # Client HTTP REST API service
 │
 ├── server/                                    # BACKEND API GATEWAY (Node.js / Express :5000)

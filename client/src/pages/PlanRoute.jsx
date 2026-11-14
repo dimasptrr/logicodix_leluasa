@@ -1692,11 +1692,6 @@ export default function PlanRoute({ setActiveTab, onNavigatingChange }) {
               <span>Mulai Panduan Navigasi</span>
               <span className="material-symbols-outlined text-2xl">arrow_forward</span>
             </button>
-
-            <div className="bg-error/10 border border-error/30 rounded-xl px-3 py-2 flex items-center gap-2 text-xs text-error font-medium">
-              <span className="material-symbols-outlined text-base shrink-0 font-bold">lightbulb</span>
-              <span><strong>Tips Demo Hackathon:</strong> Klik tombol di atas, lalu tekan tombol merah <strong>[⚠️ Uji Demo 10m]</strong> di dalam layar peta untuk menampilkan peringatan suara LUMI + getaran zona 10 meter.</span>
-            </div>
           </div>
         </div>
       </div>
